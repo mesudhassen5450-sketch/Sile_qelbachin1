@@ -1,0 +1,62 @@
+{
+  "nav": {
+    "home": "መነሻ",
+    "kitab": "ኪታብ",
+    "audioLecture": "የቀጥታ ድምፅ ትምህርት",
+    "subpages": "ትምህርታዊ ክፍሎች",
+    "contact": "ግንኙነት",
+    "reminders": "ማስታወሻዎች",
+    "knowledge": "ዕውቀት",
+    "sahabah": "የሶሓቦች ታሪክ",
+    "muhadara": "ሙሓደራዎች",
+    "videos": "ቪዲዮዎች"
+  },
+  "hero": {
+    "badge": "የእስልምና ትምህርታዊ ቻናል",
+    "hadithText": "«በሰውነት ውስጥ አንዲት ቁራጭ ስጋ አለች፤ እሷ ከተስተካከለች መላው ሰውነት ይስተካከላል፤ እሷ ከተበላሸች መላው ሰውነት ይበላሻል። እሷም ቀልብ (ልብ) ነች።»",
+    "hadithSource": "📚 ቡኻሪና ሙስሊም",
+    "btnKitab": "የኪታብ ድርሶች (Kitab)",
+    "btnMuhadara": "ሙሓደራዎች (Lectures)",
+    "btnTelegram": "Telegram ቻናል ይቀላቀሉ"
+  },
+  "purpose": {
+    "title": "የቻናሉ ዋነኛ ዓላማ",
+    "p1": "በዚህ የፈተናና የቴክኖሎጂ ዘመን የቀልብ መድረቅና የኢማን መድከም የብዙዎቻችን የጋራ ፈተና ሆኗል። የዚህ ቻናል ዋነኛ ዓላማም አላህ ባገራልን ቴክኖሎጂ በመጠቀም፣ ከቁርኣንና ከሐዲሥ ቀልባችንን የምናክምበትን ጥበብ በጋራ መፈለግና ለወጣቱ ትውልድ ደግሞ በራሱ ቋንቋ የሕይወት መፍትሔዎችን ማመላከት ነው።",
+    "p2": "አላህ እርስ በርስ በመልካም የምንመካከርበት፣ የቀልባችንን ድርቀት በጋራ የምናክምበትና እጅ ለእጅ ተያይዘን ወደ እርሱ የምንጓዝበት መድረክ ያድርግልን።"
+  },
+  "sections": {
+    "featuredKitab": "የተመረጡ ኪታቦች",
+    "viewAllKitabs": "ሁሉንም ኪታቦች ይመልከቱ",
+    "latestDers": "የቅርብ ጊዜ ትምህርቶች",
+    "randomMuhadara": "የዕለቱ የሙሓደራ ምርጫ",
+    "listenAnother": "ሌላ ሙሓደራ ቀይር",
+    "spotlight": "Qur'an & Hadith Spotlight",
+    "viewKnowledge": "ወደ እስላማዊ እውቀቶች",
+    "viewReminders": "ተጨማሪ ማስታወሻዎችን ያንብቡ",
+    "readSahabah": "ታሪካቸውንና ትምህርቱን ያንብቡ"
+  },
+  "buttons": {
+    "play": "አዳምጥ",
+    "pause": "አቁም",
+    "openKitab": "ኪታቡን ክፈት",
+    "sendMessage": "መልእክት ላክ",
+    "joiningTelegram": "Telegram ይቀላቀሉ"
+  },
+  "contact": {
+    "title": "ግንኙነትና አድራሻዎች",
+    "verifiedSocials": "የተረጋገጡ አድራሻዎች",
+    "sendMessageTitle": "መልእክት ወይም ጥያቄ ይላኩ",
+    "yourName": "ስምዎ",
+    "yourContact": "የመገናኛ አድራሻዎ (ቴሌግራም/ስልክ/ኢሜይል)",
+    "yourMessage": "መልእክትዎ",
+    "successMessage": "መልእክትዎ በተሳካ ሁኔታ ደርሶናል!"
+  },
+  "audioLecture": {
+    "liveNow": "አሁን በቀጥታ በመተላለፍ ላይ",
+    "noLiveStream": "በአሁኑ ሰዓት የቀጥታ ስርጭት የለም",
+    "noLiveSubtext": "በTelegram ቻናላችን የቀጥታ ትምህርት ሲጀምር እዚህ ያዳምጣሉ።",
+    "upcoming": "የሚመጡ የቀጥታ መርሃ-ግብሮች",
+    "previous": "ያለፉ የቀጥታ ስርጭት የተቀረፁ ትምህርቶች"
+  },
+  "rightsReserved": "መብቱ በህግ የተጠበቀ ነው።"
+}

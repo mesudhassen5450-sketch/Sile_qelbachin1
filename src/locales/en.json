@@ -1,0 +1,62 @@
+{
+  "nav": {
+    "home": "Home",
+    "kitab": "Kitab",
+    "audioLecture": "Online Audio Lecture",
+    "subpages": "Educational Sections",
+    "contact": "Contact",
+    "reminders": "Reminders",
+    "knowledge": "Qur'an & Hadith",
+    "sahabah": "Sahabah Stories",
+    "muhadara": "Lectures",
+    "videos": "Videos"
+  },
+  "hero": {
+    "badge": "Islamic Educational Channel",
+    "hadithText": "“Verily, in the body there is a piece of flesh of which if it is sound, the whole body is sound, and if it is corrupt, the whole body is corrupt. Truly, it is the heart.”",
+    "hadithSource": "📚 Sahih al-Bukhari & Sahih Muslim",
+    "btnKitab": "Kitab Lessons",
+    "btnMuhadara": "General Lectures",
+    "btnTelegram": "Join Telegram Channel"
+  },
+  "purpose": {
+    "title": "Main Goal of the Channel",
+    "p1": "In this era of trials and technology, spiritual dryness and weakening faith affect many of us. The primary objective of this channel is to utilize modern technology to seek wisdom from the Qur'an and Hadith to purify our hearts and offer youth life solutions in their native tongue.",
+    "p2": "May Allah make this a platform where we advise each other in goodness, cure spiritual hardness together, and walk hand-in-hand towards His pleasure."
+  },
+  "sections": {
+    "featuredKitab": "Featured Kitabs",
+    "viewAllKitabs": "View All Kitabs",
+    "latestDers": "Latest Audio Lessons",
+    "randomMuhadara": "Selected Lecture of the Day",
+    "listenAnother": "Pick Another Lecture",
+    "spotlight": "Qur'an & Hadith Spotlight",
+    "viewKnowledge": "Explore Islamic Knowledge",
+    "viewReminders": "Read More Reminders",
+    "readSahabah": "Read Biography & Lessons"
+  },
+  "buttons": {
+    "play": "Play",
+    "pause": "Pause",
+    "openKitab": "Open Kitab",
+    "sendMessage": "Send Message",
+    "joiningTelegram": "Join Telegram"
+  },
+  "contact": {
+    "title": "Contact & Official Handles",
+    "verifiedSocials": "Verified Channels",
+    "sendMessageTitle": "Send Us a Message",
+    "yourName": "Your Name",
+    "yourContact": "Contact Info (Telegram / Phone / Email)",
+    "yourMessage": "Your Message",
+    "successMessage": "Your message has been sent successfully!"
+  },
+  "audioLecture": {
+    "liveNow": "Live Broadcast Now",
+    "noLiveStream": "No Live Stream Currently Active",
+    "noLiveSubtext": "When live broadcasts start on our Telegram channel, you can listen directly here.",
+    "upcoming": "Upcoming Live Lectures",
+    "previous": "Recorded Audio Archives"
+  },
+  "rightsReserved": "All rights reserved."
+}
