@@ -42,7 +42,7 @@ next-env.d.ts
 *.so
 *.dylib 
 
-# Large media files (audio/video)
+# Large media files (audio/video) - Upload separately to Netlify or CDN
 /public/telegram_media/
 
 # Tencent Cloud EdgeOne
@@ -52,3 +52,5 @@ next-env.d.ts
 .tef_dist/*
 generated/
   
+# Local Netlify folder
+.netlify
