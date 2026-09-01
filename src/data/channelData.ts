@@ -95,8 +95,8 @@ export const siteMetadata = {
   telegramUrl: 'https://t.me/Sle_qelbachn1',
   tiktokHandle: '@sle_qelbachn1',
   tiktokUrl: 'https://www.tiktok.com/@sle_qelbachn1',
-  youtubeHandle: '@sle_qelbachn1', // TODO: Update with correct YouTube handle
-  youtubeUrl: 'https://www.youtube.com/@sle_qelbachn1', // TODO: Update with correct YouTube URL
+  youtubeHandle: '@sle_qelbachn1',
+  youtubeUrl: 'https://youtube.com/@sle_qelbachn1?si=jwFjYSDtGE-clwJn',
   heroHadithText: {
     am: '«በሰውነት ውስጥ አንዲት ቁራጭ ስጋ አለች፤ እሷ ከተስተካከለች መላው ሰውነት ይስተካከላል፤ እሷ ከተበላሸች መላው ሰውነት ይበላሻል። እሷም ቀልብ (ልብ) ነች።»',
     ar: '«أَلا وَإِنَّ فِي الْجَسَدِ مُضْغَةً إِذَا صَلَحَتْ صَلَحَ الْجَسَدُ كُلُّهُ، وَإِذَا فَسَدَتْ فَسَدَ الْجَسَدُ كُلُّهُ، أَلا وَهِيَ الْقَلْبُ.»',

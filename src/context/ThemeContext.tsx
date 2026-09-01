@@ -12,16 +12,14 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  // Initialize theme from localStorage or system preference
+  // Initialize theme from localStorage, default to light mode
   const getInitialTheme = (): Theme => {
     if (typeof window !== 'undefined') {
       const storedTheme = localStorage.getItem('theme') as Theme;
       if (storedTheme) {
         return storedTheme;
       }
-      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        return 'dark';
-      }
+      // Default to light mode instead of system preference
     }
     return 'light';
   };

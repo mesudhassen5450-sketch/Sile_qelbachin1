@@ -116,9 +116,9 @@ export default function KitabDetailClient({ kitab }: { kitab: Kitab }) {
                     </span>
                   )}
                 </div>
-                <h3 className="text-xl font-bold text-neutral-900 dark:text-white">
+                <h2 className="text-xl font-bold text-neutral-900 dark:text-white">
                   {displayTitle} — PDF
-                </h3>
+                </h2>
                 <p className="text-xs text-neutral-600 dark:text-neutral-300">
                   ትምህርቱን በፅሁፍ እየተከታተሉ ለማዳመጥ ፒዲኤፉን እዚህ ያንብቡ ወይም ያውርዱ።
                 </p>
@@ -236,6 +236,7 @@ export default function KitabDetailClient({ kitab }: { kitab: Kitab }) {
                           className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition ${
                             isPlayingThis ? 'bg-red-600 animate-pulse' : 'bg-neutral-200 dark:bg-neutral-700'
                           }`}
+                          aria-label={`${isPlayingThis ? 'Pause' : 'Play'} ${getLocalized(ders.title)}`}
                         >
                           {isPlayingThis ? (
                             <Pause className="w-4 h-4 fill-white text-white" />
@@ -326,7 +327,7 @@ export default function KitabDetailClient({ kitab }: { kitab: Kitab }) {
             <Headphones className="w-6 h-6 text-red-600" />
             <span>የተያያዙ የድምፅ ድርሶች (Audio Lessons Playlist)</span>
           </h2>
-          <span className="text-xs font-mono text-neutral-500 bg-neutral-100 dark:bg-neutral-800 px-3 py-1 rounded-full">
+          <span className="text-xs font-mono text-neutral-400 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-3 py-1 rounded-full">
             {kitab.dersList.length} Tracks
           </span>
         </div>
@@ -396,7 +397,7 @@ export default function KitabDetailClient({ kitab }: { kitab: Kitab }) {
                 </div>
 
                 <div className="flex items-center space-x-4 justify-between sm:justify-end">
-                  <span className="text-xs font-mono text-neutral-500 bg-neutral-100 dark:bg-neutral-800 px-3 py-1 rounded-md">
+                  <span className="text-xs font-mono text-neutral-400 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-3 py-1 rounded-md">
                     ⏱️ {ders.duration}
                   </span>
 
@@ -407,6 +408,7 @@ export default function KitabDetailClient({ kitab }: { kitab: Kitab }) {
                         ? 'bg-red-600 text-white'
                         : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-200'
                     }`}
+                    aria-label={`${isPlayingThis ? t('buttons.pause') : t('buttons.play')} ${getLocalized(ders.title)}`}
                   >
                     {isPlayingThis ? t('buttons.pause') : t('buttons.play')}
                   </button>
@@ -416,6 +418,7 @@ export default function KitabDetailClient({ kitab }: { kitab: Kitab }) {
                     download
                     className="p-2 rounded-lg text-neutral-400 hover:text-red-600 transition"
                     title="Download Audio (.ogg/.mp3)"
+                    aria-label={`Download ${getLocalized(ders.title)}`}
                   >
                     <Download className="w-4 h-4" />
                   </a>

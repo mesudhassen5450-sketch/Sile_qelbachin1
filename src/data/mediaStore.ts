@@ -29,7 +29,9 @@ const safeEncodeSegment = (segment: string): string => {
   }
 };
 
-// Clean and normalize file paths with safe URL segment encoding for browser fetching
+// Clean and normalize file paths with CDN URL for jsDelivr
+const CDN_BASE = 'https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main';
+
 const items: MediaItem[] = (rawData as any[]).map((item) => {
   let cleanUrl = item.fileUrl || '';
 
@@ -37,19 +39,11 @@ const items: MediaItem[] = (rawData as any[]).map((item) => {
     // Strip leading dots or slashes
     cleanUrl = cleanUrl.replace(/^(\.\/|\/)/, '');
 
-    // Ensure it starts with telegram_media/
-    if (!cleanUrl.startsWith('telegram_media/')) {
-      cleanUrl = `telegram_media/${cleanUrl}`;
-    }
+    // Remove telegram_media/ prefix if exists
+    cleanUrl = cleanUrl.replace(/^telegram_media\//, '');
 
-    // Format full absolute URL for local public server
-    cleanUrl = `/${cleanUrl}`;
-
-    // Safely encode spaces and special characters for browser fetching
-    cleanUrl = cleanUrl
-      .split('/')
-      .map((segment: string) => safeEncodeSegment(segment))
-      .join('/');
+    // Build CDN URL
+    cleanUrl = `${CDN_BASE}/${cleanUrl}`;
   }
 
   return {

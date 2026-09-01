@@ -136,6 +136,7 @@ export default function AudioPlayerBar() {
               value={currentTime}
               onChange={(e) => seek(Number(e.target.value))}
               className="w-full h-1.5 bg-neutral-200 dark:bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-red-600 dark:accent-red-500"
+              aria-label="Seek audio position"
             />
             <span>{formatTime(duration)}</span>
           </div>
@@ -150,6 +151,7 @@ export default function AudioPlayerBar() {
               onClick={() => setShowSpeedMenu(!showSpeedMenu)}
               className="flex items-center space-x-1 px-2.5 py-1 text-xs font-medium rounded-md bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition"
               title="Playback Speed"
+              aria-label={`Playback speed: ${playbackRate}x`}
             >
               <Gauge className="w-3.5 h-3.5" />
               <span>{playbackRate}x</span>
@@ -182,6 +184,7 @@ export default function AudioPlayerBar() {
             <button
               onClick={handleMuteToggle}
               className="p-1 text-neutral-600 dark:text-neutral-300 hover:text-red-600 transition"
+              aria-label={isMuted ? 'Unmute' : 'Mute'}
             >
               {isMuted || volume === 0 ? (
                 <VolumeX className="w-4 h-4 text-red-500" />
@@ -200,6 +203,7 @@ export default function AudioPlayerBar() {
                 if (isMuted) setIsMuted(false);
               }}
               className="w-16 h-1.5 bg-neutral-200 dark:bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-red-600 dark:accent-red-500"
+              aria-label="Adjust volume"
             />
           </div>
 

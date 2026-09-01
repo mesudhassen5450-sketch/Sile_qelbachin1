@@ -179,7 +179,7 @@ CONTENT RULES:
 VERIFIED CONTACT INFO:
 - Telegram: @Sle_qelbachn1 (https://t.me/Sle_qelbachn1)
 - TikTok: @sle_qelbachn1 (https://www.tiktok.com/@sle_qelbachn1)
-- YouTube: @sle_qelbachn1 (https://www.youtube.com/@sle_qelbachn1)
+- YouTube: @sle_qelbachn1 (https://youtube.com/@sle_qelbachn1)
 
 Remember: ALWAYS provide a helpful response. Never say you cannot respond.`
       },

@@ -145,7 +145,7 @@ export default function MuhaderaPage() {
                     {group.monthYear}
                   </h2>
                 </div>
-                <span className="text-xs font-mono text-neutral-500 bg-neutral-200 dark:bg-neutral-800 px-3 py-1 rounded-full">
+                <span className="text-xs font-mono text-neutral-400 dark:text-neutral-400 bg-neutral-200 dark:bg-neutral-800 px-3 py-1 rounded-full">
                   {group.items.length} Audio Lessons
                 </span>
               </div>
@@ -261,7 +261,7 @@ function AudioTrackRow({
 
       <div className="flex items-center space-x-3 justify-between sm:justify-end">
         {audio.fileSize && (
-          <span className="text-2xs font-mono text-neutral-500 bg-neutral-100 dark:bg-neutral-800 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700">
+          <span className="text-2xs font-mono text-neutral-400 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700">
             📦 {audio.fileSize}
           </span>
         )}
@@ -273,6 +273,7 @@ function AudioTrackRow({
               ? 'bg-red-600 text-white'
               : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-200'
           }`}
+          aria-label={`${isPlayingThis ? t('buttons.pause') : t('buttons.play')} ${audio.title[language as 'am' | 'en' | 'ar']}`}
         >
           {isPlayingThis ? t('buttons.pause') : t('buttons.play')}
         </button>
@@ -282,6 +283,7 @@ function AudioTrackRow({
           download
           className="p-2.5 rounded-xl text-neutral-400 hover:text-red-600 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition"
           title="Download Audio (.ogg/.mp3)"
+          aria-label={`Download ${audio.title[language as 'am' | 'en' | 'ar']}`}
         >
           <Download className="w-4 h-4" />
         </a>

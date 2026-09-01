@@ -182,6 +182,7 @@ export default function AudioLecturePage() {
                     }
                   }}
                   className="px-4 py-2 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-xs font-bold text-neutral-800 dark:text-neutral-200 hover:bg-neutral-200"
+                  aria-label={`${isPlayingThis ? t('buttons.pause') : t('buttons.play')} ${getLocalized(lecture.title)}`}
                 >
                   {isPlayingThis ? t('buttons.pause') : t('buttons.play')}
                 </button>
@@ -252,6 +253,7 @@ export default function AudioLecturePage() {
                       }
                     }}
                     className="px-4 py-2 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-xs font-bold text-neutral-800 dark:text-neutral-200 hover:bg-neutral-200"
+                    aria-label={`${isPlayingThis ? t('buttons.pause') : t('buttons.play')} ${itemTitle}`}
                   >
                     {isPlayingThis ? t('buttons.pause') : t('buttons.play')}
                   </button>
