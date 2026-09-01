@@ -127,13 +127,12 @@ export default function HomePage() {
               <div className="absolute -inset-1 bg-gradient-to-r from-red-600 to-amber-600 rounded-3xl blur-xl opacity-30 group-hover:opacity-60 transition duration-500" />
               <div className="relative bg-neutral-900 border border-neutral-800 rounded-3xl overflow-hidden p-6 space-y-6 shadow-2xl">
                 
-                <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden border border-neutral-800">
+                <div className="relative w-full aspect-[2/1] rounded-2xl overflow-hidden border border-neutral-800">
                   <Image
                     src="/logo2hero.jpg"
                     alt={siteMetadata.channelName}
-                    width={800}
-                    height={600}
-                    className="w-full h-full object-contain bg-neutral-950 group-hover:scale-105 transition duration-500"
+                    fill
+                    className="object-cover scale-110 group-hover:scale-115 transition duration-500"
                     priority
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex items-end p-4">
