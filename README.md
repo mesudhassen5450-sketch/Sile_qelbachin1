@@ -208,7 +208,7 @@ The platform uses a modern JAMstack architecture with:
 
 <br>
 
-![Home Page Hero](screenshoot/Home%20logo1.png)
+![Home Page Hero](https://raw.githubusercontent.com/mesudhassen5450-sketch/Sile_qelbachin1/main/public/screenshoot/Home%20logo1.png)
 
 *The home page features a prominent hero section with easy navigation to all platform sections*
 
@@ -219,7 +219,7 @@ The platform uses a modern JAMstack architecture with:
 
 <br>
 
-![Kitab Library](screenshoot/Screenshot%202026-08-29%20074031.png)
+![Kitab Library](https://raw.githubusercontent.com/mesudhassen5450-sketch/Sile_qelbachin1/main/public/screenshoot/Screenshot%202026-08-29%20074031.png)
 
 *Browse the comprehensive collection of Islamic books with audio lectures*
 
@@ -230,7 +230,7 @@ The platform uses a modern JAMstack architecture with:
 
 <br>
 
-![Audio Player](screenshoot/Screenshot%202026-08-29%20074103.png)
+![Audio Player](https://raw.githubusercontent.com/mesudhassen5450-sketch/Sile_qelbachin1/main/public/screenshoot/Screenshot%202026-08-29%20074103.png)
 
 *Listen to Islamic lectures with our integrated audio player*
 
@@ -241,7 +241,7 @@ The platform uses a modern JAMstack architecture with:
 
 <br>
 
-![Muhadara](screenshoot/Screenshot%202026-08-29%20074127.png)
+![Muhadara](https://raw.githubusercontent.com/mesudhassen5450-sketch/Sile_qelbachin1/main/public/screenshoot/Screenshot%202026-08-29%20074127.png)
 
 *Access a wide collection of Islamic lectures and speeches*
 
@@ -252,7 +252,7 @@ The platform uses a modern JAMstack architecture with:
 
 <br>
 
-![AI Assistant](screenshoot/Screenshot%202026-08-29%20074157.png)
+![AI Assistant](https://raw.githubusercontent.com/mesudhassen5450-sketch/Sile_qelbachin1/main/public/screenshoot/Screenshot%202026-08-29%20074157.png)
 
 *Get intelligent help navigating the platform and finding content*
 
@@ -263,7 +263,7 @@ The platform uses a modern JAMstack architecture with:
 
 <br>
 
-![Mobile View](screenshoot/Screenshot%202026-08-29%20074244.png)
+![Mobile View](https://raw.githubusercontent.com/mesudhassen5450-sketch/Sile_qelbachin1/main/public/screenshoot/Screenshot%202026-08-29%20074244.png)
 
 *Fully responsive design optimized for mobile devices*
 
