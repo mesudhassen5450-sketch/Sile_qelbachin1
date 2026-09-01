@@ -42,8 +42,11 @@ next-env.d.ts
 *.so
 *.dylib 
 
-# Large media files (audio/video) - Upload separately to Netlify or CDN
-/public/telegram_media/
+# Large media files - Ignore entire telegram_media folder except home page audio
+/public/telegram_media/*
+!/public/telegram_media/files/
+/public/telegram_media/files/*
+!/public/telegram_media/files/home page audio/
 
 # Tencent Cloud EdgeOne
 .env
