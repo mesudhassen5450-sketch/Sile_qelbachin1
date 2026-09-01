@@ -127,12 +127,13 @@ export default function HomePage() {
               <div className="absolute -inset-1 bg-gradient-to-r from-red-600 to-amber-600 rounded-3xl blur-xl opacity-30 group-hover:opacity-60 transition duration-500" />
               <div className="relative bg-neutral-900 border border-neutral-800 rounded-3xl overflow-hidden p-6 space-y-6 shadow-2xl">
                 
-                <div className="relative h-56 rounded-2xl overflow-hidden border border-neutral-800">
+                <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden border border-neutral-800">
                   <Image
                     src="/logo2hero.jpg"
                     alt={siteMetadata.channelName}
-                    fill
-                    className="object-cover group-hover:scale-105 transition duration-500"
+                    width={800}
+                    height={600}
+                    className="w-full h-full object-contain bg-neutral-950 group-hover:scale-105 transition duration-500"
                     priority
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex items-end p-4">
@@ -261,7 +262,7 @@ export default function HomePage() {
           <FeaturedAudioBlock
             title={{ am: "#ግጥም1 — ማረኝ ጌታየ ሆይ!!", ar: "قصيدة — يا ربي", en: "Poetry — My Lord" }}
             speaker="በ ኡስታዝ፦ ሙሓመድ ሲራጅ ተገጥሞ፤ በ ወንድም አቡ ሱፍያን ድምፅ የቀረበ"
-            audioUrl="https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/files/home page audio/ማረኝ_የኔ_ጌታ…!የ_ኡስታዝ_መመሀመድ_ሲራጁ_ግጥም.m4a"
+            audioUrl="/telegram_media/files/home page audio/ማረኝ_የኔ_ጌታ…!የ_ኡስታዝ_መመሀመድ_ሲራጁ_ግጥም.m4a"
             category="ግጥም (Poetry)"
           />
 
@@ -269,7 +270,7 @@ export default function HomePage() {
           <FeaturedAudioBlock
             title={{ am: "ከ ሐሳብ እና ከ ጭንቀት እንዴት መውጣት እንችላለን?", ar: "كيف نتخلص من القلق والحزن؟", en: "How to Overcome Anxiety & Stress?" }}
             speaker="አቅራቢ፦ ኡስታዝ አብዱ ረዛቅ አል-ባጂ"
-            audioUrl="https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/voice_messages/ከ%20ሐሳብ%20እና%20ከ%20ጭንቀት%20እንዴት%20መውጣት%20እንችላለን%3F.mp3"
+            audioUrl="/telegram_media/files/home page audio/ከጭንቀት_እና_ከ_ሐሳብ_መውጫ_መንገዶች!.mp3"
             category="መልእክት (Advice)"
           />
 
@@ -279,7 +280,7 @@ export default function HomePage() {
             speaker="ወንድም አቡ ሱፍያን"
             duration="52:43"
             description="ወንጀልን መሥራት በሰው ልጅ ላይ በዱንያ እና በ ኣኺራ ላይ የሚያመጣው ተፅዕኖ!"
-            audioUrl="https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/files/home page audio/ትዳር እና እስልምና.ogg"
+            audioUrl="/telegram_media/files/home page audio/ትዳር እና እስልምና.ogg"
             category="ትዳር (Marriage)"
           />
 
