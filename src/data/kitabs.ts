@@ -371,13 +371,13 @@ export const kitabsData: Kitab[] = [
     slug: "alwasail-almufida",
     coverImage: "https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/files/الوسائل%20المفيدة%20للحياة%20السعيدة/الوسائل%20المفيدة%20للحياة%20السعيدة.jpg",
     coverBg: "#060c1e",
-    title: { am: "አልወሳዕል አልሙፊዳህ (Al-Wasail Al-Mufida)", ar: "الوسائل المفيدة للحياة السعيدة", en: "Beneficial Means for a Happy Life" },
+    title: { am: "ለደስተኛ ሕይወት ጠቃሚ መንገዶች", ar: "الوسائل المفيدة للحياة السعيدة", en: "Useful Means for a Happy Life" },
     author: { am: "ሸይኽ ዐብደሰላም አል-ቡርዐይ", ar: "الشيخ عبدالسلام البرعي", en: "Sheikh Abdussalam Al-Burei" },
     category: { am: "መልእክትና ትምህርት", ar: "الوعظ والتعليم", en: "Advice & Teaching" },
     pdfUrl: "https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/files/الوسائل%20المفيدة%20للحياة%20السعيدة/الوسائل%20المفيدة%20للحياة%20السعيدة.pdf",
     pdfSize: "2.5 MB",
     dersCount: 11,
-    description: { am: "«አልወሳዕል አልሙፊዳህ ለልሐያህ አልሰዒዳህ» — ለደስታና የተሞላ ሕይወት የሚጠቅሙ መንገዶች በ11 ክፍሎች።", ar: "الوسائل المفيدة للحياة السعيدة — سلسلة في 11 جزءاً.", en: "Beneficial Means for a Happy Life — an 11-part lecture series." },
+    description: { am: "«ለደስተኛ ሕይወት ጠቃሚ መንገዶች» — በ11 ክፍሎች የሚቀርብ ትምህርት።", ar: "الوسائل المفيدة للحياة السعيدة — سلسلة في 11 جزءاً.", en: "Useful Means for a Happy Life — an 11-part lecture series." },
     dersList: [
       {
         id: "alwasail-almufida-ders-1",
@@ -386,7 +386,7 @@ export const kitabsData: Kitab[] = [
         duration: '',
         audioUrl: "https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/files/الوسائل%20المفيدة%20للحياة%20السعيدة/_01_الوسائل_المفيدة_للحياة_السعيدة.mp3",
         kitabId: "alwasail-almufida",
-        kitabTitle: { am: "አልወሳዕል አልሙፊዳህ", ar: "الوسائل المفيدة للحياة السعيدة", en: "Al-Wasail Al-Mufida" },
+        kitabTitle: { am: "ለደስተኛ ሕይወት ጠቃሚ መንገዶች", ar: "الوسائل المفيدة للحياة السعيدة", en: "Useful Means for a Happy Life" },
       },
       {
         id: "alwasail-almufida-ders-2",
@@ -395,7 +395,7 @@ export const kitabsData: Kitab[] = [
         duration: '',
         audioUrl: "https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/files/الوسائل%20المفيدة%20للحياة%20السعيدة/_02_الوسائل_المفيدة_للحياة_السعيدة.mp3",
         kitabId: "alwasail-almufida",
-        kitabTitle: { am: "አልወሳዕል አልሙፊዳህ", ar: "الوسائل المفيدة للحياة السعيدة", en: "Al-Wasail Al-Mufida" },
+        kitabTitle: { am: "ለደስተኛ ሕይወት ጠቃሚ መንገዶች", ar: "الوسائل المفيدة للحياة السعيدة", en: "Useful Means for a Happy Life" },
       },
       {
         id: "alwasail-almufida-ders-3",
@@ -404,7 +404,7 @@ export const kitabsData: Kitab[] = [
         duration: '',
         audioUrl: "https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/files/الوسائل%20المفيدة%20للحياة%20السعيدة/_03_الوسائل_المفيدة_للحياة_السعيدة.mp3",
         kitabId: "alwasail-almufida",
-        kitabTitle: { am: "አልወሳዕል አልሙፊዳህ", ar: "الوسائل المفيدة للحياة السعيدة", en: "Al-Wasail Al-Mufida" },
+        kitabTitle: { am: "ለደስተኛ ሕይወት ጠቃሚ መንገዶች", ar: "الوسائل المفيدة للحياة السعيدة", en: "Useful Means for a Happy Life" },
       },
       {
         id: "alwasail-almufida-ders-4",
@@ -413,7 +413,7 @@ export const kitabsData: Kitab[] = [
         duration: '',
         audioUrl: "https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/files/الوسائل%20المفيدة%20للحياة%20السعيدة/_04_الوسائل_المفيدة_للحياة_السعيدة.mp3",
         kitabId: "alwasail-almufida",
-        kitabTitle: { am: "አልወሳዕል አልሙፊዳህ", ar: "الوسائل المفيدة للحياة السعيدة", en: "Al-Wasail Al-Mufida" },
+        kitabTitle: { am: "ለደስተኛ ሕይወት ጠቃሚ መንገዶች", ar: "الوسائل المفيدة للحياة السعيدة", en: "Useful Means for a Happy Life" },
       },
       {
         id: "alwasail-almufida-ders-5",
@@ -422,7 +422,7 @@ export const kitabsData: Kitab[] = [
         duration: '',
         audioUrl: "https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/files/الوسائل%20المفيدة%20للحياة%20السعيدة/_05_الوسائل_المفيدة_للحياة_السعيدة.mp3",
         kitabId: "alwasail-almufida",
-        kitabTitle: { am: "አልወሳዕል አልሙፊዳህ", ar: "الوسائل المفيدة للحياة السعيدة", en: "Al-Wasail Al-Mufida" },
+        kitabTitle: { am: "ለደስተኛ ሕይወት ጠቃሚ መንገዶች", ar: "الوسائل المفيدة للحياة السعيدة", en: "Useful Means for a Happy Life" },
       },
       {
         id: "alwasail-almufida-ders-6",
@@ -431,7 +431,7 @@ export const kitabsData: Kitab[] = [
         duration: '',
         audioUrl: "https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/files/الوسائل%20المفيدة%20للحياة%20السعيدة/06%20الوسائل%20المفيدة%20للحياة%20السعيدة.mp3",
         kitabId: "alwasail-almufida",
-        kitabTitle: { am: "አልወሳዕል አልሙፊዳህ", ar: "الوسائل المفيدة للحياة السعيدة", en: "Al-Wasail Al-Mufida" },
+        kitabTitle: { am: "ለደስተኛ ሕይወት ጠቃሚ መንገዶች", ar: "الوسائل المفيدة للحياة السعيدة", en: "Useful Means for a Happy Life" },
       },
       {
         id: "alwasail-almufida-ders-7",
@@ -440,7 +440,7 @@ export const kitabsData: Kitab[] = [
         duration: '',
         audioUrl: "https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/files/الوسائل%20المفيدة%20للحياة%20السعيدة/07%20الوسائل%20المفيدة%20للحياة%20السعيدة.mp3",
         kitabId: "alwasail-almufida",
-        kitabTitle: { am: "አልወሳዕል አልሙፊዳህ", ar: "الوسائل المفيدة للحياة السعيدة", en: "Al-Wasail Al-Mufida" },
+        kitabTitle: { am: "ለደስተኛ ሕይወት ጠቃሚ መንገዶች", ar: "الوسائل المفيدة للحياة السعيدة", en: "Useful Means for a Happy Life" },
       },
       {
         id: "alwasail-almufida-ders-8",
@@ -449,7 +449,7 @@ export const kitabsData: Kitab[] = [
         duration: '',
         audioUrl: "https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/files/الوسائل%20المفيدة%20للحياة%20السعيدة/08%20الوسائل%20المفيدة%20للحياة%20السعيدة.mp3",
         kitabId: "alwasail-almufida",
-        kitabTitle: { am: "አልወሳዕል አልሙፊዳህ", ar: "الوسائل المفيدة للحياة السعيدة", en: "Al-Wasail Al-Mufida" },
+        kitabTitle: { am: "ለደስተኛ ሕይወት ጠቃሚ መንገዶች", ar: "الوسائل المفيدة للحياة السعيدة", en: "Useful Means for a Happy Life" },
       },
       {
         id: "alwasail-almufida-ders-9",
@@ -458,7 +458,7 @@ export const kitabsData: Kitab[] = [
         duration: '',
         audioUrl: "https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/files/الوسائل%20المفيدة%20للحياة%20السعيدة/09%20الوسائل%20المفيدة%20للحياة%20السعيدة.mp3",
         kitabId: "alwasail-almufida",
-        kitabTitle: { am: "አልወሳዕል አልሙፊዳህ", ar: "الوسائل المفيدة للحياة السعيدة", en: "Al-Wasail Al-Mufida" },
+        kitabTitle: { am: "ለደስተኛ ሕይወት ጠቃሚ መንገዶች", ar: "الوسائل المفيدة للحياة السعيدة", en: "Useful Means for a Happy Life" },
       },
       {
         id: "alwasail-almufida-ders-10",
@@ -467,7 +467,7 @@ export const kitabsData: Kitab[] = [
         duration: '',
         audioUrl: "https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/files/الوسائل%20المفيدة%20للحياة%20السعيدة/_10_الوسائل_المفيدة_للحياة_السعيدة.mp3",
         kitabId: "alwasail-almufida",
-        kitabTitle: { am: "አልወሳዕል አልሙፊዳህ", ar: "الوسائل المفيدة للحياة السعيدة", en: "Al-Wasail Al-Mufida" },
+        kitabTitle: { am: "ለደስተኛ ሕይወት ጠቃሚ መንገዶች", ar: "الوسائل المفيدة للحياة السعيدة", en: "Useful Means for a Happy Life" },
       },
       {
         id: "alwasail-almufida-ders-11",
@@ -476,7 +476,7 @@ export const kitabsData: Kitab[] = [
         duration: '',
         audioUrl: "https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/files/الوسائل%20المفيدة%20للحياة%20السعيدة/_11_الوسائل_المفيدة_للحياة_السعيدة.mp3",
         kitabId: "alwasail-almufida",
-        kitabTitle: { am: "አልወሳዕል አልሙፊዳህ", ar: "الوسائل المفيدة للحياة السعيدة", en: "Al-Wasail Al-Mufida" },
+        kitabTitle: { am: "ለደስተኛ ሕይወት ጠቃሚ መንገዶች", ar: "الوسائل المفيدة للحياة السعيدة", en: "Useful Means for a Happy Life" },
       }
     ],
   },

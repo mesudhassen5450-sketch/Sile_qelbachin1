@@ -43,14 +43,18 @@ export default function HomePage() {
       <section className="w-screen relative left-1/2 -translate-x-1/2 -mt-10 mb-12 overflow-hidden bg-neutral-950 border-b border-neutral-800 shadow-2xl">
         
         {/* Background Image Layer with Calligraphy & Dark Contrast Gradient */}
-        <div className="absolute inset-0 w-full h-full -z-10 overflow-hidden">
-          <Image
-            src="/logo2hero.jpg"
-            alt={siteMetadata.channelName}
-            fill
-            priority
-            className="object-cover w-full h-full opacity-20 scale-100 filter blur-sm"
-          />
+        <div className="absolute inset-0 w-full h-full -z-10 flex items-center justify-center">
+          <div className="relative w-[82%] sm:w-full h-full max-w-4xl mx-auto">
+            <Image
+              src="/logo2hero.jpg"
+              alt={siteMetadata.channelName}
+              width={800}
+              height={800}
+              priority
+              className="w-full h-auto opacity-20 filter blur-sm mx-auto block"
+              style={{ objectFit: 'contain' }}
+            />
+          </div>
           <div className="absolute inset-0 bg-gradient-to-r from-neutral-950/95 via-neutral-950/85 to-red-950/60" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-red-600/15 via-transparent to-transparent" />
         </div>
