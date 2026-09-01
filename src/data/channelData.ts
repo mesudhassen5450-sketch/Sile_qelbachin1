@@ -95,6 +95,8 @@ export const siteMetadata = {
   telegramUrl: 'https://t.me/Sle_qelbachn1',
   tiktokHandle: '@sle_qelbachn1',
   tiktokUrl: 'https://www.tiktok.com/@sle_qelbachn1',
+  youtubeHandle: '@sle_qelbachn1', // TODO: Update with correct YouTube handle
+  youtubeUrl: 'https://www.youtube.com/@sle_qelbachn1', // TODO: Update with correct YouTube URL
   heroHadithText: {
     am: '«በሰውነት ውስጥ አንዲት ቁራጭ ስጋ አለች፤ እሷ ከተስተካከለች መላው ሰውነት ይስተካከላል፤ እሷ ከተበላሸች መላው ሰውነት ይበላሻል። እሷም ቀልብ (ልብ) ነች።»',
     ar: '«أَلا وَإِنَّ فِي الْجَسَدِ مُضْغَةً إِذَا صَلَحَتْ صَلَحَ الْجَسَدُ كُلُّهُ، وَإِذَا فَسَدَتْ فَسَدَ الْجَسَدُ كُلُّهُ، أَلا وَهِيَ الْقَلْبُ.»',
@@ -137,7 +139,7 @@ export const muhadarasData: Muhadara[] = [
     },
     duration: '54:10',
     date: '2026-02-15',
-    audioUrl: '/telegram_media/voice_messages/audio_10.ogg'
+    audioUrl: 'https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/voice_messages/audio_10.ogg'
   }
 ];
 

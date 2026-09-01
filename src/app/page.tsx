@@ -257,7 +257,7 @@ export default function HomePage() {
           <FeaturedAudioBlock
             title={{ am: "#ግጥም1 — ማረኝ ጌታየ ሆይ!!", ar: "قصيدة — يا ربي", en: "Poetry — My Lord" }}
             speaker="በ ኡስታዝ፦ ሙሓመድ ሲራጅ ተገጥሞ፤ በ ወንድም አቡ ሱፍያን ድምፅ የቀረበ"
-            audioUrl="/telegram_media/files/home page audio/ማረኝ_የኔ_ጌታ…!የ_ኡስታዝ_መመሀመድ_ሲራጁ_ግጥም.m4a"
+            audioUrl="https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/files/home page audio/ማረኝ_የኔ_ጌታ…!የ_ኡስታዝ_መመሀመድ_ሲራጁ_ግጥም.m4a"
             category="ግጥም (Poetry)"
           />
 
@@ -265,7 +265,7 @@ export default function HomePage() {
           <FeaturedAudioBlock
             title={{ am: "ከ ሐሳብ እና ከ ጭንቀት እንዴት መውጣት እንችላለን?", ar: "كيف نتخلص من القلق والحزن؟", en: "How to Overcome Anxiety & Stress?" }}
             speaker="አቅራቢ፦ ኡስታዝ አብዱ ረዛቅ አል-ባጂ"
-            audioUrl="/telegram_media/files/home page audio/ከጭንቀት_እና_ከ_ሐሳብ_መውጫ_መንገዶች!.mp3"
+            audioUrl="https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/files/home page audio/ከጭንቀት_እና_ከ_ሐሳብ_መውጫ_መንገዶች!.mp3"
             category="መልእክት (Advice)"
           />
 
@@ -275,7 +275,7 @@ export default function HomePage() {
             speaker="ወንድም አቡ ሱፍያን"
             duration="52:43"
             description="ወንጀልን መሥራት በሰው ልጅ ላይ በዱንያ እና በ ኣኺራ ላይ የሚያመጣው ተፅዕኖ!"
-            audioUrl="/telegram_media/files/home page audio/ትዳር እና እስልምና.ogg"
+            audioUrl="https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/files/home page audio/ትዳር እና እስልምና.ogg"
             category="ትዳር (Marriage)"
           />
 

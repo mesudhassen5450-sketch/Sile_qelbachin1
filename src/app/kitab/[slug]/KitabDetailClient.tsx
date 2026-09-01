@@ -262,11 +262,11 @@ export default function KitabDetailClient({ kitab }: { kitab: Kitab }) {
               </div>
             </div>
 
-            {/* Right Panel: PDF Viewer */}
-            <div className="w-2/3 h-full bg-neutral-900 rounded-lg overflow-hidden shadow-xl">
+            {/* Right Panel: PDF Viewer - Stretchable */}
+            <div className="w-2/3 flex flex-col bg-neutral-900 rounded-lg overflow-hidden shadow-xl">
               <iframe
                 src={kitab.pdfUrl}
-                className="w-full h-full border-none"
+                className="w-full flex-1 min-h-0 border-none"
                 title="Kitab PDF Viewer"
               />
             </div>
