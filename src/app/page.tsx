@@ -49,7 +49,7 @@ export default function HomePage() {
             alt={siteMetadata.channelName}
             fill
             priority
-            className="object-cover w-full h-full opacity-20 scale-105 filter blur-sm"
+            className="object-cover w-full h-full opacity-20 scale-100 filter blur-sm"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-neutral-950/95 via-neutral-950/85 to-red-950/60" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-red-600/15 via-transparent to-transparent" />
@@ -265,7 +265,7 @@ export default function HomePage() {
           <FeaturedAudioBlock
             title={{ am: "ከ ሐሳብ እና ከ ጭንቀት እንዴት መውጣት እንችላለን?", ar: "كيف نتخلص من القلق والحزن؟", en: "How to Overcome Anxiety & Stress?" }}
             speaker="አቅራቢ፦ ኡስታዝ አብዱ ረዛቅ አል-ባጂ"
-            audioUrl="https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/files/home page audio/ከጭንቀት_እና_ከ_ሐሳብ_መውጫ_መንገዶች!.mp3"
+            audioUrl="https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/voice_messages/ከ%20ሐሳብ%20እና%20ከ%20ጭንቀት%20እንዴት%20መውጣት%20እንችላለን%3F.mp3"
             category="መልእክት (Advice)"
           />
 

@@ -23,7 +23,7 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 const LANGUAGE_STORAGE_KEY = 'islamic-resources-language';
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<Language>('en');
+  const [language, setLanguageState] = useState<Language>('am'); // Default to Amharic
   const [mounted, setMounted] = useState(false);
 
   // Load saved language preference on mount

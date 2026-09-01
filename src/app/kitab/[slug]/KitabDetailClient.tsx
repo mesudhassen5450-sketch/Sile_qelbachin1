@@ -161,26 +161,27 @@ export default function KitabDetailClient({ kitab }: { kitab: Kitab }) {
       {isDualPaneMode && kitab.pdfUrl && (
         <div className="fixed inset-0 z-50 bg-black w-screen h-screen flex flex-col overflow-hidden">
           {/* Header Bar */}
-          <div className="bg-neutral-900 border-b border-neutral-800 px-6 py-3 flex items-center justify-between flex-shrink-0">
-            <div className="flex items-center space-x-3">
-              <FileText className="w-5 h-5 text-red-500" />
-              <h2 className="text-lg font-bold text-white truncate">
+          <div className="bg-neutral-900 border-b border-neutral-800 px-4 sm:px-6 py-3 flex items-center justify-between flex-shrink-0">
+            <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0 pr-2">
+              <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 flex-shrink-0" />
+              <h2 className="text-sm sm:text-lg font-bold text-white truncate">
                 {displayTitle} — Dual Pane Workspace
               </h2>
             </div>
             <button
               onClick={() => setIsDualPaneMode(false)}
-              className="p-2 text-neutral-400 hover:text-white rounded-full bg-neutral-800 hover:bg-neutral-700 transition"
+              className="p-2 sm:p-2.5 text-white bg-red-600 hover:bg-red-700 rounded-full transition flex-shrink-0 z-50 shadow-lg"
+              aria-label="Close dual pane view"
             >
-              <X className="w-5 h-5" />
+              <X className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
           </div>
 
           {/* Main Dual-Pane Content Area filling remaining vertical space */}
-          <div className="flex flex-1 w-full h-full overflow-hidden gap-2 p-2">
+          <div className="flex flex-col md:flex-row flex-1 w-full h-full overflow-hidden gap-2 p-2">
             
             {/* Left Panel: Audio Player & Playlist */}
-            <div className="w-1/3 h-full bg-white dark:bg-neutral-900 rounded-lg border border-neutral-200 dark:border-neutral-800 flex flex-col overflow-hidden shadow-xl">
+            <div className="w-full md:w-1/3 h-1/2 md:h-full bg-white dark:bg-neutral-900 rounded-lg border border-neutral-200 dark:border-neutral-800 flex flex-col overflow-hidden shadow-xl">
               <div className="p-4 border-b border-neutral-200 dark:border-neutral-800 flex-shrink-0">
                 <div className="flex items-center space-x-2 text-xs font-bold text-red-600 dark:text-red-400 mb-2">
                   <Headphones className="w-4 h-4" />
@@ -264,7 +265,7 @@ export default function KitabDetailClient({ kitab }: { kitab: Kitab }) {
             </div>
 
             {/* Right Panel: PDF Viewer - Stretchable */}
-            <div className="w-2/3 flex flex-col bg-neutral-900 rounded-lg overflow-hidden shadow-xl">
+            <div className="w-full md:w-2/3 h-1/2 md:h-full flex flex-col bg-neutral-900 rounded-lg overflow-hidden shadow-xl">
               <iframe
                 src={kitab.pdfUrl}
                 className="w-full flex-1 min-h-0 border-none"
