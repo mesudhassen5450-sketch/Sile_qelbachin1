@@ -17,6 +17,7 @@ import {
   type Sahabah,
 } from '@/data/channelData';
 import { getAudios, getVideos, getPdfs } from '@/data/mediaStore';
+import { getCachedIndex } from '@/lib/aiContentIndex';
 import type { LocalizedString } from '@/context/LanguageContext';
 
 export type ContentType =
@@ -389,6 +390,28 @@ export function globalSearch(query: string, limit = 40): SearchResult[] {
         score,
       });
     }
+  }
+
+  // Featured homepage audio already indexed for AI (existing titles only)
+  try {
+    const featured = getCachedIndex().featuredAudio;
+    for (const a of featured) {
+      const blob = `${a.title} ${a.speaker} ${a.category} ${a.id}`;
+      const score = scoreMatch(blob, q);
+      if (score > 0) {
+        results.push({
+          id: a.id,
+          type: 'audio',
+          title: a.title,
+          speaker: a.speaker,
+          description: a.category,
+          href: a.route || (a.kitabId ? `/kitab/${a.kitabId}` : '/audio-lecture'),
+          score: score + 5,
+        });
+      }
+    }
+  } catch {
+    /* ignore */
   }
 
   // Telegram dump — link to listing pages only (no fabricated detail routes)
