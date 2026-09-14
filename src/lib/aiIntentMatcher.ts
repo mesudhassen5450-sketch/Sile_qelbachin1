@@ -50,30 +50,44 @@ export function matchIntent(userInput: string): Intent {
   }
 
   // Home navigation
-  if (/^(home|go\s*home|homepage|main\s*page)/i.test(input)) {
+  if (/^(home|go\s*home|homepage|main\s*page)$/i.test(input)) {
     return { type: 'NAVIGATE_HOME', confidence: 1.0, params: { route: '/' } };
   }
 
-  // Kitab navigation
-  if (/^(kitab|go\s*to\s*kitab|kitabpage|show\s*kitab|open\s*kitab|kitab\s*page|kitab\s*library)/i.test(input)) {
+  const kitabSlug = extractKitabSlug(input);
+  const lessonNum = extractLessonNumber(input);
+
+  // Specific Kitab + lesson ("go to adawa kitab audio 9")
+  if (kitabSlug && lessonNum) {
+    return {
+      type: 'PLAY_AUDIO',
+      confidence: 1.0,
+      params: {
+        route: `/kitab/${kitabSlug}?ders=${lessonNum}`,
+        kitabId: kitabSlug,
+        audioId: String(lessonNum),
+        query: input,
+      },
+    };
+  }
+
+  // Specific Kitab page
+  if (kitabSlug) {
+    return {
+      type: 'NAVIGATE_KITAB_DETAIL',
+      confidence: 1.0,
+      params: { route: `/kitab/${kitabSlug}`, kitabId: kitabSlug },
+    };
+  }
+
+  // Kitab library
+  if (/^(kitab|go\s*to\s*kitab|kitabpage|show\s*kitab|open\s*kitab|kitab\s*page|kitab\s*library)$/i.test(input) ||
+      /^(go\s*to\s*|open\s*|show\s*)?kitabs?\b/i.test(input)) {
     return { type: 'NAVIGATE_KITAB', confidence: 1.0, params: { route: '/kitab' } };
   }
 
-  // Specific Kitab navigation
-  const kitabMatches = input.match(/(?:go\s*to\s*|open\s*|show\s*)?(?:intebih|intebihkitab|adewae|fatihu|alkesidu|teshilu|yekelb|betewbet)(?:\s*kitab)?/i);
-  if (kitabMatches) {
-    const kitabSlug = extractKitabSlug(input);
-    if (kitabSlug) {
-      return {
-        type: 'NAVIGATE_KITAB_DETAIL',
-        confidence: 1.0,
-        params: { route: `/kitab/${kitabSlug}`, kitabId: kitabSlug }
-      };
-    }
-  }
-
-  // Audio/Ders navigation or playback
-  if (/^(audio|go\s*to\s*audio|audio\s*lecture|audio\s*page|ders)/i.test(input)) {
+  // Audio/Ders navigation
+  if (/^(audio|go\s*to\s*audio|audio\s*lecture|audio\s*page|ders)$/i.test(input)) {
     return { type: 'NAVIGATE_AUDIO', confidence: 1.0, params: { route: '/audio-lecture' } };
   }
 
@@ -83,7 +97,7 @@ export function matchIntent(userInput: string): Intent {
   }
 
   // Muhadara navigation
-  if (/^(muhadara|go\s*to\s*muhadara|muhadara\s*page|open\s*muhadara|discourse)/i.test(input)) {
+  if (/^(muhadara|muhadera|go\s*to\s*muhadara|muhadara\s*page|open\s*muhadara|discourse)/i.test(input)) {
     return { type: 'NAVIGATE_MUHADARA', confidence: 1.0, params: { route: '/muhadara' } };
   }
 
@@ -92,9 +106,12 @@ export function matchIntent(userInput: string): Intent {
     return { type: 'RANDOM_MUHADARA', confidence: 1.0 };
   }
 
-  // Videos navigation
+  // Videos navigation (including "go to video latest")
+  if (/\b(video|videos)\b/i.test(input) && /go\s*to|open|show|latest|watch/i.test(input)) {
+    return { type: 'NAVIGATE_VIDEOS', confidence: 1.0, params: { route: '/video-lecture' } };
+  }
   if (/^(video|go\s*to\s*video|video\s*page|open\s*video|videos|show\s*videos)/i.test(input)) {
-    return { type: 'NAVIGATE_VIDEOS', confidence: 1.0, params: { route: '/videos' } };
+    return { type: 'NAVIGATE_VIDEOS', confidence: 1.0, params: { route: '/video-lecture' } };
   }
 
   // Reminders navigation
@@ -132,36 +149,50 @@ export function matchIntent(userInput: string): Intent {
 
   // Search Kitab
   if (/(?:find|search|show|look\s*for).*(?:kitab|book)/i.test(input) && !(/page/i.test(input))) {
-    return { type: 'SEARCH_KITAB', confidence: 0.8, params: { query: input } };
+    return { type: 'SEARCH_KITAB', confidence: 0.85, params: { query: input } };
   }
 
   // Search Audio
   if (/(?:find|search|show|look\s*for).*(?:audio|lecture|ders)/i.test(input)) {
-    return { type: 'SEARCH_AUDIO', confidence: 0.8, params: { query: input } };
+    return { type: 'SEARCH_AUDIO', confidence: 0.85, params: { query: input } };
   }
 
-  // General content search
-  if (/(?:find|search|show|tell|what|about|explain)/i.test(input)) {
-    return { type: 'SEARCH_CONTENT', confidence: 0.6, params: { query: input } };
+  // General content search — keep local so navigation works without Groq
+  if (/(?:find|search|show|tell|what|about|explain|give\s*me)/i.test(input)) {
+    return { type: 'SEARCH_CONTENT', confidence: 0.85, params: { query: input } };
   }
 
-  // Unknown
   return { type: 'UNKNOWN', confidence: 0.0, params: { query: input } };
 }
 
 /**
  * Extract Kitab slug from user input
  */
-function extractKitabSlug(input: string): string | null {
+export function extractKitabSlug(input: string): string | null {
   const lowerInput = input.toLowerCase();
 
-  if (/intebih/i.test(lowerInput)) return 'intebih-ante-murakeb';
-  if (/adewae|dawa|disease|cure/i.test(lowerInput)) return 'adewae-kitab';
-  if (/fatihu|awliya/i.test(lowerInput)) return 'fatihu-awliya';
-  if (/alkesidu|leyse|algerib/i.test(lowerInput)) return 'alkesidu-leyse-algerib';
-  if (/teshilu|alimu|sheria/i.test(lowerInput)) return 'teshilu-alimu-sheria';
-  if (/yekelb|betewbet/i.test(lowerInput)) return 'yekelb-betewbet-kitab';
+  if (/intebih|murakeb|murakeb/i.test(lowerInput)) return 'intebih-ante-murakeb';
+  if (/\b(adewae|adewa|adawa|ad-?da['’]?|ad-dawa|ad\s*da)\b/i.test(lowerInput) || /الداء|الدواء/.test(input)) {
+    return 'adewae-kitab';
+  }
+  if (/fatihu|awliya|mefatih|مفاتح/i.test(lowerInput)) return 'fatihu-awliya';
+  if (/alwasail|almufida|wasail|happy\s*life|وسائل/i.test(lowerInput)) return 'alwasail-almufida';
+  if (/teshilu|alimu|sheria|تسهيل/i.test(lowerInput)) return 'teshilu-alimu-sheria';
+  if (/betewbet|tawba|repent/i.test(lowerInput)) return 'betewbet-mengede-lay';
+  if (/yekelb|medreq|hardness|جفاف/i.test(lowerInput)) return 'yekelb-medreq';
 
+  return null;
+}
+
+/**
+ * Extract lesson/ders number ("audio 9", "ders 3", "ክፍል 09")
+ */
+export function extractLessonNumber(input: string): number | null {
+  const labeled = input.match(/(?:audio|ders?|lesson|part|track|ክፍል|الجزء)\s*#?\s*(\d{1,2})/i);
+  if (labeled) {
+    const n = parseInt(labeled[1], 10);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
   return null;
 }
 

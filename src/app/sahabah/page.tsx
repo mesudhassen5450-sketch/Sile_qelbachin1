@@ -52,22 +52,24 @@ export default function SahabahListPage() {
               <p className="text-xs font-semibold text-red-600 dark:text-red-400">
                 {getLocalized(sahabah.title)}
               </p>
+              {sahabah.reign && (
+                <p className="text-xs font-mono text-neutral-500 dark:text-neutral-400">
+                  {getLocalized(sahabah.reign)}
+                </p>
+              )}
 
               <p className="text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed">
                 {getLocalized(sahabah.shortDescription)}
               </p>
             </div>
 
-            <div className="pt-4 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between">
-              <span className="text-xs text-neutral-400 font-mono">
-                /sahabah/{sahabah.slug}
-              </span>
+            <div className="pt-4 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-end">
               <Link
                 href={`/sahabah/${sahabah.slug}`}
-                className="btn-red inline-flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium shadow-sm"
+                className="btn-red inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium shadow-sm"
               >
                 <span>{t('sections.readSahabah')}</span>
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-4 h-4 rtl:rotate-180" />
               </Link>
             </div>
           </div>

@@ -3,7 +3,7 @@
  * Executes structured actions safely without arbitrary code execution
  */
 
-import { Intent } from './aiIntentMatcher';
+import { Intent, extractKitabSlug } from './aiIntentMatcher';
 import { 
   searchKitab, 
   searchAudio, 
@@ -11,7 +11,8 @@ import {
   getRandomMuhadara, 
   getRandomReminder,
   getSocialLink,
-  getCachedIndex
+  getCachedIndex,
+  findKitabLesson,
 } from './aiContentIndex';
 
 export interface AIAction {
@@ -64,7 +65,12 @@ export function executeIntent(intent: Intent): AIAction {
       return handleKitabSearch(intent);
 
     case 'SEARCH_AUDIO':
+      return handleAudioSearch(intent);
+
     case 'PLAY_AUDIO':
+      if (intent.params?.kitabId && intent.params?.audioId) {
+        return handleKitabLessonPlay(intent);
+      }
       return handleAudioSearch(intent);
 
     case 'GET_SOCIAL_LINK':
@@ -159,6 +165,46 @@ function handleKitabSearch(intent: Intent): AIAction {
       message: `📖 Found ${results.length} Kitabs:\n\n${list}`,
       route: '/kitab'
     }
+  };
+}
+
+/**
+ * Open a specific kitab lesson ("adawa kitab audio 9")
+ */
+function handleKitabLessonPlay(intent: Intent): AIAction {
+  const kitabId = intent.params?.kitabId || '';
+  const lessonNumber = parseInt(intent.params?.audioId || '', 10);
+  const found = findKitabLesson(kitabId, lessonNumber);
+
+  if (!found) {
+    return {
+      type: 'navigate',
+      data: { route: '/kitab', message: '📖 Kitab not found. Opening the library.' },
+    };
+  }
+
+  if (!found.ders || !Number.isFinite(lessonNumber)) {
+    return {
+      type: 'navigate',
+      data: {
+        route: `/kitab/${kitabId}`,
+        title: found.kitab.title,
+        kitabId,
+        message: `📖 **${found.kitab.title}**\n\nLesson ${lessonNumber} is not in the archive yet. Opening the Kitab so you can choose another lesson.`,
+      },
+    };
+  }
+
+  return {
+    type: 'play_audio',
+    data: {
+      audioUrl: found.ders.audioUrl,
+      title: found.ders.title,
+      speaker: found.ders.speaker,
+      kitabId,
+      route: `/kitab/${kitabId}?ders=${lessonNumber}`,
+      message: `🎧 **${found.kitab.title}** — Lesson ${String(lessonNumber).padStart(2, '0')}\n\n${found.ders.title}\nSpeaker: ${found.ders.speaker}`,
+    },
   };
 }
 
@@ -275,8 +321,17 @@ function handleRandomReminder(): AIAction {
  * Handle general content search
  */
 function handleContentSearch(intent: Intent): AIAction {
-  // For now, direct to appropriate page based on keywords
-  // In future, could implement more sophisticated search
+  const query = intent.params?.query || '';
+  const kitabId = extractKitabSlug(query);
+
+  if (kitabId) {
+    return handleKitabNavigation({
+      type: 'NAVIGATE_KITAB_DETAIL',
+      confidence: 1,
+      params: { kitabId, route: `/kitab/${kitabId}` },
+    });
+  }
+
   return {
     type: 'answer',
     data: {
@@ -316,6 +371,7 @@ export function getActionButtons(action: AIAction): Array<{ type: 'navigate' | '
       '/kitab': '📖 View All Kitabs',
       '/audio-lecture': '🎧 Browse Audio',
       '/muhadara': '🎙️ Open Muhadara',
+      '/video-lecture': '🎥 Watch Videos',
       '/videos': '🎥 Watch Videos',
       '/reminders': '💭 Read Reminders',
       '/knowledge': '📜 Explore Knowledge',
@@ -329,7 +385,7 @@ export function getActionButtons(action: AIAction): Array<{ type: 'navigate' | '
       buttons.push({
         type: 'open-kitab',
         label: `📖 Open ${action.data.title || 'Kitab'}`,
-        url: action.data.route
+        url: action.data.route.split('?')[0]
       });
     } else {
       buttons.push({
@@ -343,7 +399,7 @@ export function getActionButtons(action: AIAction): Array<{ type: 'navigate' | '
   if (action.type === 'play_audio' && action.data?.route) {
     buttons.push({
       type: 'play-audio',
-      label: '🎧 Listen',
+      label: action.data.title ? `🎧 Play ${action.data.title}` : '🎧 Listen',
       url: action.data.route
     });
   }

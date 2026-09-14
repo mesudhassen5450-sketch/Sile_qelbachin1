@@ -48,6 +48,12 @@ next-env.d.ts
 /public/telegram_media/files/*
 !/public/telegram_media/files/home page audio/
 
+# Accidental APK upload (PDF extracted to muktasar.pdf)
+/public/muktasar.apk
+# Large assets live in sileqelbachin-media (keep local copies for upload only)
+/public/intebih5.m4a
+/public/muktasar.pdf
+
 # Tencent Cloud EdgeOne
 .env
 .edgeone/*

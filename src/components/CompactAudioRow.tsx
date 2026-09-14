@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import { Play, Pause } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { LocalizedString } from '@/context/LanguageContext';
+import { useAudio } from '@/context/AudioContext';
 
 interface CompactAudioRowProps {
   title: LocalizedString;
@@ -19,50 +20,34 @@ export default function CompactAudioRow({
   audioUrl,
 }: CompactAudioRowProps) {
   const { getLocalized } = useLanguage();
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [audioDuration, setAudioDuration] = useState(0);
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const { currentTrack, isPlaying, currentTime, duration, playTrack, togglePlayPause } = useAudio();
 
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
+  const isThisTrack = currentTrack?.audioUrl === audioUrl;
+  const isThisPlaying = isThisTrack && isPlaying;
+  const displayTime = isThisTrack ? currentTime : 0;
+  const displayDuration = isThisTrack ? duration : 0;
+  const progress = displayDuration > 0 ? (displayTime / displayDuration) * 100 : 0;
 
-    const updateTime = () => setCurrentTime(audio.currentTime);
-    const updateDuration = () => setAudioDuration(audio.duration);
-    const handleEnded = () => setIsPlaying(false);
-
-    audio.addEventListener('timeupdate', updateTime);
-    audio.addEventListener('loadedmetadata', updateDuration);
-    audio.addEventListener('ended', handleEnded);
-
-    return () => {
-      audio.removeEventListener('timeupdate', updateTime);
-      audio.removeEventListener('loadedmetadata', updateDuration);
-      audio.removeEventListener('ended', handleEnded);
-    };
-  }, []);
-
-  const togglePlayPause = () => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    if (isPlaying) {
-      audio.pause();
-    } else {
-      audio.play();
+  const toggleThisTrack = () => {
+    if (isThisTrack) {
+      togglePlayPause();
+      return;
     }
-    setIsPlaying(!isPlaying);
+    playTrack({
+      id: audioUrl,
+      title,
+      speaker,
+      duration: '',
+      audioUrl,
+    });
   };
 
   const formatTime = (time: number) => {
-    if (isNaN(time)) return '0:00';
+    if (isNaN(time) || time <= 0) return '0:00';
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
-
-  const progress = audioDuration > 0 ? (currentTime / audioDuration) * 100 : 0;
 
   return (
     <div className="group bg-neutral-900 dark:bg-neutral-950 rounded-2xl border border-neutral-800 hover:border-red-900/50 transition-all duration-300 shadow-md hover:shadow-lg overflow-hidden">
@@ -72,10 +57,10 @@ export default function CompactAudioRow({
         
         {/* Play Button */}
         <button
-          onClick={togglePlayPause}
+          onClick={toggleThisTrack}
           className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white flex items-center justify-center transition-all duration-300 shadow-lg hover:shadow-red-900/50 hover:scale-105 active:scale-95"
         >
-          {isPlaying ? (
+          {isThisPlaying ? (
             <Pause className="w-5 h-5 fill-current" />
           ) : (
             <Play className="w-5 h-5 fill-current ml-0.5" />
@@ -99,15 +84,15 @@ export default function CompactAudioRow({
         </div>
 
         {/* Duration */}
-        {audioDuration > 0 && (
+        {displayDuration > 0 && (
           <div className="flex-shrink-0 text-xs font-mono text-neutral-500">
-            {formatTime(currentTime)} / {formatTime(audioDuration)}
+            {formatTime(displayTime)} / {formatTime(displayDuration)}
           </div>
         )}
       </div>
 
       {/* Progress Bar */}
-      {audioDuration > 0 && (
+      {displayDuration > 0 && (
         <div className="h-1 bg-neutral-800">
           <div
             className="h-full bg-gradient-to-r from-red-600 to-red-500 transition-all duration-300"
@@ -115,9 +100,6 @@ export default function CompactAudioRow({
           />
         </div>
       )}
-
-      {/* Hidden Audio Element */}
-      <audio ref={audioRef} src={audioUrl} preload="metadata" />
     </div>
   );
 }

@@ -68,6 +68,11 @@ export interface KnowledgeItem {
   reference: string | LocalizedString;
 }
 
+export interface SahabahSection {
+  title: string | LocalizedString;
+  body: string | LocalizedString;
+}
+
 export interface Sahabah {
   slug: string;
   name: string | LocalizedString;
@@ -76,7 +81,11 @@ export interface Sahabah {
   fullBiography: string | LocalizedString;
   keyLessons: (string | LocalizedString)[];
   famousQuotes?: (string | LocalizedString)[];
+  sections?: SahabahSection[];
+  reign?: string | LocalizedString;
 }
+
+export { sahabahData } from './sahabah';
 
 export interface LiveLecture {
   id: string;
@@ -89,14 +98,28 @@ export interface LiveLecture {
   description: string | LocalizedString;
 }
 
+export const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL || 'https://sileqelbachin1.netlify.app';
+
 export const siteMetadata = {
   channelName: 'ስለ ቀልባችን',
+  siteUrl: SITE_URL,
   telegramHandle: '@Sle_qelbachn1',
   telegramUrl: 'https://t.me/Sle_qelbachn1',
   tiktokHandle: '@sle_qelbachn1',
   tiktokUrl: 'https://www.tiktok.com/@sle_qelbachn1',
   youtubeHandle: '@sle_qelbachn1',
   youtubeUrl: 'https://youtube.com/@sle_qelbachn1?si=jwFjYSDtGE-clwJn',
+  bannerVerse: {
+    am: '«እነዚያ ያመኑ ልቦቻቸውም አላህን በማውሳት (በማስታወስ) የሚረኩ ናቸው፤ ንቁ! አላህን በማውሳት ልቦች ይረካሉ።»',
+    ar: '«الَّذِينَ آمَنُوا وَتَطْمَئِنُّ قُلُوبُهُم بِذِكْرِ اللَّهِ ۗ أَلَا بِذِكْرِ اللَّهِ تَطْمَئِنُّ الْقُلُوبُ»',
+    en: '“Those who have believed and whose hearts find rest in the remembrance of Allah. Unquestionably, in the remembrance of Allah do hearts find rest.”',
+  },
+  bannerVerseSource: {
+    am: 'ቁርኣን — ሱረቱ አር-ረዕድ 13:28',
+    ar: 'القرآن — سورة الرعد: ٢٨',
+    en: 'Qur’an 13:28',
+  },
   heroHadithText: {
     am: '«በሰውነት ውስጥ አንዲት ቁራጭ ስጋ አለች፤ እሷ ከተስተካከለች መላው ሰውነት ይስተካከላል፤ እሷ ከተበላሸች መላው ሰውነት ይበላሻል። እሷም ቀልብ (ልብ) ነች።»',
     ar: '«أَلا وَإِنَّ فِي الْجَسَدِ مُضْغَةً إِذَا صَلَحَتْ صَلَحَ الْجَسَدُ كُلُّهُ، وَإِذَا فَسَدَتْ فَسَدَ الْجَسَدُ كُلُّهُ، أَلا وَهِيَ الْقَلْبُ.»',
@@ -182,39 +205,6 @@ export const knowledgeData: KnowledgeItem[] = [
       ar: 'سورة الرعد ፡ ٢٨',
       en: 'Surah Ar-Ra’d: 28'
     }
-  }
-];
-
-export const sahabahData: Sahabah[] = [
-  {
-    slug: 'abu-bakr-al-siddiq',
-    name: {
-      am: 'አቡ በክር አስ-ሲዲቅ (ረ.ዐ)',
-      ar: 'أبو بكر الصديق رضي الله عنه',
-      en: 'Abu Bakr Al-Siddiq (R.A)'
-    },
-    title: {
-      am: 'የምእመናን መሪና የታማኝነት ተምሳሌት',
-      ar: 'الصديق الخليفة الأول',
-      en: 'The Truthful, First Caliph'
-    },
-    shortDescription: {
-      am: 'ከነቢያት በኋላ ከሰዎች ሁሉ የተሻለውና ኢማኑ የሚመዘን ታላቁ የነቢዩ (ሰ.ዐ.ወ) ባልደረባ።',
-      ar: 'خير الناس بعد الأنبياء وأقواهم إيماناً وصحبة لرسول الله صلى الله عليه وسلم.',
-      en: 'The greatest companion of the Prophet (PBUH) whose faith outweighed that of the Ummah.'
-    },
-    fullBiography: {
-      am: 'አቡ በክር አስ-ሲዲቅ (ረ.ዐ) በኢስላም ታሪክ ውስጥ ለመጀመሪያ ጊዜ ለነቢዩ ጥሪ እጅ የሰጡ፣ ንብረታቸውን በሙሉ ለአላህ መንገድ የሰጡና በዋሻው ውስጥ ከነቢዩ ጋር የነበሩ ታላቅ ሶሓቢ ናቸው።',
-      ar: 'كان أول من آمن من الرجال، وبذل ماله ونفسه لنصرة الدين.',
-      en: 'Abu Bakr Al-Siddiq (R.A) was the first adult male to accept Islam and sacrificed everything for the sake of Allah.'
-    },
-    keyLessons: [
-      {
-        am: 'ሙሉ እምነትና አላህን የመፍራት ተቅዋ',
-        ar: 'التصديق المطلق والتقوى',
-        en: 'Unwavering faith and devotion'
-      }
-    ]
   }
 ];
 

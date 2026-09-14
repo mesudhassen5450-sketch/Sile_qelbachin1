@@ -53,7 +53,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const t = (key: string | { en: string; ar: string; am: string }): string => {
     // If it's an object, return the appropriate language value directly
     if (typeof key === 'object') {
-      return key[language] || key.en;
+      return key[language] || key.am || key.en;
     }
     
     // If it's a string key, look it up in translations
@@ -63,14 +63,28 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       'hero.btnKitab': 'heroBtnKitab',
       'hero.btnMuhadara': 'heroBtnMuhadara',
       'hero.btnTelegram': 'heroBtnTelegram',
+      'hero.listenAudio': 'heroListenAudio',
+      'hero.exploreKitab': 'heroExploreKitab',
+      'hero.telegramChannel': 'heroTelegramChannel',
+      'hero.joinTelegramBanner': 'joinTelegramBanner',
+      'hero.telegramBannerSub': 'telegramBannerSub',
       'purpose.title': 'purposeTitle',
       'sections.featuredKitab': 'featuredKitab',
+      'sections.featuredKitabLabel': 'featuredKitabLabel',
       'sections.viewAllKitabs': 'viewAllKitabs',
       'sections.latestDers': 'latestDers',
+      'sections.popularAudio': 'popularAudio',
+      'sections.popularAudioLabel': 'popularAudioLabel',
+      'sections.viewAllAudio': 'viewAllAudio',
+      'sections.exploreSite': 'exploreSite',
+      'sections.mainSections': 'mainSections',
+      'sections.open': 'openSection',
       'sections.viewReminders': 'viewReminders',
       'sections.readSahabah': 'readSahabah',
       'sections.spotlight': 'spotlight',
       'sections.viewKnowledge': 'viewKnowledge',
+      'sections.randomMuhadara': 'randomMuhadaraTitle',
+      'sections.listenAnother': 'listenAnother',
       'nav.home': 'navHome',
       'nav.kitab': 'navKitab',
       'nav.audioLecture': 'navAudioLecture',
@@ -85,7 +99,18 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       'audioLecture.previous': 'previousLectures',
       'buttons.play': 'play',
       'buttons.pause': 'pause',
+      'buttons.playAudio': 'playAudio',
+      'buttons.pauseAudio': 'pauseAudio',
       'buttons.openKitab': 'openKitab',
+      'downloadPdf': 'downloadPdf',
+      'ai.askButton': 'aiAskButton',
+      'ai.title': 'aiTitle',
+      'ai.subtitle': 'aiSubtitle',
+      'ai.explore': 'aiExplore',
+      'ai.quickActions': 'aiQuickActions',
+      'ai.placeholder': 'aiPlaceholder',
+      'ai.empty': 'aiEmpty',
+      'ai.thinking': 'aiThinking',
       'contactTitle': 'contactTitle',
       'verifiedSocials': 'verifiedSocials',
       'sendMessageTitle': 'sendMessageTitle',
@@ -100,7 +125,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     
     if (translation) {
       const langUpper = language.toUpperCase() as 'EN' | 'AR' | 'AM';
-      return translation[langUpper] || translation.EN;
+      return translation[langUpper] || translation.AM || translation.EN;
     }
     
     // Return key if no translation found
@@ -115,7 +140,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     if (typeof text === 'string') {
       return text;
     }
-    return text[language] || text.en;
+    return text[language] || text.am || text.en;
   };
 
   // Set initial direction on mount

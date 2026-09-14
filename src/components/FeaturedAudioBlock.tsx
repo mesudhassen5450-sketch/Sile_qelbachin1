@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import { Play, Pause, Volume2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { LocalizedString } from '@/context/LanguageContext';
+import { useAudio } from '@/context/AudioContext';
 
 interface FeaturedAudioBlockProps {
   title: LocalizedString;
@@ -11,7 +12,7 @@ interface FeaturedAudioBlockProps {
   duration?: string;
   description?: string;
   audioUrl: string;
-  category?: string;
+  category?: string | LocalizedString;
 }
 
 export default function FeaturedAudioBlock({
@@ -22,51 +23,37 @@ export default function FeaturedAudioBlock({
   audioUrl,
   category,
 }: FeaturedAudioBlockProps) {
-  const { getLocalized } = useLanguage();
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [audioDuration, setAudioDuration] = useState(0);
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const { getLocalized, t } = useLanguage();
+  const { currentTrack, isPlaying, currentTime, duration: globalDuration, playTrack, togglePlayPause } = useAudio();
 
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
+  const isThisTrack = currentTrack?.audioUrl === audioUrl;
+  const isThisPlaying = isThisTrack && isPlaying;
+  const displayTime = isThisTrack ? currentTime : 0;
+  const displayDuration = isThisTrack && globalDuration ? globalDuration : 0;
 
-    const updateTime = () => setCurrentTime(audio.currentTime);
-    const updateDuration = () => setAudioDuration(audio.duration);
-    const handleEnded = () => setIsPlaying(false);
-
-    audio.addEventListener('timeupdate', updateTime);
-    audio.addEventListener('loadedmetadata', updateDuration);
-    audio.addEventListener('ended', handleEnded);
-
-    return () => {
-      audio.removeEventListener('timeupdate', updateTime);
-      audio.removeEventListener('loadedmetadata', updateDuration);
-      audio.removeEventListener('ended', handleEnded);
-    };
-  }, []);
-
-  const togglePlayPause = () => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    if (isPlaying) {
-      audio.pause();
-    } else {
-      audio.play();
+  const toggleThisTrack = () => {
+    if (isThisTrack) {
+      togglePlayPause();
+      return;
     }
-    setIsPlaying(!isPlaying);
+    playTrack({
+      id: audioUrl,
+      title,
+      speaker,
+      duration: duration || '',
+      audioUrl,
+    });
   };
 
   const formatTime = (time: number) => {
-    if (isNaN(time)) return '0:00';
+    if (isNaN(time) || time <= 0) return '0:00';
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  const progress = audioDuration > 0 ? (currentTime / audioDuration) * 100 : 0;
+  const progress = displayDuration > 0 ? (displayTime / displayDuration) * 100 : 0;
+  const categoryLabel = typeof category === 'string' ? category : category ? getLocalized(category) : '';
 
   return (
     <div className="relative group bg-gradient-to-br from-neutral-900 via-neutral-900 to-red-950/40 rounded-3xl overflow-hidden border border-neutral-800 hover:border-red-900/50 transition-all duration-300 shadow-xl hover:shadow-2xl">
@@ -81,11 +68,11 @@ export default function FeaturedAudioBlock({
       <div className="relative z-10 p-8 space-y-6">
         
         {/* Top Badge */}
-        {category && (
+        {categoryLabel && (
           <div className="flex items-center justify-between">
             <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold bg-red-950/60 text-red-400 border border-red-800/60 backdrop-blur-sm">
               <Volume2 className="w-3.5 h-3.5 mr-1.5" />
-              {category}
+              {categoryLabel}
             </span>
             {duration && (
               <span className="text-xs font-mono text-neutral-500">
@@ -127,34 +114,31 @@ export default function FeaturedAudioBlock({
               />
             </div>
             <div className="flex items-center justify-between text-xs font-mono text-neutral-500">
-              <span>{formatTime(currentTime)}</span>
-              <span>{formatTime(audioDuration)}</span>
+              <span>{formatTime(displayTime)}</span>
+              <span>{displayDuration > 0 ? formatTime(displayDuration) : duration || '0:00'}</span>
             </div>
           </div>
 
           {/* Play Button */}
           <button
-            onClick={togglePlayPause}
+            onClick={toggleThisTrack}
             className="w-full flex items-center justify-center space-x-3 bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white font-bold py-4 px-6 rounded-2xl transition-all duration-300 shadow-lg hover:shadow-red-900/50 hover:scale-[1.02] active:scale-[0.98]"
           >
-            {isPlaying ? (
+            {isThisPlaying ? (
               <>
                 <Pause className="w-6 h-6 fill-current" />
-                <span className="text-lg">Pause Audio</span>
+                <span className="text-lg">{t('buttons.pauseAudio')}</span>
               </>
             ) : (
               <>
                 <Play className="w-6 h-6 fill-current" />
-                <span className="text-lg">Play Audio</span>
+                <span className="text-lg">{t('buttons.playAudio')}</span>
               </>
             )}
           </button>
         </div>
 
       </div>
-
-      {/* Hidden Audio Element */}
-      <audio ref={audioRef} src={audioUrl} preload="metadata" />
     </div>
   );
 }

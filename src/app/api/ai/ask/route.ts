@@ -110,11 +110,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('API Key present:', apiKey ? 'Yes' : 'No');
-    console.log('API Key length:', apiKey?.length);
-    console.log('User message:', message);
-
-    // Build context with website content
     const websiteContext = getAIContextSummary();
 
     // Prepare messages for Groq API
@@ -206,15 +201,9 @@ Remember: ALWAYS provide a helpful response. Never say you cannot respond.`
     });
 
     if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('Groq API error details:');
-      console.error('Status:', aiResponse.status);
-      console.error('Status Text:', aiResponse.statusText);
-      console.error('Response:', errorText);
-      console.error('Headers:', Object.fromEntries(aiResponse.headers.entries()));
-      
+      console.error('Groq API error', aiResponse.status);
       return NextResponse.json(
-        { error: `AI service error (${aiResponse.status}): ${errorText.substring(0, 100)}` },
+        { error: 'AI service temporarily unavailable' },
         { status: 503 }
       );
     }
@@ -307,7 +296,7 @@ function extractActionsFromResponse(response: string, query: string): Array<{
     actions.push({
       type: 'navigate',
       label: '🎥 Watch Videos',
-      url: '/videos'
+      url: '/video-lecture'
     });
   }
 

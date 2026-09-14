@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { getVideos, getGroupedVideosByMonthYear, MediaItem } from '@/data/mediaStore';
 import { useLanguage } from '@/context/LanguageContext';
+import { useAudio } from '@/context/AudioContext';
 import {
   Video,
   Play,
@@ -16,6 +17,7 @@ import {
 
 export default function VideoLecturePage() {
   const { language, t } = useLanguage();
+  const { closePlayer } = useAudio();
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeVideoModal, setActiveVideoModal] = useState<MediaItem | null>(null);
 
@@ -97,6 +99,7 @@ export default function VideoLecturePage() {
                 src={activeVideoModal.fileUrl}
                 controls
                 autoPlay
+                onPlay={closePlayer}
                 className="w-full h-full object-contain"
               />
             </div>
@@ -133,7 +136,10 @@ export default function VideoLecturePage() {
                 key={video.id}
                 video={video}
                 language={language}
-                onWatch={() => setActiveVideoModal(video)}
+                onWatch={() => {
+                  closePlayer();
+                  setActiveVideoModal(video);
+                }}
               />
             ))}
           </div>
@@ -160,7 +166,10 @@ export default function VideoLecturePage() {
                     key={video.id}
                     video={video}
                     language={language}
-                    onWatch={() => setActiveVideoModal(video)}
+                    onWatch={() => {
+                  closePlayer();
+                  setActiveVideoModal(video);
+                }}
                   />
                 ))}
               </div>

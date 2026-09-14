@@ -448,6 +448,26 @@ export function searchKnowledge(query: string, category?: 'quran' | 'hadith' | '
 }
 
 /**
+ * Find a kitab lesson by slug + 1-based ders number (e.g. adewae-kitab, 9)
+ */
+export function findKitabLesson(kitabSlug: string, lessonNumber: number): {
+  kitab: KitabIndex;
+  ders: KitabIndex['dersList'][number] | null;
+} | null {
+  const index = getCachedIndex();
+  const kitab = index.kitabs.find((k) => k.slug === kitabSlug);
+  if (!kitab) return null;
+
+  const ders =
+    kitab.dersList.find((d) => {
+      const match = d.id.match(/ders-(\d+)$/);
+      return match ? parseInt(match[1], 10) === lessonNumber : false;
+    }) || null;
+
+  return { kitab, ders };
+}
+
+/**
  * Get social link by platform
  */
 export function getSocialLink(platform: string): SocialIndex | null {

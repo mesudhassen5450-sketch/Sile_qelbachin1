@@ -25,22 +25,39 @@ import {
   Bookmark,
   Radio,
   ChevronRight,
+  Smartphone,
+  Compass,
+  BookMarked,
+  Bell,
+  Globe2,
+  Clock3,
 } from 'lucide-react';
+import { SITELINK_PAGES, getSitePageCopy } from '@/lib/seo';
 
 export default function HomePage() {
-  const { t, getLocalized } = useLanguage();
+  const { t, getLocalized, language } = useLanguage();
 
   const featuredKitabs = kitabsData.slice(0, 3);
-  const latestDersList = kitabsData[0].dersList.slice(0, 4); // Changed to 4 to include Part 4
+  const latestDersList = [...kitabsData[0].dersList].reverse().slice(0, 5);
   const featuredReminder = remindersData[0];
   const featuredSahabah = sahabahData[0];
   const featuredKnowledge = knowledgeData[0];
+
+  const appFeatures = [
+    { label: t('appFeatureQibla'), icon: Compass },
+    { label: t('appFeatureQuran'), icon: BookMarked },
+    { label: t('appFeatureAzan'), icon: Clock3 },
+    { label: t('appFeatureReminder'), icon: Bell },
+    { label: t('appFeatureDers'), icon: Headphones },
+    { label: t('appFeatureKitab'), icon: BookOpen },
+    { label: t('appFeatureGlobal'), icon: Globe2 },
+  ];
 
   return (
     <div className="space-y-16 sm:space-y-24">
       
       {/* 1. PROFESSIONAL HIGH-IMPACT HERO SECTION */}
-      <section className="w-screen relative left-1/2 -translate-x-1/2 -mt-10 mb-12 overflow-hidden bg-neutral-950 border-b border-neutral-800 shadow-2xl">
+      <section className="w-screen relative left-1/2 -translate-x-1/2 -mt-6 mb-12 overflow-hidden bg-neutral-950 border-b border-neutral-800 shadow-2xl">
         
         {/* Background Image Layer with Calligraphy & Dark Contrast Gradient */}
         <div className="absolute inset-0 w-full h-full -z-10 flex items-center justify-center">
@@ -63,7 +80,7 @@ export default function HomePage() {
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-28 flex flex-col lg:flex-row items-center justify-between gap-12">
           
           {/* Left Column: Typography, Hadith Glass Box, and Interactive CTAs */}
-          <div className="w-full lg:w-7/12 space-y-8 text-left">
+          <div className="w-full lg:w-7/12 space-y-8 text-start">
             
             <div className="space-y-4">
               <div className="inline-flex items-center space-x-2.5 px-4 py-1.5 rounded-full bg-red-950/80 text-red-400 border border-red-800/60 text-xs font-bold uppercase tracking-wider backdrop-blur-md shadow-md">
@@ -80,8 +97,8 @@ export default function HomePage() {
             </div>
 
             {/* Hadith Quote Glass Box Component */}
-            <div className="backdrop-blur-xl bg-neutral-900/80 border border-neutral-800/80 p-6 sm:p-8 rounded-3xl border-l-4 border-l-red-600 shadow-2xl space-y-4">
-              <p className="text-lg sm:text-2xl font-semibold leading-relaxed text-neutral-100 tracking-tight">
+            <div className="backdrop-blur-xl bg-neutral-900/80 border border-neutral-800/80 p-6 sm:p-8 rounded-3xl border-s-4 border-s-red-600 shadow-2xl space-y-4">
+              <p className={`text-lg sm:text-2xl font-semibold leading-relaxed text-neutral-100 tracking-tight ${language === 'ar' ? 'arabic-text' : ''}`}>
                 {getLocalized(siteMetadata.heroHadithText)}
               </p>
               <div className="flex items-center justify-end font-bold text-xs sm:text-sm text-red-400">
@@ -96,8 +113,8 @@ export default function HomePage() {
                 className="btn-red inline-flex items-center space-x-2.5 px-7 py-4 rounded-2xl font-bold text-sm sm:text-base shadow-xl hover:scale-105 transition"
               >
                 <Headphones className="w-5 h-5 text-white" />
-                <span>Listen to Audio Lectures (ድምፅ ድርሶች)</span>
-                <ChevronRight className="w-4 h-4 text-white/80" />
+                <span>{t('hero.listenAudio')}</span>
+                <ChevronRight className="w-4 h-4 text-white/80 rtl:rotate-180" />
               </Link>
 
               <Link
@@ -105,7 +122,7 @@ export default function HomePage() {
                 className="inline-flex items-center space-x-2.5 px-7 py-4 rounded-2xl font-bold text-sm sm:text-base bg-neutral-900/90 text-white hover:bg-neutral-800 border border-neutral-700/80 backdrop-blur-md shadow-xl hover:border-red-600/50 transition"
               >
                 <BookOpen className="w-5 h-5 text-red-500" />
-                <span>Explore Kitab (ኪታቦች)</span>
+                <span>{t('hero.exploreKitab')}</span>
               </Link>
 
               <a
@@ -115,7 +132,7 @@ export default function HomePage() {
                 className="inline-flex items-center space-x-2.5 px-6 py-4 rounded-2xl font-bold text-sm sm:text-base bg-sky-600/90 hover:bg-sky-500 text-white transition shadow-xl border border-sky-500/30"
               >
                 <Send className="w-5 h-5" />
-                <span>Telegram Channel</span>
+                <span>{t('hero.telegramChannel')}</span>
               </a>
             </div>
 
@@ -137,7 +154,7 @@ export default function HomePage() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex items-end p-4">
                     <div>
-                      <span className="text-xs font-mono text-red-400 font-bold">ይፋዊ ማህበረሰብ</span>
+                      <span className="text-xs font-mono text-red-400 font-bold">{t('officialCommunity')}</span>
                       <h3 className="text-lg font-bold text-white">{siteMetadata.channelName}</h3>
                     </div>
                   </div>
@@ -147,7 +164,7 @@ export default function HomePage() {
                   <div className="flex items-center justify-between p-3 rounded-xl bg-neutral-950/60 border border-neutral-800">
                     <span className="flex items-center space-x-2">
                       <Radio className="w-4 h-4 text-red-500" />
-                      <span>የድምፅ ድርሶች (Audio Archives)</span>
+                      <span>{t('audioArchives')}</span>
                     </span>
                     <span className="font-mono text-red-400 font-bold">180+ Tracks</span>
                   </div>
@@ -155,7 +172,7 @@ export default function HomePage() {
                   <div className="flex items-center justify-between p-3 rounded-xl bg-neutral-950/60 border border-neutral-800">
                     <span className="flex items-center space-x-2">
                       <BookOpen className="w-4 h-4 text-red-500" />
-                      <span>የኪታብ PDF ፋይሎች (Kitab PDFs)</span>
+                      <span>{t('kitabPdfs')}</span>
                     </span>
                     <span className="font-mono text-red-400 font-bold">22+ Books</span>
                   </div>
@@ -184,13 +201,49 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* 2b. SITELINK / SECTION DIRECTORY (clear homepage anchors for Google + visitors) */}
+      <section className="space-y-6">
+        <div>
+          <div className="flex items-center space-x-2 text-red-600 font-semibold text-xs tracking-wider uppercase mb-1">
+            <Sparkles className="w-4 h-4" />
+            <span>{t('sections.exploreSite')}</span>
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-white">
+            {t('sections.mainSections')}
+          </h2>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {SITELINK_PAGES.map((page) => {
+            const copy = getSitePageCopy(page, language);
+            return (
+            <Link
+              key={page.path}
+              href={page.path}
+              className="portfolio-card p-5 space-y-2 hover:border-red-500/40 hover:-translate-y-0.5 transition group"
+            >
+              <h3 className="text-lg font-bold text-neutral-900 dark:text-white group-hover:text-red-600 transition">
+                {copy.name}
+              </h3>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                {copy.description}
+              </p>
+              <span className="inline-flex items-center text-sm font-semibold text-red-600">
+                {language === 'en' ? `${t('sections.open')} ${copy.name}` : `${copy.name} ${t('sections.open')}`}
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </span>
+            </Link>
+            );
+          })}
+        </div>
+      </section>
+
       {/* 3. FEATURED KITAB SECTION */}
       <section className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
             <div className="flex items-center space-x-2 text-red-600 font-semibold text-xs tracking-wider uppercase mb-1">
               <BookOpen className="w-4 h-4" />
-              <span>{t('sections.featuredKitab')}</span>
+              <span>{t('sections.featuredKitabLabel')}</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-white">
               {t('sections.featuredKitab')}
@@ -239,17 +292,17 @@ export default function HomePage() {
           <div>
             <div className="flex items-center space-x-2 text-red-600 font-semibold text-xs tracking-wider uppercase mb-1">
               <Headphones className="w-4 h-4" />
-              <span>Featured Audio</span>
+              <span>{t('sections.popularAudioLabel')}</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-white">
-              Latest Audio Teachings
+              {t('sections.popularAudio')}
             </h2>
           </div>
           <Link
             href="/audio-lecture"
             className="inline-flex items-center space-x-2 text-sm font-semibold text-red-600 hover:text-red-700 dark:text-red-400"
           >
-            <span>View All Audio</span>
+            <span>{t('sections.viewAllAudio')}</span>
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
@@ -262,7 +315,7 @@ export default function HomePage() {
             title={{ am: "#ግጥም1 — ማረኝ ጌታየ ሆይ!!", ar: "قصيدة — يا ربي", en: "Poetry — My Lord" }}
             speaker="በ ኡስታዝ፦ ሙሓመድ ሲራጅ ተገጥሞ፤ በ ወንድም አቡ ሱፍያን ድምፅ የቀረበ"
             audioUrl="/telegram_media/files/home page audio/ማረኝ_የኔ_ጌታ…!የ_ኡስታዝ_መመሀመድ_ሲራጁ_ግጥም.m4a"
-            category="ግጥም (Poetry)"
+            category={{ am: 'ግጥም', ar: 'شعر', en: 'Poetry' }}
           />
 
           {/* Track 2: Anxiety & Stress Advice */}
@@ -270,7 +323,7 @@ export default function HomePage() {
             title={{ am: "ከ ሐሳብ እና ከ ጭንቀት እንዴት መውጣት እንችላለን?", ar: "كيف نتخلص من القلق والحزن؟", en: "How to Overcome Anxiety & Stress?" }}
             speaker="አቅራቢ፦ ኡስታዝ አብዱ ረዛቅ አል-ባጂ"
             audioUrl="/telegram_media/files/home page audio/ከጭንቀት_እና_ከ_ሐሳብ_መውጫ_መንገዶች!.mp3"
-            category="መልእክት (Advice)"
+            category={{ am: 'መልእክት', ar: 'نصيحة', en: 'Advice' }}
           />
 
           {/* Track 3: Marriage & Islam */}
@@ -280,7 +333,7 @@ export default function HomePage() {
             duration="52:43"
             description="ወንጀልን መሥራት በሰው ልጅ ላይ በዱንያ እና በ ኣኺራ ላይ የሚያመጣው ተፅዕኖ!"
             audioUrl="/telegram_media/files/home page audio/ትዳር እና እስልምና.ogg"
-            category="ትዳር (Marriage)"
+            category={{ am: 'ትዳር', ar: 'الزواج', en: 'Marriage' }}
           />
 
         </div>
@@ -393,13 +446,177 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 8. TELEGRAM BANNER SECTION */}
+      {/* 8. MOBILE APP COMING SOON */}
+      <section className="relative overflow-hidden rounded-3xl border border-neutral-800 bg-neutral-950 text-white shadow-2xl">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-80"
+          style={{
+            background:
+              'radial-gradient(ellipse 70% 60% at 85% 20%, rgba(185,28,28,0.35), transparent 55%), radial-gradient(ellipse 50% 40% at 10% 90%, rgba(127,29,29,0.25), transparent 50%), linear-gradient(160deg, #0a0a0b 0%, #171717 55%, #1c1917 100%)',
+          }}
+        />
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.07]"
+          style={{
+            backgroundImage:
+              'linear-gradient(to right, rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.5) 1px, transparent 1px)',
+            backgroundSize: '28px 28px',
+          }}
+        />
+
+        <div className="relative grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-10 lg:gap-6 p-6 sm:p-10 lg:p-12 items-center">
+          <div className="space-y-6 max-w-xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-red-500/30 bg-red-950/50 px-3 py-1 text-xs font-semibold tracking-wide text-red-300">
+              <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+              <span>{t('appComingSoonBadge')}</span>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-red-400">
+                <Smartphone className="w-5 h-5" />
+                <span className="text-xs font-bold uppercase tracking-[0.18em]">Digital App</span>
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-extrabold leading-tight tracking-tight">
+                {t('appComingSoonTitle')}
+              </h2>
+              <p className="text-base sm:text-lg text-neutral-300 leading-relaxed">
+                {t('appComingSoonBody')}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2.5">
+              {appFeatures.map(({ label, icon: Icon }) => (
+                <span
+                  key={label}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs sm:text-sm font-semibold text-neutral-100 backdrop-blur-sm transition hover:border-red-500/40 hover:bg-red-950/40"
+                >
+                  <Icon className="w-3.5 h-3.5 text-red-400" />
+                  {label}
+                </span>
+              ))}
+            </div>
+
+            <p className="text-sm text-neutral-400">
+              {t('appNotifyHint')}:{' '}
+              <a
+                href={siteMetadata.telegramUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-bold text-red-400 hover:text-red-300 transition"
+              >
+                {siteMetadata.telegramHandle}
+              </a>
+            </p>
+          </div>
+
+          {/* Phone mock — visual only */}
+          <div className="relative mx-auto w-full max-w-[260px] sm:max-w-[280px] lg:justify-self-end">
+            <div className="absolute -inset-8 rounded-full bg-red-600/20 blur-3xl animate-pulse" />
+            <div className="relative rounded-[2rem] border border-neutral-700 bg-neutral-900 p-2.5 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.7)] rotate-[-2deg] hover:rotate-0 transition-transform duration-500">
+              <div className="rounded-[1.5rem] overflow-hidden bg-neutral-950 border border-neutral-800">
+                <div className="h-7 bg-neutral-900 flex items-center justify-center">
+                  <div className="h-1.5 w-16 rounded-full bg-neutral-700" />
+                </div>
+                <div className="px-4 pt-3 pb-5 space-y-4 min-h-[380px]">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-red-400 font-bold">Sile Qelbachin</p>
+                      <p className="text-sm font-bold text-white">ስለ ቀልባችን</p>
+                    </div>
+                    <div className="w-8 h-8 rounded-full bg-red-600/20 border border-red-500/40 flex items-center justify-center">
+                      <Heart className="w-3.5 h-3.5 text-red-400" />
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl bg-gradient-to-br from-red-900/60 to-neutral-900 border border-red-800/40 p-4 space-y-2">
+                    <div className="flex items-center gap-2 text-red-300 text-xs font-semibold">
+                      <Compass className="w-3.5 h-3.5" />
+                      <span>{t('appFeatureQibla')}</span>
+                    </div>
+                    <div className="mx-auto w-20 h-20 rounded-full border-2 border-red-500/50 flex items-center justify-center relative">
+                      <div className="absolute inset-2 rounded-full border border-dashed border-red-400/30 animate-[spin_12s_linear_infinite]" />
+                      <div className="w-0 h-0 border-l-[6px] border-r-[6px] border-b-[18px] border-l-transparent border-r-transparent border-b-red-500" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { icon: BookMarked, label: t('appFeatureQuran') },
+                      { icon: Clock3, label: t('appFeatureAzan') },
+                      { icon: Bell, label: t('appFeatureReminder') },
+                      { icon: Headphones, label: t('appFeatureDers') },
+                      { icon: BookOpen, label: t('appFeatureKitab') },
+                      { icon: Globe2, label: t('appFeatureGlobal') },
+                    ].map(({ icon: Icon, label }) => (
+                      <div
+                        key={label}
+                        className="rounded-xl bg-white/5 border border-white/10 p-2.5 flex flex-col items-center gap-1.5 text-center"
+                      >
+                        <Icon className="w-4 h-4 text-red-400" />
+                        <span className="text-[9px] leading-tight text-neutral-300 font-medium line-clamp-2">
+                          {label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="rounded-xl bg-red-600 text-center py-2.5 text-xs font-bold tracking-wide">
+                    {t('appComingSoonBadge')}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 8b. LIVE DERS — STAY TUNED (honest teaser) */}
+      <section className="rounded-2xl border border-neutral-800 bg-neutral-950/90 text-white overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 p-4 sm:p-5">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="relative flex-shrink-0 w-11 h-11 rounded-xl bg-red-950/80 border border-red-800/60 flex items-center justify-center">
+              <Radio className="w-5 h-5 text-red-400" />
+              <span className="absolute -top-1 -end-1 h-2.5 w-2.5 rounded-full bg-neutral-500 border border-neutral-900" />
+            </div>
+            <div className="min-w-0 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 bg-neutral-900 border border-neutral-700 px-2 py-0.5 rounded-full">
+                  {t('liveStayTunedBadge')}
+                </span>
+                <span className="text-[10px] font-semibold text-neutral-500">
+                  {t('liveStayTunedStyle')}
+                </span>
+              </div>
+              <h3 className="text-sm sm:text-base font-extrabold tracking-tight truncate">
+                {t('liveStayTunedTitle')}
+              </h3>
+              <p className="text-xs text-neutral-400 leading-relaxed">
+                {t('liveStayTunedBody')}
+              </p>
+            </div>
+          </div>
+          <div className="flex-shrink-0 sm:text-end space-y-1">
+            <p className="text-[11px] font-semibold text-neutral-500">{t('liveNotActiveYet')}</p>
+            <a
+              href={siteMetadata.telegramUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-red-400 hover:text-red-300 transition"
+            >
+              <Send className="w-3.5 h-3.5" />
+              {siteMetadata.telegramHandle}
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* 9. TELEGRAM BANNER SECTION */}
       <section>
         <div className="bg-sky-950/80 border border-sky-800/60 rounded-2xl p-6 sm:p-10 text-white flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl">
           <div className="space-y-2 text-center sm:text-left">
-            <h3 className="text-2xl font-bold">📱 Join the Telegram Channel</h3>
+            <h3 className="text-2xl font-bold">{t('hero.joinTelegramBanner')}</h3>
             <p className="text-sm text-sky-200">
-              ዕለታዊ የቁርኣን፣ የሐዲሥና የኪታብ ድርሶችን በቴሌግራም ቻናላችን ይከታተሉ፡ <strong className="text-white">{siteMetadata.telegramHandle}</strong>
+              {t('hero.telegramBannerSub')}: <strong className="text-white">{siteMetadata.telegramHandle}</strong>
             </p>
           </div>
 

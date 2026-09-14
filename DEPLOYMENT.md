@@ -12,9 +12,11 @@ The repository **does not include** the `public/telegram_media/` folder (1.9 GB,
 3. Build settings:
    - Build command: `npm run build`
    - Publish directory: `.next`
-4. Add environment variable:
+4. Add environment variable in Netlify (Site settings → Environment variables):
    - Key: `GROQ_API_KEY`
-   - Value: `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`
+   - Value: your Groq API key (never commit keys to git)
+   - Key: `NEXT_PUBLIC_SITE_URL`
+   - Value: `https://sileqelbachin1.netlify.app`
 
 ### Step 2: Upload Media Files
 After your site deploys:
@@ -124,10 +126,24 @@ npm run dev
 3. Test PDF viewer on Kitab pages
 4. Verify audio playback
 
+## 🔎 Google Search Console (SEO)
+
+After the site is live:
+
+1. Open [Google Search Console](https://search.google.com/search-console)
+2. Add property for your domain (or URL prefix matching `NEXT_PUBLIC_SITE_URL`)
+3. Verify ownership (HTML tag, DNS, or Netlify method)
+4. Submit sitemap: `{NEXT_PUBLIC_SITE_URL}/sitemap.xml`  
+   Example: `https://sileqelbachin1.netlify.app/sitemap.xml`
+5. Confirm robots is reachable: `{NEXT_PUBLIC_SITE_URL}/robots.txt`
+
+Set `NEXT_PUBLIC_SITE_URL` in Netlify to your final public URL (Netlify or custom domain such as `https://sileqelbachin1.com`) so canonicals, Open Graph, sitemap, and robots stay correct.
+
 ## 📝 Environment Variables
 
 Required for production:
 - `GROQ_API_KEY`: Your Groq API key for AI features
+- `NEXT_PUBLIC_SITE_URL`: Public site URL for sitemap / OG / canonicals
 
 ## 💡 Pro Tip
 

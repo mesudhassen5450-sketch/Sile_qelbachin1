@@ -7,7 +7,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { Send, Video, BookOpen, Headphones, ShieldCheck, Heart, Sparkles, Youtube } from 'lucide-react';
 
 export default function Footer() {
-  const { t } = useLanguage();
+  const { t, getLocalized } = useLanguage();
 
   return (
     <footer className="bg-neutral-900 text-neutral-300 border-t border-neutral-800 transition-colors pt-12 pb-16">
@@ -29,12 +29,12 @@ export default function Footer() {
                 <h3 className="text-xl font-bold text-white tracking-wide">
                   {siteMetadata.channelName}
                 </h3>
-                <p className="text-xs text-red-400 font-mono">የቀልብና የኢማን ማጠናከሪያ ቻናል</p>
+                <p className="text-xs text-red-400 font-mono">{t('hero.badge')}</p>
               </div>
             </div>
 
             <p className="text-sm text-neutral-400 leading-relaxed max-w-lg">
-              በዚህ የፈተናና የቴክኖሎጂ ዘመን ከቁርኣንና ከሐዲሥ ቀልባችንን የምናክምበትን ጥበብ በጋራ የምንፈልግበትና ለወጣቱ ትውልድ በራሱ ቋንቋ የሕይወት መፍትሔዎችን የምናመላክትበት የእስልምና ትምህርታዊ መድረክ።
+              {getLocalized(siteMetadata.purposeParagraph1)}
             </p>
 
             {/* Social Verification Badges */}
@@ -102,7 +102,7 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/videos" className="hover:text-red-400 transition flex items-center space-x-2">
+                <Link href="/video-lecture" className="hover:text-red-400 transition flex items-center space-x-2">
                   <Sparkles className="w-3.5 h-3.5 text-red-500" />
                   <span>{t('nav.videos')}</span>
                 </Link>
@@ -113,7 +113,7 @@ export default function Footer() {
           {/* Main Nav Items */}
           <div className="md:col-span-3 space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400">
-              ዋና ገጾች (Main Navigation)
+              {t('mainNavigation')}
             </h4>
             <ul className="space-y-2 text-sm">
               <li>
@@ -136,7 +136,7 @@ export default function Footer() {
         <div className="pt-6 flex flex-col sm:flex-row items-center justify-between text-xs text-neutral-500 space-y-3 sm:space-y-0">
           <p>© {new Date().getFullYear()} {siteMetadata.channelName} — {t('rightsReserved')}</p>
           <p className="flex items-center space-x-1">
-            <span>በአላህ ፈቃድ ለቀልብ ጥራት የቀረበ መድረክ</span>
+            <span>{t('footerBlessing')}</span>
           </p>
         </div>
       </div>

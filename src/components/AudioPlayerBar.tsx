@@ -16,6 +16,7 @@ export default function AudioPlayerBar() {
     playbackRate,
     playlist,
     togglePlayPause,
+    closePlayer,
     seek,
     setVolume,
     setPlaybackSpeed,
@@ -28,9 +29,8 @@ export default function AudioPlayerBar() {
   const [isMuted, setIsMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(0.8);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
-  const [isDismissed, setIsDismissed] = useState(false);
 
-  if (!currentTrack || isDismissed) {
+  if (!currentTrack) {
     return null;
   }
 
@@ -58,7 +58,7 @@ export default function AudioPlayerBar() {
   const hasPrev = playlist.length > 0 && playlist.findIndex(t => t.id === currentTrack.id) > 0;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 p-2 sm:p-4 bg-white/95 dark:bg-neutral-900/95 border-t border-neutral-200 dark:border-neutral-800 shadow-2xl backdrop-blur-md transition-all duration-300">
+    <div className="fixed bottom-0 left-0 right-0 z-[60] p-2 sm:p-4 bg-white/95 dark:bg-neutral-900/95 border-t border-neutral-200 dark:border-neutral-800 shadow-2xl backdrop-blur-md transition-all duration-300">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-2 md:gap-4">
         
         {/* Track Metadata */}
@@ -77,11 +77,12 @@ export default function AudioPlayerBar() {
             </div>
           </div>
           <button
-            onClick={() => setIsDismissed(true)}
-            className="md:hidden text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-1"
+            onClick={closePlayer}
+            className="md:hidden text-neutral-400 hover:text-white p-1.5 rounded-full hover:bg-neutral-800 transition"
             aria-label="Close Player"
+            title="Close Player"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -207,13 +208,14 @@ export default function AudioPlayerBar() {
             />
           </div>
 
-          {/* Dismiss Player */}
+          {/* Close / stop player */}
           <button
-            onClick={() => setIsDismissed(true)}
-            className="p-1 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition ml-1"
-            title="Hide Player"
+            onClick={closePlayer}
+            className="p-1.5 text-neutral-400 hover:text-white rounded-full hover:bg-neutral-800 transition ml-1"
+            title="Close Player"
+            aria-label="Close Player"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
 
         </div>

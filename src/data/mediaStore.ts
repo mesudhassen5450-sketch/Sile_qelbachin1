@@ -1,5 +1,6 @@
 import rawData from './content.json';
 import { kitabsData } from './channelData';
+import { resolveMediaUrl } from '@/lib/mediaUrl';
 
 export interface LocalizedTextObj {
   am: string;
@@ -42,13 +43,13 @@ const items: MediaItem[] = (rawData as any[]).map((item) => {
     // Remove telegram_media/ prefix if exists
     cleanUrl = cleanUrl.replace(/^telegram_media\//, '');
 
-    // Build CDN URL
+    // Build CDN URL, then rewrite to GitHub raw with encoded paths
     cleanUrl = `${CDN_BASE}/${cleanUrl}`;
   }
 
   return {
     ...item,
-    fileUrl: cleanUrl,
+    fileUrl: resolveMediaUrl(cleanUrl),
   };
 });
 

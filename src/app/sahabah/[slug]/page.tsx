@@ -1,6 +1,7 @@
 import { sahabahData } from '@/data/channelData';
 import SahabahDetailClient from './SahabahDetailClient';
 import { notFound } from 'next/navigation';
+import { pageMetadata } from '@/lib/seo';
 
 export async function generateStaticParams() {
   return sahabahData.map((s) => ({
@@ -24,10 +25,10 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       : sahabah.shortDescription.am
     : 'የሶሓቦች ታሪክና ትምህርቶች';
 
-  return {
-    title: `${nameString} - ስለ ቀልባችን`,
+  return pageMetadata(`/sahabah/${slug}`, {
+    title: nameString,
     description: descString,
-  };
+  });
 }
 
 export default async function SahabahDetailPage({ params }: { params: Promise<{ slug: string }> }) {

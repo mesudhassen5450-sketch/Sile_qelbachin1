@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import { AIAssistantButtonWithTooltip } from './AIAssistantButton';
 import AIChatDrawer, { Message, QuickAction } from './AIChatDrawer';
 import { getFeaturedQuickActions } from '@/lib/aiQuickActions';
-import { matchIntent, getIntentResponse } from '@/lib/aiIntentMatcher';
+import { matchIntent } from '@/lib/aiIntentMatcher';
 import { executeIntent, getActionButtons } from '@/lib/aiActionHandler';
 
 /**
@@ -70,7 +70,6 @@ export default function AIAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const quickActions = getFeaturedQuickActions();
 
@@ -89,7 +88,6 @@ export default function AIAssistant() {
     };
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
-    setError(null);
 
     try {
       // Step 1: Try deterministic intent matching first
@@ -100,7 +98,7 @@ export default function AIAssistant() {
         const action = executeIntent(intent);
         
         // Execute navigation if needed
-        if (action.type === 'navigate' && action.data?.route) {
+        if ((action.type === 'navigate' || action.type === 'play_audio') && action.data?.route) {
           setTimeout(() => {
             router.push(action.data!.route!);
           }, 500);
@@ -140,7 +138,32 @@ export default function AIAssistant() {
       });
 
       if (!response.ok) {
-        throw new Error('AI service temporarily unavailable');
+        const localIntent = matchIntent(userMessage);
+        const localAction = executeIntent(
+          localIntent.confidence >= 0.5
+            ? localIntent
+            : { type: 'UNKNOWN', confidence: 0, params: { query: userMessage } }
+        );
+        const actionButtons = getActionButtons(localAction);
+
+        if ((localAction.type === 'navigate' || localAction.type === 'play_audio') && localAction.data?.route) {
+          setTimeout(() => {
+            router.push(localAction.data!.route!);
+          }, 500);
+        }
+
+        const fallbackMsg: Message = {
+          id: `ai-${Date.now()}`,
+          role: 'assistant',
+          content:
+            localAction.data?.message ||
+            'I can still guide you on this site. Try: “go to intebih”, “go to adawa kitab audio 9”, or “open videos”.',
+          timestamp: new Date(),
+          actions: actionButtons,
+        };
+        setMessages(prev => [...prev, fallbackMsg]);
+        setIsLoading(false);
+        return;
       }
 
       const data = await response.json();
@@ -159,14 +182,24 @@ export default function AIAssistant() {
       setMessages(prev => [...prev, aiMsg]);
     } catch (err) {
       console.error('AI Error:', err);
-      setError('The assistant is temporarily unavailable. Please try again.');
-      
-      // Add error message
+      const localIntent = matchIntent(userMessage);
+      const localAction = executeIntent(localIntent.confidence >= 0.5 ? localIntent : { type: 'UNKNOWN', confidence: 0, params: { query: userMessage } });
+      const actionButtons = getActionButtons(localAction);
+
+      if ((localAction.type === 'navigate' || localAction.type === 'play_audio') && localAction.data?.route) {
+        setTimeout(() => {
+          router.push(localAction.data!.route!);
+        }, 500);
+      }
+
       const errorMsg: Message = {
         id: `error-${Date.now()}`,
         role: 'assistant',
-        content: 'The assistant is temporarily unavailable. Please try again.',
+        content:
+          localAction.data?.message ||
+          'Cloud assistant is offline, but I can still open pages on this site. Try a kitab name or “open videos”.',
         timestamp: new Date(),
+        actions: actionButtons,
       };
       setMessages(prev => [...prev, errorMsg]);
     } finally {
@@ -207,7 +240,6 @@ export default function AIAssistant() {
    */
   const clearConversation = useCallback(() => {
     setMessages([]);
-    setError(null);
   }, []);
 
   return (

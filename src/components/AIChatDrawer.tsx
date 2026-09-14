@@ -58,7 +58,7 @@ export default function AIChatDrawer({
   const [inputValue, setInputValue] = React.useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -118,8 +118,8 @@ export default function AIChatDrawer({
             <div className="flex items-center space-x-3">
               <AILogo size={32} />
               <div>
-                <h2 className="text-lg font-bold">ስለ ቀልባችን Assistant</h2>
-                <p className="text-xs text-neutral-400">Islamic Knowledge Helper</p>
+                <h2 className="text-lg font-bold">{t('ai.title')}</h2>
+                <p className="text-xs text-neutral-400">{t('ai.subtitle')}</p>
               </div>
             </div>
             
@@ -142,7 +142,7 @@ export default function AIChatDrawer({
           </div>
           
           <p className="text-xs text-neutral-300">
-            Explore the knowledge available on Sle Qelbachin
+            {t('ai.explore')}
           </p>
         </div>
 
@@ -150,7 +150,7 @@ export default function AIChatDrawer({
         {messages.length === 0 && (
           <div className="flex-shrink-0 p-4 bg-neutral-50 dark:bg-neutral-800/50 border-b border-neutral-200 dark:border-neutral-700">
             <p className="text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-3">
-              Quick Actions:
+              {t('ai.quickActions')}
             </p>
             <div className="grid grid-cols-2 gap-2">
               {quickActions.map((action) => (
@@ -161,7 +161,7 @@ export default function AIChatDrawer({
                 >
                   <span className="text-xl flex-shrink-0">{action.icon}</span>
                   <span className="text-xs font-medium text-neutral-900 dark:text-white group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">
-                    {action.label}
+                    {language === 'am' ? action.labelAm : action.label}
                   </span>
                 </button>
               ))}
@@ -180,7 +180,7 @@ export default function AIChatDrawer({
                 السلام عليكم
               </h3>
               <p className="text-sm text-neutral-600 dark:text-neutral-400 max-w-xs">
-                Ask me about Kitabs, audio lectures, Muhadara, or any Islamic content on this website!
+                {t('ai.empty')}
               </p>
             </div>
           ) : (
@@ -234,7 +234,7 @@ export default function AIChatDrawer({
                   <div className="bg-neutral-100 dark:bg-neutral-800 rounded-2xl px-4 py-3">
                     <div className="flex items-center space-x-2 text-neutral-600 dark:text-neutral-400">
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span className="text-sm">Thinking...</span>
+                      <span className="text-sm">{t('ai.thinking')}</span>
                     </div>
                   </div>
                 </div>
@@ -252,7 +252,7 @@ export default function AIChatDrawer({
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Ask about Kitabs, audio, or Islamic content..."
+              placeholder={t('ai.placeholder')}
               className="flex-1 px-4 py-3 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-600 dark:focus:ring-red-500 text-sm text-neutral-900 dark:text-white placeholder-neutral-500"
               disabled={isLoading}
             />

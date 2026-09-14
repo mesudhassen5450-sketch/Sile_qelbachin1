@@ -7,6 +7,15 @@
 :root {
   --bg-grid: #fcfcfd;
   --grid-line: rgba(0, 0, 0, 0.04);
+  --site-nav-height: 4rem;
+  --site-marquee-height: 2.75rem;
+  --site-header-height: calc(var(--site-nav-height) + var(--site-marquee-height));
+}
+
+@media (min-width: 640px) {
+  :root {
+    --site-nav-height: 5rem;
+  }
 }
 
 .dark {
@@ -52,6 +61,14 @@ body {
   direction: rtl;
   text-align: right;
   line-height: 1.9;
+}
+
+html[lang="ar"] body {
+  font-family: 'Amiri', 'Noto Sans Ethiopic', system-ui, sans-serif;
+}
+
+html[dir="rtl"] .arabic-text {
+  text-align: start;
 }
 
 /* Hide Google Translate Top Banner & Toolbars */
@@ -104,4 +121,32 @@ font {
 .dark .btn-red:hover {
   background-color: #B91C1C;
   box-shadow: 0 4px 14px rgba(220, 38, 38, 0.35);
+}
+
+/* Qur'an verse ticker under the header */
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee-scroll 32s linear infinite;
+}
+
+.marquee-banner:hover .marquee-track,
+.marquee-banner:focus-within .marquee-track,
+.marquee-banner:active .marquee-track {
+  animation-play-state: paused;
+}
+
+@keyframes marquee-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
+  }
 }

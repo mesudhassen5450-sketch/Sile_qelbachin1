@@ -21,7 +21,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       }
       // Default to light mode instead of system preference
     }
-    return 'light';
+    return 'dark';
   };
 
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
