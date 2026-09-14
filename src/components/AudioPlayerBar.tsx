@@ -15,20 +15,42 @@ export default function AudioPlayerBar() {
     volume,
     playbackRate,
     playlist,
+    continueTrack,
     togglePlayPause,
     seek,
     setVolume,
     setPlaybackSpeed,
     playNext,
     playPrev,
+    resumeContinueListening,
   } = useAudio();
 
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
 
   const [isMuted, setIsMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(0.8);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
+
+  if (!currentTrack && continueTrack && !isDismissed) {
+    return (
+      <div className="fixed bottom-0 left-0 right-0 z-50 p-3 bg-white/95 dark:bg-neutral-900/95 border-t border-neutral-200 dark:border-neutral-800 shadow-xl backdrop-blur-md">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
+          <p className="text-sm text-neutral-700 dark:text-neutral-200 truncate">
+            {t('continueListening')}:{' '}
+            <TranslatedText text={continueTrack.track.title} targetLang={language} />
+          </p>
+          <button
+            type="button"
+            onClick={resumeContinueListening}
+            className="btn-red px-4 py-2 rounded-xl text-xs font-bold flex-shrink-0"
+          >
+            {t('continueListening')}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!currentTrack || isDismissed) {
     return null;

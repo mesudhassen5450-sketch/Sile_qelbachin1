@@ -248,7 +248,13 @@ export default function KitabDetailClient({ kitab }: { kitab: Kitab }) {
 
                         <div className="flex-1 min-w-0 space-y-1">
                           <h4 className="text-sm font-bold text-neutral-900 dark:text-white truncate">
-                            {getLocalized(ders.title)}
+                            <Link
+                              href={`/ders/${ders.id}`}
+                              className="hover:text-red-600"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {getLocalized(ders.title)}
+                            </Link>
                           </h4>
                           <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
                             🎙️ {getLocalized(ders.speaker)}
@@ -389,7 +395,9 @@ export default function KitabDetailClient({ kitab }: { kitab: Kitab }) {
 
                   <div className="space-y-1">
                     <h3 className="text-base font-bold text-neutral-900 dark:text-white">
-                      {getLocalized(ders.title)}
+                      <Link href={`/ders/${ders.id}`} className="hover:text-red-600">
+                        {getLocalized(ders.title)}
+                      </Link>
                     </h3>
                     <p className="text-xs text-neutral-500 dark:text-neutral-400">
                       🎙️ {getLocalized(ders.speaker)}

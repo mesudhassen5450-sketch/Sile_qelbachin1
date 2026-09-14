@@ -106,6 +106,13 @@ export default function AIAssistant() {
           }, 500);
         }
 
+        // Exact ders / play: navigate to shareable route when present
+        if (action.type === 'play_audio' && action.data?.route) {
+          setTimeout(() => {
+            router.push(action.data!.route!);
+          }, 400);
+        }
+
         // Get action buttons
         const actionButtons = getActionButtons(action);
 

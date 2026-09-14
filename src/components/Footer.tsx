@@ -107,6 +107,18 @@ export default function Footer() {
                   <span>{t('nav.videos')}</span>
                 </Link>
               </li>
+              <li>
+                <Link href="/speakers" className="hover:text-red-400 transition flex items-center space-x-2">
+                  <ShieldCheck className="w-3.5 h-3.5 text-red-500" />
+                  <span>{t('nav.speakers')}</span>
+                </Link>
+              </li>
+              <li>
+                <Link href="/search" className="hover:text-red-400 transition flex items-center space-x-2">
+                  <BookOpen className="w-3.5 h-3.5 text-red-500" />
+                  <span>{t('nav.search')}</span>
+                </Link>
+              </li>
             </ul>
           </div>
 

@@ -7,12 +7,12 @@ import { Intent } from './aiIntentMatcher';
 import { 
   searchKitab, 
   searchAudio, 
-  searchMuhadara, 
   getRandomMuhadara, 
   getRandomReminder,
   getSocialLink,
   getCachedIndex
 } from './aiContentIndex';
+import { resolveDers, globalSearch, getDersById } from './contentCatalog';
 
 export interface AIAction {
   type: 'navigate' | 'play_audio' | 'open_pdf' | 'answer' | 'error';
@@ -48,6 +48,8 @@ export function executeIntent(intent: Intent): AIAction {
     case 'NAVIGATE_REMINDERS':
     case 'NAVIGATE_KNOWLEDGE':
     case 'NAVIGATE_SAHABAH':
+    case 'NAVIGATE_SPEAKERS':
+    case 'NAVIGATE_SEARCH':
     case 'NAVIGATE_CONTACT':
       return {
         type: 'navigate',
@@ -59,6 +61,9 @@ export function executeIntent(intent: Intent): AIAction {
 
     case 'NAVIGATE_KITAB_DETAIL':
       return handleKitabNavigation(intent);
+
+    case 'PLAY_DERS':
+      return handlePlayDers(intent);
 
     case 'SEARCH_KITAB':
       return handleKitabSearch(intent);
@@ -163,12 +168,91 @@ function handleKitabSearch(intent: Intent): AIAction {
 }
 
 /**
- * Handle audio search
+ * Exact ders resolution: Kitab + part number → /ders/[id]
+ */
+function handlePlayDers(intent: Intent): AIAction {
+  const kitabId = intent.params?.kitabId || null;
+  const partNumber = intent.params?.partNumber ?? null;
+  const resolved = resolveDers(kitabId, partNumber);
+
+  if (!resolved) {
+    return {
+      type: 'answer',
+      data: {
+        message:
+          "I couldn't find that Ders in the available Sile Qelbachin content. Try searching the Kitab library or use Search.",
+        route: '/search',
+      },
+    };
+  }
+
+  const title =
+    typeof resolved.ders.title === 'string'
+      ? resolved.ders.title
+      : resolved.ders.title.en;
+  const kitabTitle =
+    typeof resolved.kitab.title === 'string'
+      ? resolved.kitab.title
+      : resolved.kitab.title.en;
+  const speaker =
+    typeof resolved.ders.speaker === 'string'
+      ? resolved.ders.speaker
+      : resolved.ders.speaker.en;
+
+  return {
+    type: 'play_audio',
+    data: {
+      audioUrl: resolved.ders.audioUrl,
+      title: `${kitabTitle} — ${title}`,
+      speaker,
+      message: `Opening exact Ders:\n\n${kitabTitle}\n${title}\nSpeaker: ${speaker}\n\nLink: ${resolved.href}`,
+      route: resolved.href,
+      dersId: resolved.ders.id,
+      kitabId: resolved.kitab.slug,
+    },
+  };
+}
+
+/**
+ * Handle audio search — prefer catalog ders with exact /ders routes
  */
 function handleAudioSearch(intent: Intent): AIAction {
   const query = intent.params?.query || '';
-  const audioResults = searchAudio(query);
 
+  // Try exact kitab+part from free-form query first
+  const partMatch = query.match(/(?:ders|part|ክፍል|الجزء)\s*#?\s*0*(\d+)/i);
+  const partNumber = partMatch ? parseInt(partMatch[1], 10) : null;
+  if (partNumber != null) {
+    const exact = resolveDers(query, partNumber);
+    if (exact) {
+      return handlePlayDers({
+        type: 'PLAY_DERS',
+        confidence: 1,
+        params: { kitabId: exact.kitab.slug, partNumber },
+      });
+    }
+  }
+
+  const catalogHits = globalSearch(query, 10).filter((r) => r.type === 'ders');
+  if (catalogHits.length > 0) {
+    const hit = catalogHits[0];
+    const rec = getDersById(hit.id);
+    if (rec) {
+      return {
+        type: 'play_audio',
+        data: {
+          audioUrl: rec.ders.audioUrl,
+          title: hit.title,
+          speaker: hit.speaker,
+          message: `${hit.title}\n\nSpeaker: ${hit.speaker || 'Not available'}\n\nLink: ${hit.href}`,
+          route: hit.href,
+          dersId: rec.ders.id,
+        },
+      };
+    }
+  }
+
+  const audioResults = searchAudio(query);
   if (audioResults.length > 0) {
     const audio = audioResults[0];
     return {
@@ -177,18 +261,19 @@ function handleAudioSearch(intent: Intent): AIAction {
         audioUrl: audio.audioUrl,
         title: audio.title,
         speaker: audio.speaker,
-        message: `🎧 **${audio.title}**\n\nSpeaker: ${audio.speaker}`,
-        route: audio.route
-      }
+        message: `${audio.title}\n\nSpeaker: ${audio.speaker}`,
+        route: audio.route || '/audio-lecture',
+      },
     };
   }
 
   return {
     type: 'answer',
     data: {
-      message: '🎧 Audio not found. Browse all available audio:',
-      route: '/audio-lecture'
-    }
+      message:
+        "I couldn't find that audio in the available Sile Qelbachin content.",
+      route: '/search',
+    },
   };
 }
 
@@ -237,9 +322,9 @@ function handleRandomMuhadara(): AIAction {
         audioUrl: muhadara.audioUrl,
         title: muhadara.title,
         speaker: muhadara.speaker,
-        message: `🎙️ **Random Muhadara**\n\n**${muhadara.title}**\nSpeaker: ${muhadara.speaker}\nTopic: ${muhadara.topic}`,
-        route: '/muhadara'
-      }
+        message: `Random Muhadara\n\n${muhadara.title}\nSpeaker: ${muhadara.speaker}\nTopic: ${muhadara.topic}`,
+        route: `/muhadara/${muhadara.id}`,
+      },
     };
   }
 
@@ -259,9 +344,9 @@ function handleRandomReminder(): AIAction {
     return {
       type: 'answer',
       data: {
-        message: `💭 **Daily Reminder**\n\n${reminder.content}\n\n**Source:** ${reminder.source}`,
-        route: '/reminders'
-      }
+        message: `Reminder\n\n${reminder.content}\n\nSource: ${reminder.source}`,
+        route: `/reminder/${reminder.id}`,
+      },
     };
   }
 
@@ -272,16 +357,42 @@ function handleRandomReminder(): AIAction {
 }
 
 /**
- * Handle general content search
+ * Handle general content search via unified catalog
  */
 function handleContentSearch(intent: Intent): AIAction {
-  // For now, direct to appropriate page based on keywords
-  // In future, could implement more sophisticated search
+  const query = intent.params?.query || '';
+  const hits = globalSearch(query, 5);
+
+  if (hits.length === 0) {
+    return {
+      type: 'answer',
+      data: {
+        message:
+          "I couldn't find that information in the available Sile Qelbachin content. Try the Search page or browse Kitab.",
+        route: `/search?q=${encodeURIComponent(query)}`,
+      },
+    };
+  }
+
+  if (hits.length === 1) {
+    const h = hits[0];
+    return {
+      type: 'navigate',
+      data: {
+        route: h.href,
+        message: `Found: ${h.title}\n\nOpening ${h.href}`,
+        title: h.title,
+      },
+    };
+  }
+
+  const list = hits.map((h) => `• [${h.type}] ${h.title} → ${h.href}`).join('\n');
   return {
     type: 'answer',
     data: {
-      message: 'I can help you find:\n\n📖 Kitabs and books\n🎧 Audio lectures\n🎙️ Muhadara\n💭 Reminders\n🕌 Knowledge & Sahabah\n\nWhat would you like to explore?'
-    }
+      message: `Found ${hits.length} matches:\n\n${list}`,
+      route: `/search?q=${encodeURIComponent(query)}`,
+    },
   };
 }
 
@@ -297,8 +408,10 @@ function getNavigationMessage(intentType: string): string {
     'NAVIGATE_VIDEOS': '🎥 Opening Videos page.',
     'NAVIGATE_REMINDERS': '💭 Opening Daily Reminders page.',
     'NAVIGATE_KNOWLEDGE': '📜 Opening Qur\'an & Hadith Knowledge page.',
-    'NAVIGATE_SAHABAH': '🕌 Opening Sahabah (Companions) Stories page.',
-    'NAVIGATE_CONTACT': '📱 Opening Contact page with social links.',
+    'NAVIGATE_SAHABAH': 'Opening Sahabah Stories.',
+    'NAVIGATE_SPEAKERS': 'Opening Speakers.',
+    'NAVIGATE_SEARCH': 'Opening Search.',
+    'NAVIGATE_CONTACT': 'Opening Contact.',
   };
 
   return messages[intentType] || 'Navigating...';

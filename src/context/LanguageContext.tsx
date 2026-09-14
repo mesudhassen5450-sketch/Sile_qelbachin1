@@ -81,6 +81,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       'nav.sahabah': 'subSahabahAm',
       'nav.muhadara': 'subMuhadaraAm',
       'nav.videos': 'videos',
+      'nav.search': 'navSearch',
+      'nav.speakers': 'navSpeakers',
       'audioLecture.upcoming': 'upcomingLectures',
       'audioLecture.previous': 'previousLectures',
       'buttons.play': 'play',

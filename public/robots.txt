@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://sileqelbachin1.com/sitemap.xml

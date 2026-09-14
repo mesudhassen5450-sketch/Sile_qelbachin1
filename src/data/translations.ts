@@ -236,4 +236,20 @@ export const translations: Record<string, Record<Language, string>> = {
     AR: 'جميع الحقوق محفوظة.',
     EN: 'All rights reserved.',
   },
+
+  navSearch: {
+    AM: 'ፈልግ',
+    AR: 'بحث',
+    EN: 'Search',
+  },
+  navSpeakers: {
+    AM: 'አስተማሪዎች',
+    AR: 'المعلمون',
+    EN: 'Speakers',
+  },
+  continueListening: {
+    AM: 'ማዳመጥ ቀጥል',
+    AR: 'متابعة الاستماع',
+    EN: 'Continue listening',
+  },
 };

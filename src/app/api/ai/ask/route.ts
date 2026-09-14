@@ -110,9 +110,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('API Key present:', apiKey ? 'Yes' : 'No');
-    console.log('API Key length:', apiKey?.length);
-    console.log('User message:', message);
+    console.log('AI ask request received');
 
     // Build context with website content
     const websiteContext = getAIContextSummary();
@@ -121,67 +119,25 @@ export async function POST(request: NextRequest) {
     const messages = [
       {
         role: 'system',
-        content: `You are a helpful Islamic Knowledge Assistant for the Sle Qelbachin website.
+        content: `You are the Sile Qelbachin content-navigation assistant.
 
-🔒 CRITICAL OUTPUT RULES - READ CAREFULLY:
-- You MUST always provide a helpful response
+OUTPUT RULES:
 - Return ONLY the final visitor-facing answer
-- NEVER use <think>, <analysis>, <reasoning> tags
-- NEVER show internal reasoning or step-by-step analysis  
-- NEVER show checklists or validation notes
-- NEVER explain how you generated the answer
-- Start your response immediately with the helpful answer
+- Never use <think>, <analysis>, or reasoning tags
+- Never show checklists, tools, or internal process
 
-RESPONSE REQUIREMENTS:
-- ALWAYS respond, even for simple questions like "who is you?" or "what new?"
-- Be warm, friendly, and respectful
-- Use Islamic greetings (Wa alaykumussalam)
-- Keep responses concise but helpful
-- Sound natural, not robotic
-
-EXAMPLES:
-Q: "who is you?"
-A: "Wa alaykumussalam wa rahmatullahi wa barakatuh 🌙
-
-I am the **Sle Qelbachin** Islamic Knowledge Assistant.
-
-My purpose is to help you find spiritual resources to purify your heart and gain beneficial knowledge. I can guide you to:
-
-📖 **Kitabs**: 7 collections of audio lessons and PDFs
-🎧 **Audio Lectures**: Spiritual talks and teachings
-🎙️ **Muhadara**: Islamic discourses
-💭 **Reminders & Knowledge**: Daily wisdom
-
-How can I help you today?"
-
-Q: "so that what new?"
-A: "Welcome back! I'm here to help you navigate Sle Qelbachin's Islamic resources.
-
-What would you like to explore today?
-
-📖 Browse our Kitabs
-🎧 Listen to audio lectures  
-🎙️ Explore Muhadara
-💭 Read daily reminders
-
-Just ask me anything about Islamic knowledge available on this site!"
-
-AVAILABLE WEBSITE CONTENT:
-
-${websiteContext}
+ROLE:
+- Help users Find → Navigate → Play → Read available website content
+- You are NOT a Mufti. Do not invent Islamic rulings, verses, Hadith, scholars, books, or Ders
 
 CONTENT RULES:
-1. Only discuss content that EXISTS on this website
-2. NEVER invent Qur'an verses, Hadith, or Islamic rulings
-3. If content is not on the website, say: "I don't have a verified source for that on Sle Qelbachin."
-4. Provide direct links when helpful (/kitab/[slug], /audio-lecture, /muhadara, /videos)
+1. Only discuss content in the website index below
+2. For exact Ders requests (e.g. "Play Intebih Ante Murakeb Ders 3"), give the exact /ders/... link
+3. If missing: say "I couldn't find that information in the available Sile Qelbachin content."
+4. Verified socials only: Telegram https://t.me/Sle_qelbachn1 · TikTok https://www.tiktok.com/@sle_qelbachn1 · YouTube https://youtube.com/@sle_qelbachn1
 
-VERIFIED CONTACT INFO:
-- Telegram: @Sle_qelbachn1 (https://t.me/Sle_qelbachn1)
-- TikTok: @sle_qelbachn1 (https://www.tiktok.com/@sle_qelbachn1)
-- YouTube: @sle_qelbachn1 (https://youtube.com/@sle_qelbachn1)
-
-Remember: ALWAYS provide a helpful response. Never say you cannot respond.`
+AVAILABLE WEBSITE CONTENT:
+${websiteContext}`
       },
       ...conversationHistory.slice(-6), // Keep last 6 messages for context
       {
@@ -267,78 +223,49 @@ function extractActionsFromResponse(response: string, query: string): Array<{
   url?: string;
 }> {
   const actions: Array<{ type: string; label: string; url?: string }> = [];
-  const lowerResponse = response.toLowerCase();
   const lowerQuery = query.toLowerCase();
 
-  // Check for Kitab mentions
-  const kitabKeywords = ['intebih', 'ad-da', 'dawa', 'fatihu', 'awliya', 'alkesidu', 'teshilu', 'yekelb', 'betewbet'];
-  const mentionedKitab = kitabKeywords.find(keyword => 
-    lowerResponse.includes(keyword) || lowerQuery.includes(keyword)
-  );
-
-  if (mentionedKitab || lowerQuery.includes('kitab')) {
-    actions.push({
-      type: 'navigate',
-      label: '📖 View All Kitabs',
-      url: '/kitab'
-    });
+  // Prefer exact /ders/ links mentioned in the response
+  const dersLink = response.match(/\/ders\/[a-z0-9-]+/i);
+  if (dersLink) {
+    actions.push({ type: 'navigate', label: 'Open exact Ders', url: dersLink[0] });
+    return actions;
   }
 
-  // Check for audio mentions
-  if (lowerQuery.includes('audio') || lowerQuery.includes('lecture') || lowerQuery.includes('ders')) {
-    actions.push({
-      type: 'navigate',
-      label: '🎧 Browse Audio Lectures',
-      url: '/audio-lecture'
-    });
+  const kitabLink = response.match(/\/kitab\/[a-z0-9-]+/i);
+  if (kitabLink) {
+    actions.push({ type: 'navigate', label: 'Open Kitab', url: kitabLink[0] });
   }
 
-  // Check for Muhadara mentions
-  if (lowerQuery.includes('muhadara') || lowerQuery.includes('discourse')) {
-    actions.push({
-      type: 'navigate',
-      label: '🎙️ Open Muhadara',
-      url: '/muhadara'
-    });
+  if (lowerQuery.includes('kitab') && actions.length === 0) {
+    actions.push({ type: 'navigate', label: 'View Kitabs', url: '/kitab' });
+  }
+  if (/audio|lecture|ders/i.test(lowerQuery) && actions.length === 0) {
+    actions.push({ type: 'navigate', label: 'Browse Audio', url: '/audio-lecture' });
+  }
+  if (/muhadara/i.test(lowerQuery)) {
+    actions.push({ type: 'navigate', label: 'Open Muhadara', url: '/muhadara' });
+  }
+  if (/video/i.test(lowerQuery)) {
+    actions.push({ type: 'navigate', label: 'Watch Videos', url: '/videos' });
+  }
+  if (/reminder/i.test(lowerQuery)) {
+    actions.push({ type: 'navigate', label: 'Read Reminders', url: '/reminders' });
+  }
+  if (/quran|hadith|knowledge/i.test(lowerQuery)) {
+    actions.push({ type: 'navigate', label: "Qur'an & Hadith", url: '/knowledge' });
+  }
+  if (/sahabah|companion/i.test(lowerQuery)) {
+    actions.push({ type: 'navigate', label: 'Sahabah', url: '/sahabah' });
+  }
+  if (/search|find/i.test(lowerQuery)) {
+    actions.push({ type: 'navigate', label: 'Open Search', url: '/search' });
+  }
+  if (/speaker|ustaaz|ustaz/i.test(lowerQuery)) {
+    actions.push({ type: 'navigate', label: 'Speakers', url: '/speakers' });
   }
 
-  // Check for video mentions
-  if (lowerQuery.includes('video')) {
-    actions.push({
-      type: 'navigate',
-      label: '🎥 Watch Videos',
-      url: '/videos'
-    });
-  }
-
-  // Check for reminder mentions
-  if (lowerQuery.includes('reminder')) {
-    actions.push({
-      type: 'navigate',
-      label: '💭 Read Reminders',
-      url: '/reminders'
-    });
-  }
-
-  // Check for Qur'an/Hadith mentions
-  if (lowerQuery.includes('quran') || lowerQuery.includes('hadith') || lowerQuery.includes('knowledge')) {
-    actions.push({
-      type: 'navigate',
-      label: '📜 Qur\'an & Hadith',
-      url: '/knowledge'
-    });
-  }
-
-  // Check for Sahabah mentions
-  if (lowerQuery.includes('sahabah') || lowerQuery.includes('companion')) {
-    actions.push({
-      type: 'navigate',
-      label: '🕌 Learn About Sahabah',
-      url: '/sahabah'
-    });
-  }
-
-  return actions.slice(0, 2); // Maximum 2 actions per response
+  return actions.slice(0, 2);
 }
 
 /**

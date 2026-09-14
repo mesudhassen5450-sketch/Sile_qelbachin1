@@ -14,7 +14,7 @@ The repository **does not include** the `public/telegram_media/` folder (1.9 GB,
    - Publish directory: `.next`
 4. Add environment variable:
    - Key: `GROQ_API_KEY`
-   - Value: `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`
+   - Value: set in Netlify UI from your Groq console (never commit real keys)
 
 ### Step 2: Upload Media Files
 After your site deploys:
