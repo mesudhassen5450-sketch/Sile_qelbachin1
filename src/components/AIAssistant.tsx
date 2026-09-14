@@ -1,7 +1,6 @@
 /**
  * AI Assistant Main Controller
- * Professional navigation system with deterministic intent matching
- * Architecture: Intent Detection → Content Search → Action Execution → Navigation
+ * Intent Detection → Content Search → Action Execution → Navigation / Language
  */
 
 'use client';
@@ -12,34 +11,23 @@ import { AIAssistantButtonWithTooltip } from './AIAssistantButton';
 import AIChatDrawer, { Message, QuickAction } from './AIChatDrawer';
 import { getFeaturedQuickActions } from '@/lib/aiQuickActions';
 import { matchIntent } from '@/lib/aiIntentMatcher';
-import { executeIntent, getActionButtons } from '@/lib/aiActionHandler';
+import { executeIntent, getActionButtons, type AIAction } from '@/lib/aiActionHandler';
+import { useLanguage } from '@/context/LanguageContext';
+import type { Language } from '@/types/media';
 
-/**
- * Frontend safety net: Remove thinking/reasoning tags AND meta/checklist output
- * This is a secondary protection layer in case backend sanitization fails
- */
 function sanitizeFrontend(text: string): string {
   if (!text) return '';
-  
+
   let sanitized = text;
-  
-  // Remove reasoning blocks
+
   sanitized = sanitized.replace(/<think>[\s\S]*?<\/think>/gi, '');
   sanitized = sanitized.replace(/<analysis>[\s\S]*?<\/analysis>/gi, '');
   sanitized = sanitized.replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '');
-  
-  // Handle unclosed tags
-  if (sanitized.includes('<think>')) {
-    sanitized = sanitized.split('<think>')[0];
-  }
-  if (sanitized.includes('<analysis>')) {
-    sanitized = sanitized.split('<analysis>')[0];
-  }
-  if (sanitized.includes('<reasoning>')) {
-    sanitized = sanitized.split('<reasoning>')[0];
-  }
 
-  // Remove meta/checklist output lines
+  if (sanitized.includes('<think>')) sanitized = sanitized.split('<think>')[0];
+  if (sanitized.includes('<analysis>')) sanitized = sanitized.split('<analysis>')[0];
+  if (sanitized.includes('<reasoning>')) sanitized = sanitized.split('<reasoning>')[0];
+
   const metaPatterns = [
     /^\s*[-•]?\s*(checked\.?|✓|✔)\s*$/gim,
     /^\s*[-•]?\s*(checklist:?|internal reasoning:?|response check:?|compliance check:?|self-check:?|validation:?)\s*$/gim,
@@ -56,201 +44,231 @@ function sanitizeFrontend(text: string): string {
     sanitized = sanitized.replace(pattern, '');
   }
 
-  // Remove lines with "tags? Checked" or similar checklist items
   sanitized = sanitized.replace(/^.+\?\s*checked\.?\s*$/gim, '');
-
-  // Clean up multiple consecutive newlines
   sanitized = sanitized.replace(/\n{3,}/g, '\n\n');
-  
+
   return sanitized.trim();
+}
+
+function applyActionSideEffects(
+  action: AIAction,
+  router: ReturnType<typeof useRouter>,
+  setLanguage: (lang: Language) => void
+) {
+  if (action.type === 'set_language' && action.data?.language) {
+    setLanguage(action.data.language);
+    if (typeof window !== 'undefined' && (window as any).changeLanguage) {
+      (window as any).changeLanguage(action.data.language);
+    }
+  }
+
+  if (
+    (action.type === 'navigate' || action.type === 'play_audio') &&
+    action.data?.route
+  ) {
+    setTimeout(() => {
+      router.push(action.data!.route!);
+    }, 400);
+  }
 }
 
 export default function AIAssistant() {
   const router = useRouter();
+  const { setLanguage } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const quickActions = getFeaturedQuickActions();
 
-  /**
-   * Send message with Intent-Action architecture
-   * Step 1: Try deterministic intent matching (no API needed)
-   * Step 2: If uncertain, use AI API for complex queries
-   */
-  const handleSendMessage = useCallback(async (userMessage: string) => {
-    // Add user message
-    const userMsg: Message = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content: userMessage,
-      timestamp: new Date(),
-    };
-    setMessages(prev => [...prev, userMsg]);
-    setIsLoading(true);
+  const handleSendMessage = useCallback(
+    async (userMessage: string) => {
+      const trimmed = userMessage.trim();
+      if (!trimmed) return;
 
-    try {
-      // Step 1: Try deterministic intent matching first
-      const intent = matchIntent(userMessage);
+      // Language quick buttons from chat actions
+      if (trimmed.startsWith('#lang-')) {
+        const code = trimmed.replace('#lang-', '') as Language;
+        if (code === 'am' || code === 'ar' || code === 'en') {
+          const action = executeIntent({
+            type: 'CHANGE_LANGUAGE',
+            confidence: 1,
+            params: { language: code },
+          });
+          applyActionSideEffects(action, router, setLanguage);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `user-${Date.now()}`,
+              role: 'user',
+              content: `Change language to ${code.toUpperCase()}`,
+              timestamp: new Date(),
+            },
+            {
+              id: `ai-${Date.now()}`,
+              role: 'assistant',
+              content: action.data?.message || 'Language updated.',
+              timestamp: new Date(),
+              actions: getActionButtons(action),
+            },
+          ]);
+          return;
+        }
+      }
 
-      // High confidence intent - handle locally without AI API
-      if (intent.confidence >= 0.8) {
-        const action = executeIntent(intent);
-        
-        // Execute navigation if needed
-        if ((action.type === 'navigate' || action.type === 'play_audio') && action.data?.route) {
-          setTimeout(() => {
-            router.push(action.data!.route!);
-          }, 500);
+      const userMsg: Message = {
+        id: `user-${Date.now()}`,
+        role: 'user',
+        content: trimmed,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, userMsg]);
+      setIsLoading(true);
+
+      try {
+        const intent = matchIntent(trimmed);
+
+        // Prefer local assistance for any recognized actionable intent
+        if (intent.confidence >= 0.8) {
+          const action = executeIntent(intent);
+          applyActionSideEffects(action, router, setLanguage);
+
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `ai-${Date.now()}`,
+              role: 'assistant',
+              content: action.data?.message || 'Done!',
+              timestamp: new Date(),
+              actions: getActionButtons(action),
+            },
+          ]);
+          setIsLoading(false);
+          return;
         }
 
-        // Get action buttons
-        const actionButtons = getActionButtons(action);
+        const conversationHistory = messages.map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+        }));
 
-        // Add AI response
-        const aiMsg: Message = {
-          id: `ai-${Date.now()}`,
-          role: 'assistant',
-          content: action.data?.message || 'Done!',
-          timestamp: new Date(),
-          actions: actionButtons,
-        };
-        setMessages(prev => [...prev, aiMsg]);
-        setIsLoading(false);
-        return;
-      }
+        const response = await fetch('/api/ai/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: trimmed,
+            conversationHistory,
+          }),
+        });
 
-      // Step 2: Low confidence or complex query - use AI API
-      const conversationHistory = messages.map(msg => ({
-        role: msg.role,
-        content: msg.content,
-      }));
+        if (!response.ok) {
+          const localAction = executeIntent({
+            type: 'UNKNOWN',
+            confidence: 0,
+            params: { query: trimmed },
+          });
+          applyActionSideEffects(localAction, router, setLanguage);
 
-      const response = await fetch('/api/ai/ask', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: userMessage,
-          conversationHistory,
-        }),
-      });
-
-      if (!response.ok) {
-        const localIntent = matchIntent(userMessage);
-        const localAction = executeIntent(
-          localIntent.confidence >= 0.5
-            ? localIntent
-            : { type: 'UNKNOWN', confidence: 0, params: { query: userMessage } }
-        );
-        const actionButtons = getActionButtons(localAction);
-
-        if ((localAction.type === 'navigate' || localAction.type === 'play_audio') && localAction.data?.route) {
-          setTimeout(() => {
-            router.push(localAction.data!.route!);
-          }, 500);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `ai-${Date.now()}`,
+              role: 'assistant',
+              content:
+                localAction.data?.message ||
+                'I can still guide you on this site. Try: “go to new ders”, “what’s new”, or “change language to English”.',
+              timestamp: new Date(),
+              actions: getActionButtons(localAction),
+            },
+          ]);
+          setIsLoading(false);
+          return;
         }
 
-        const fallbackMsg: Message = {
-          id: `ai-${Date.now()}`,
-          role: 'assistant',
-          content:
-            localAction.data?.message ||
-            'I can still guide you on this site. Try: “go to intebih”, “go to adawa kitab audio 9”, or “open videos”.',
-          timestamp: new Date(),
-          actions: actionButtons,
-        };
-        setMessages(prev => [...prev, fallbackMsg]);
+        const data = await response.json();
+        const sanitizedResponse = sanitizeFrontend(data.response);
+
+        // If cloud AI returns empty/greeting fluff after sanitize, assist locally instead
+        const looksLikeEmptyMenu =
+          !sanitizedResponse ||
+          sanitizedResponse.length < 12 ||
+          (/wa alaykumussalam/i.test(sanitizedResponse) &&
+            /please ask me about|how can i assist|i'm here to help you explore/i.test(
+              sanitizedResponse
+            ));
+
+        if (looksLikeEmptyMenu) {
+          const localAction = executeIntent({
+            type: 'UNKNOWN',
+            confidence: 0,
+            params: { query: trimmed },
+          });
+          applyActionSideEffects(localAction, router, setLanguage);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `ai-${Date.now()}`,
+              role: 'assistant',
+              content: localAction.data?.message || sanitizedResponse,
+              timestamp: new Date(),
+              actions: getActionButtons(localAction),
+            },
+          ]);
+          return;
+        }
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `ai-${Date.now()}`,
+            role: 'assistant',
+            content: sanitizedResponse,
+            timestamp: new Date(),
+            actions: data.actions || [],
+          },
+        ]);
+      } catch (err) {
+        console.error('AI Error:', err);
+        const localAction = executeIntent({
+          type: 'UNKNOWN',
+          confidence: 0,
+          params: { query: trimmed },
+        });
+        applyActionSideEffects(localAction, router, setLanguage);
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `error-${Date.now()}`,
+            role: 'assistant',
+            content:
+              localAction.data?.message ||
+              'Cloud assistant is offline, but I can still open pages. Try “go to new ders” or a kitab name.',
+            timestamp: new Date(),
+            actions: getActionButtons(localAction),
+          },
+        ]);
+      } finally {
         setIsLoading(false);
-        return;
       }
+    },
+    [messages, router, setLanguage]
+  );
 
-      const data = await response.json();
+  const handleQuickAction = useCallback(
+    async (action: QuickAction) => {
+      await handleSendMessage(action.query);
+    },
+    [handleSendMessage]
+  );
 
-      // Frontend safety net: sanitize response
-      const sanitizedResponse = sanitizeFrontend(data.response);
-
-      // Add AI response
-      const aiMsg: Message = {
-        id: `ai-${Date.now()}`,
-        role: 'assistant',
-        content: sanitizedResponse || 'I apologize, but I cannot provide a proper response at this time.',
-        timestamp: new Date(),
-        actions: data.actions || [],
-      };
-      setMessages(prev => [...prev, aiMsg]);
-    } catch (err) {
-      console.error('AI Error:', err);
-      const localIntent = matchIntent(userMessage);
-      const localAction = executeIntent(localIntent.confidence >= 0.5 ? localIntent : { type: 'UNKNOWN', confidence: 0, params: { query: userMessage } });
-      const actionButtons = getActionButtons(localAction);
-
-      if ((localAction.type === 'navigate' || localAction.type === 'play_audio') && localAction.data?.route) {
-        setTimeout(() => {
-          router.push(localAction.data!.route!);
-        }, 500);
-      }
-
-      const errorMsg: Message = {
-        id: `error-${Date.now()}`,
-        role: 'assistant',
-        content:
-          localAction.data?.message ||
-          'Cloud assistant is offline, but I can still open pages on this site. Try a kitab name or “open videos”.',
-        timestamp: new Date(),
-        actions: actionButtons,
-      };
-      setMessages(prev => [...prev, errorMsg]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [messages, router]);
-
-  /**
-   * Handle quick action selection
-   */
-  const handleQuickAction = useCallback(async (action: QuickAction) => {
-    await handleSendMessage(action.query);
-  }, [handleSendMessage]);
-
-  /**
-   * Toggle drawer open/close
-   */
-  const toggleDrawer = useCallback(() => {
-    setIsOpen(prev => !prev);
-  }, []);
-
-  /**
-   * Close drawer
-   */
-  const closeDrawer = useCallback(() => {
-    setIsOpen(false);
-  }, []);
-
-  /**
-   * Minimize drawer (same as close for now)
-   */
-  const minimizeDrawer = useCallback(() => {
-    setIsOpen(false);
-  }, []);
-
-  /**
-   * Clear conversation and reset
-   */
-  const clearConversation = useCallback(() => {
-    setMessages([]);
-  }, []);
+  const toggleDrawer = useCallback(() => setIsOpen((prev) => !prev), []);
+  const closeDrawer = useCallback(() => setIsOpen(false), []);
+  const minimizeDrawer = useCallback(() => setIsOpen(false), []);
 
   return (
     <>
-      {/* Floating Button */}
-      <AIAssistantButtonWithTooltip 
-        onClick={toggleDrawer} 
-        isOpen={isOpen} 
-      />
-
-      {/* Chat Drawer */}
+      <AIAssistantButtonWithTooltip onClick={toggleDrawer} isOpen={isOpen} />
       <AIChatDrawer
         isOpen={isOpen}
         onClose={closeDrawer}

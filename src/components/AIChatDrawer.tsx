@@ -210,9 +210,16 @@ export default function AIChatDrawer({
                           <button
                             key={idx}
                             onClick={() => {
-                              if (action.url) {
-                                window.location.href = action.url;
+                              if (!action.url) return;
+                              if (action.url.startsWith('#lang-')) {
+                                onSendMessage(action.url);
+                                return;
                               }
+                              if (action.url.startsWith('/')) {
+                                window.location.href = action.url;
+                                return;
+                              }
+                              window.open(action.url, '_blank', 'noopener,noreferrer');
                             }}
                             className="w-full px-4 py-2 bg-white dark:bg-neutral-900 text-red-600 dark:text-red-400 rounded-lg text-sm font-semibold hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors border border-red-200 dark:border-red-900/30"
                           >

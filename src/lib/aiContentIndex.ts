@@ -491,6 +491,55 @@ function getCachedIndex(): ContentIndex {
 export { getCachedIndex };
 
 /**
+ * Get newest ders highlights for "what's new" / "go to new ders"
+ */
+export function getLatestHighlights(limit = 5): Array<{
+  kitabTitle: string;
+  dersTitle: string;
+  speaker: string;
+  dersNumber: number;
+  route: string;
+  audioUrl: string;
+  kitabSlug: string;
+}> {
+  const index = getCachedIndex();
+  const items = index.kitabs
+    .map((kitab) => {
+      if (!kitab.dersList.length) return null;
+      const ders = kitab.dersList[kitab.dersList.length - 1];
+      const match = ders.id.match(/ders-(\d+)$/);
+      const dersNumber = match ? parseInt(match[1], 10) : kitab.dersList.length;
+      return {
+        kitabTitle: kitab.title,
+        dersTitle: ders.title,
+        speaker: ders.speaker,
+        dersNumber,
+        route: `${kitab.route}?ders=${dersNumber}`,
+        audioUrl: ders.audioUrl,
+        kitabSlug: kitab.slug,
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item));
+
+  // Prefer Intebih (newest featured series) first, then others
+  items.sort((a, b) => {
+    if (a.kitabSlug === 'intebih-ante-murakeb') return -1;
+    if (b.kitabSlug === 'intebih-ante-murakeb') return 1;
+    return b.dersNumber - a.dersNumber;
+  });
+
+  return items.slice(0, limit);
+}
+
+/**
+ * Newest single ders to open when user says "new ders" / "latest lesson"
+ */
+export function getNewestDers(): ReturnType<typeof getLatestHighlights>[number] | null {
+  const list = getLatestHighlights(1);
+  return list[0] || null;
+}
+
+/**
  * Get AI-friendly comprehensive content summary
  */
 export function getAIContextSummary(): string {

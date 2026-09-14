@@ -4,19 +4,20 @@
  */
 
 import { Intent, extractKitabSlug } from './aiIntentMatcher';
-import { 
-  searchKitab, 
-  searchAudio, 
-  searchMuhadara, 
-  getRandomMuhadara, 
+import {
+  searchKitab,
+  searchAudio,
+  getRandomMuhadara,
   getRandomReminder,
   getSocialLink,
   getCachedIndex,
   findKitabLesson,
+  getLatestHighlights,
+  getNewestDers,
 } from './aiContentIndex';
 
 export interface AIAction {
-  type: 'navigate' | 'play_audio' | 'open_pdf' | 'answer' | 'error';
+  type: 'navigate' | 'play_audio' | 'open_pdf' | 'answer' | 'set_language' | 'error';
   data?: {
     route?: string;
     audioUrl?: string;
@@ -24,6 +25,9 @@ export interface AIAction {
     message?: string;
     title?: string;
     kitabId?: string;
+    language?: 'am' | 'ar' | 'en';
+    url?: string;
+    languageOptions?: boolean;
     [key: string]: any;
   };
 }
@@ -37,9 +41,19 @@ export function executeIntent(intent: Intent): AIAction {
       return {
         type: 'answer',
         data: {
-          message: 'Wa alaykumussalam wa rahmatullahi wa barakatuh 🌙\n\nWelcome to Sle Qelbachin. How can I help you today?\n\n📖 Kitab\n🎧 Audio Ders\n🎙️ Muhadara\n💭 Reminders\n🕌 Islamic Knowledge'
-        }
+          message:
+            'Wa alaykumussalam wa rahmatullahi wa barakatuh 🌙\n\nI can actually help you on this site — for example:\n• “go to new ders”\n• “what’s new”\n• “open intebih”\n• “change language to English”\n• “play muhadara”',
+        },
       };
+
+    case 'WHAT_NEW':
+      return handleWhatNew();
+
+    case 'LATEST_DERS':
+      return handleLatestDers();
+
+    case 'CHANGE_LANGUAGE':
+      return handleLanguageChange(intent);
 
     case 'NAVIGATE_HOME':
     case 'NAVIGATE_KITAB':
@@ -54,8 +68,8 @@ export function executeIntent(intent: Intent): AIAction {
         type: 'navigate',
         data: {
           route: intent.params?.route || '/',
-          message: getNavigationMessage(intent.type)
-        }
+          message: getNavigationMessage(intent.type),
+        },
       };
 
     case 'NAVIGATE_KITAB_DETAIL':
@@ -87,29 +101,115 @@ export function executeIntent(intent: Intent): AIAction {
 
     case 'UNKNOWN':
     default:
-      return {
-        type: 'answer',
-        data: {
-          message: 'I\'m not sure what you\'re looking for. You can try:\n\n📖 Browse Kitab\n🎧 Listen to Audio\n🎙️ Explore Muhadara\n💭 Read Reminders\n🕌 Learn about Sahabah'
-        }
-      };
+      return handleUnknown(intent.params?.query || '');
   }
 }
 
-/**
- * Handle Kitab navigation
- */
+function handleWhatNew(): AIAction {
+  const highlights = getLatestHighlights(4);
+  if (!highlights.length) {
+    return {
+      type: 'navigate',
+      data: {
+        route: '/kitab',
+        message: '📖 Opening the Kitab library so you can browse the latest lessons.',
+      },
+    };
+  }
+
+  const newest = highlights[0];
+  const list = highlights
+    .map(
+      (item, i) =>
+        `${i + 1}. **${item.kitabTitle}** — ${item.dersTitle} (Ders ${item.dersNumber})`
+    )
+    .join('\n');
+
+  return {
+    type: 'navigate',
+    data: {
+      route: newest.route,
+      title: newest.dersTitle,
+      kitabId: newest.kitabSlug,
+      audioUrl: newest.audioUrl,
+      message: `✨ **What’s new on Sle Qelbachin**\n\n${list}\n\nOpening the newest: **${newest.kitabTitle} — Ders ${newest.dersNumber}**.`,
+    },
+  };
+}
+
+function handleLatestDers(): AIAction {
+  const newest = getNewestDers();
+  if (!newest) {
+    return {
+      type: 'navigate',
+      data: {
+        route: '/audio-lecture',
+        message: '🎧 Opening the audio archive — ask for a kitab name if you want a specific ders.',
+      },
+    };
+  }
+
+  return {
+    type: 'play_audio',
+    data: {
+      route: newest.route,
+      audioUrl: newest.audioUrl,
+      title: newest.dersTitle,
+      kitabId: newest.kitabSlug,
+      message: `🎧 Opening the newest ders:\n\n**${newest.kitabTitle}**\n${newest.dersTitle}\nSpeaker: ${newest.speaker}`,
+    },
+  };
+}
+
+function handleLanguageChange(intent: Intent): AIAction {
+  const language = intent.params?.language;
+  if (language) {
+    const labels = { am: 'አማርኛ (Amharic)', ar: 'العربية (Arabic)', en: 'English' } as const;
+    return {
+      type: 'set_language',
+      data: {
+        language,
+        message: `🌐 Language switched to **${labels[language]}**.\n\nThe site text will update now. You can also say “change language to Amharic/Arabic/English”.`,
+      },
+    };
+  }
+
+  return {
+    type: 'answer',
+    data: {
+      message:
+        '🌐 Which language do you want?\n\n• Amharic — say “change language to Amharic”\n• Arabic — say “change language to Arabic”\n• English — say “change language to English”\n\nOr tap a button below.',
+      languageOptions: true,
+    },
+  };
+}
+
+function handleUnknown(query: string): AIAction {
+  const highlights = getLatestHighlights(3);
+  const tip = highlights[0]
+    ? `\n\nNewest ders right now: **${highlights[0].kitabTitle} — Ders ${highlights[0].dersNumber}**. Say “go to new ders” to open it.`
+    : '';
+
+  return {
+    type: 'answer',
+    data: {
+      message: `I didn’t catch a clear action for “${query || 'that'}”. Try one of these:\n\n• go to new ders\n• what’s new\n• open intebih / adewa\n• change language to English\n• open videos / muhadara / reminders${tip}`,
+      route: highlights[0]?.route,
+    },
+  };
+}
+
 function handleKitabNavigation(intent: Intent): AIAction {
   const kitabId = intent.params?.kitabId;
   if (!kitabId) {
     return {
       type: 'navigate',
-      data: { route: '/kitab', message: '📖 Opening Kitab Library.' }
+      data: { route: '/kitab', message: '📖 Opening Kitab Library.' },
     };
   }
 
   const index = getCachedIndex();
-  const kitab = index.kitabs.find(k => k.slug === kitabId);
+  const kitab = index.kitabs.find((k) => k.slug === kitabId);
 
   if (kitab) {
     return {
@@ -118,31 +218,28 @@ function handleKitabNavigation(intent: Intent): AIAction {
         route: `/kitab/${kitabId}`,
         message: `📖 **${kitab.title}**\n\n${kitab.dersCount} audio lessons${kitab.pdfUrl ? ' • PDF available' : ''}`,
         title: kitab.title,
-        kitabId: kitabId
-      }
+        kitabId: kitabId,
+      },
     };
   }
 
   return {
     type: 'navigate',
-    data: { route: '/kitab', message: '📖 Kitab not found. Opening library.' }
+    data: { route: '/kitab', message: '📖 Kitab not found. Opening library.' },
   };
 }
 
-/**
- * Handle Kitab search
- */
 function handleKitabSearch(intent: Intent): AIAction {
   const query = intent.params?.query || '';
   const results = searchKitab(query);
 
   if (results.length === 0) {
     return {
-      type: 'answer',
+      type: 'navigate',
       data: {
-        message: '📖 No Kitabs found for that search. Browse all available Kitabs:',
-        route: '/kitab'
-      }
+        message: '📖 No Kitabs matched that search. Opening the full library.',
+        route: '/kitab',
+      },
     };
   }
 
@@ -153,24 +250,21 @@ function handleKitabSearch(intent: Intent): AIAction {
       data: {
         route: kitab.route,
         message: `📖 **${kitab.title}**\n\nAuthor: ${kitab.author}\n${kitab.dersCount} audio lessons`,
-        title: kitab.title
-      }
+        title: kitab.title,
+      },
     };
   }
 
-  const list = results.slice(0, 3).map(k => `• ${k.title} - ${k.author}`).join('\n');
+  const list = results.slice(0, 3).map((k) => `• ${k.title} - ${k.author}`).join('\n');
   return {
-    type: 'answer',
+    type: 'navigate',
     data: {
-      message: `📖 Found ${results.length} Kitabs:\n\n${list}`,
-      route: '/kitab'
-    }
+      message: `📖 Found ${results.length} Kitabs:\n\n${list}\n\nOpening the library.`,
+      route: '/kitab',
+    },
   };
 }
 
-/**
- * Open a specific kitab lesson ("adawa kitab audio 9")
- */
 function handleKitabLessonPlay(intent: Intent): AIAction {
   const kitabId = intent.params?.kitabId || '';
   const lessonNumber = parseInt(intent.params?.audioId || '', 10);
@@ -208,9 +302,6 @@ function handleKitabLessonPlay(intent: Intent): AIAction {
   };
 }
 
-/**
- * Handle audio search
- */
 function handleAudioSearch(intent: Intent): AIAction {
   const query = intent.params?.query || '';
   const audioResults = searchAudio(query);
@@ -224,29 +315,26 @@ function handleAudioSearch(intent: Intent): AIAction {
         title: audio.title,
         speaker: audio.speaker,
         message: `🎧 **${audio.title}**\n\nSpeaker: ${audio.speaker}`,
-        route: audio.route
-      }
+        route: audio.route,
+      },
     };
   }
 
   return {
-    type: 'answer',
+    type: 'navigate',
     data: {
-      message: '🎧 Audio not found. Browse all available audio:',
-      route: '/audio-lecture'
-    }
+      message: '🎧 I could not match that audio title. Opening the audio archive.',
+      route: '/audio-lecture',
+    },
   };
 }
 
-/**
- * Handle social link request
- */
 function handleSocialLink(intent: Intent): AIAction {
   const platform = intent.params?.platform;
   if (!platform) {
     return {
       type: 'navigate',
-      data: { route: '/contact', message: '📱 Opening contact page.' }
+      data: { route: '/contact', message: '📱 Opening contact page.' },
     };
   }
 
@@ -257,22 +345,19 @@ function handleSocialLink(intent: Intent): AIAction {
       type: 'answer',
       data: {
         message: `📱 **${social.platform}**\n\n${social.handle}\n\n${social.url}`,
-        url: social.url
-      }
+        url: social.url,
+      },
     };
   }
 
   return {
     type: 'answer',
     data: {
-      message: `${platform.charAt(0).toUpperCase() + platform.slice(1)} is not currently available on Sle Qelbachin.\n\n**Verified platforms:**\n📱 Telegram: https://t.me/Sle_qelbachn1\n🎵 TikTok: https://www.tiktok.com/@sle_qelbachn1`
-    }
+      message: `${platform.charAt(0).toUpperCase() + platform.slice(1)} is not currently available on Sle Qelbachin.\n\n**Verified platforms:**\n📱 Telegram: https://t.me/Sle_qelbachn1\n🎵 TikTok: https://www.tiktok.com/@sle_qelbachn1`,
+    },
   };
 }
 
-/**
- * Handle random Muhadara
- */
 function handleRandomMuhadara(): AIAction {
   const muhadara = getRandomMuhadara();
 
@@ -284,20 +369,17 @@ function handleRandomMuhadara(): AIAction {
         title: muhadara.title,
         speaker: muhadara.speaker,
         message: `🎙️ **Random Muhadara**\n\n**${muhadara.title}**\nSpeaker: ${muhadara.speaker}\nTopic: ${muhadara.topic}`,
-        route: '/muhadara'
-      }
+        route: '/muhadara',
+      },
     };
   }
 
   return {
     type: 'navigate',
-    data: { route: '/muhadara', message: '🎙️ Opening Muhadara page.' }
+    data: { route: '/muhadara', message: '🎙️ Opening Muhadara page.' },
   };
 }
 
-/**
- * Handle random reminder
- */
 function handleRandomReminder(): AIAction {
   const reminder = getRandomReminder();
 
@@ -306,20 +388,17 @@ function handleRandomReminder(): AIAction {
       type: 'answer',
       data: {
         message: `💭 **Daily Reminder**\n\n${reminder.content}\n\n**Source:** ${reminder.source}`,
-        route: '/reminders'
-      }
+        route: '/reminders',
+      },
     };
   }
 
   return {
     type: 'navigate',
-    data: { route: '/reminders', message: '💭 Opening Reminders page.' }
+    data: { route: '/reminders', message: '💭 Opening Reminders page.' },
   };
 }
 
-/**
- * Handle general content search
- */
 function handleContentSearch(intent: Intent): AIAction {
   const query = intent.params?.query || '';
   const kitabId = extractKitabSlug(query);
@@ -332,66 +411,81 @@ function handleContentSearch(intent: Intent): AIAction {
     });
   }
 
-  return {
-    type: 'answer',
-    data: {
-      message: 'I can help you find:\n\n📖 Kitabs and books\n🎧 Audio lectures\n🎙️ Muhadara\n💭 Reminders\n🕌 Knowledge & Sahabah\n\nWhat would you like to explore?'
-    }
-  };
+  if (/(new|latest|update)/i.test(query)) {
+    return handleWhatNew();
+  }
+
+  const kitabResults = searchKitab(query);
+  if (kitabResults.length > 0) {
+    return handleKitabSearch(intent);
+  }
+
+  const audioResults = searchAudio(query);
+  if (audioResults.length > 0) {
+    return handleAudioSearch(intent);
+  }
+
+  return handleUnknown(query);
 }
 
-/**
- * Get navigation message for intent type
- */
 function getNavigationMessage(intentType: string): string {
   const messages: Record<string, string> = {
-    'NAVIGATE_HOME': '🏠 Taking you to the homepage.',
-    'NAVIGATE_KITAB': '📖 Opening the Kitab Library with 7 Islamic books.',
-    'NAVIGATE_AUDIO': '🎧 Opening Audio Lectures page.',
-    'NAVIGATE_MUHADARA': '🎙️ Opening Muhadara (Islamic Discourses) page.',
-    'NAVIGATE_VIDEOS': '🎥 Opening Videos page.',
-    'NAVIGATE_REMINDERS': '💭 Opening Daily Reminders page.',
-    'NAVIGATE_KNOWLEDGE': '📜 Opening Qur\'an & Hadith Knowledge page.',
-    'NAVIGATE_SAHABAH': '🕌 Opening Sahabah (Companions) Stories page.',
-    'NAVIGATE_CONTACT': '📱 Opening Contact page with social links.',
+    NAVIGATE_HOME: '🏠 Taking you to the homepage.',
+    NAVIGATE_KITAB: '📖 Opening the Kitab Library.',
+    NAVIGATE_AUDIO: '🎧 Opening Audio Lectures.',
+    NAVIGATE_MUHADARA: '🎙️ Opening Muhadara (Islamic Discourses).',
+    NAVIGATE_VIDEOS: '🎥 Opening Videos.',
+    NAVIGATE_REMINDERS: '💭 Opening Daily Reminders.',
+    NAVIGATE_KNOWLEDGE: "📜 Opening Qur'an & Hadith Knowledge.",
+    NAVIGATE_SAHABAH: '🕌 Opening Sahabah stories.',
+    NAVIGATE_CONTACT: '📱 Opening Contact with social links.',
   };
 
   return messages[intentType] || 'Navigating...';
 }
 
-/**
- * Get action buttons for response
- */
-export function getActionButtons(action: AIAction): Array<{ type: 'navigate' | 'open-kitab' | 'play-audio'; label: string; url?: string }> {
-  const buttons: Array<{ type: 'navigate' | 'open-kitab' | 'play-audio'; label: string; url?: string }> = [];
+export function getActionButtons(
+  action: AIAction
+): Array<{ type: 'navigate' | 'open-kitab' | 'play-audio'; label: string; url?: string }> {
+  const buttons: Array<{
+    type: 'navigate' | 'open-kitab' | 'play-audio';
+    label: string;
+    url?: string;
+  }> = [];
 
-  if (action.type === 'navigate' && action.data?.route) {
-    const labelMap: Record<string, string> = {
-      '/': '🏠 Go Home',
-      '/kitab': '📖 View All Kitabs',
-      '/audio-lecture': '🎧 Browse Audio',
-      '/muhadara': '🎙️ Open Muhadara',
-      '/video-lecture': '🎥 Watch Videos',
-      '/videos': '🎥 Watch Videos',
-      '/reminders': '💭 Read Reminders',
-      '/knowledge': '📜 Explore Knowledge',
-      '/sahabah': '🕌 Learn About Sahabah',
-      '/contact': '📱 Contact Us',
-    };
+  if (action.data?.languageOptions) {
+    buttons.push(
+      { type: 'navigate', label: '🇪🇹 Amharic', url: '#lang-am' },
+      { type: 'navigate', label: '🇸🇦 Arabic', url: '#lang-ar' },
+      { type: 'navigate', label: '🇬🇧 English', url: '#lang-en' }
+    );
+  }
 
-    const label = labelMap[action.data.route] || `Open ${action.data.title || 'Page'}`;
-
-    if (action.data.route.startsWith('/kitab/')) {
+  if ((action.type === 'navigate' || action.type === 'answer') && action.data?.route) {
+    const route = action.data.route;
+    if (route.startsWith('/kitab/')) {
       buttons.push({
         type: 'open-kitab',
         label: `📖 Open ${action.data.title || 'Kitab'}`,
-        url: action.data.route.split('?')[0]
+        url: route.split('?')[0],
       });
     } else {
+      const labelMap: Record<string, string> = {
+        '/': '🏠 Go Home',
+        '/kitab': '📖 View All Kitabs',
+        '/audio-lecture': '🎧 Browse Audio',
+        '/muhadara': '🎙️ Open Muhadara',
+        '/video-lecture': '🎥 Watch Videos',
+        '/videos': '🎥 Watch Videos',
+        '/reminders': '💭 Read Reminders',
+        '/knowledge': '📜 Explore Knowledge',
+        '/sahabah': '🕌 Learn About Sahabah',
+        '/contact': '📱 Contact Us',
+      };
       buttons.push({
         type: 'navigate',
-        label: label,
-        url: action.data.route
+        label: labelMap[route] || `Open ${action.data.title || 'Page'}`,
+        url: route,
       });
     }
   }
@@ -400,9 +494,9 @@ export function getActionButtons(action: AIAction): Array<{ type: 'navigate' | '
     buttons.push({
       type: 'play-audio',
       label: action.data.title ? `🎧 Play ${action.data.title}` : '🎧 Listen',
-      url: action.data.route
+      url: action.data.route,
     });
   }
 
-  return buttons;
+  return buttons.slice(0, 3);
 }

@@ -21,6 +21,9 @@ export type IntentType =
   | 'SEARCH_KITAB'
   | 'SEARCH_AUDIO'
   | 'SEARCH_CONTENT'
+  | 'WHAT_NEW'
+  | 'LATEST_DERS'
+  | 'CHANGE_LANGUAGE'
   | 'RANDOM_MUHADARA'
   | 'RANDOM_REMINDER'
   | 'GREETING'
@@ -35,6 +38,7 @@ export interface Intent {
     audioId?: string;
     platform?: string;
     query?: string;
+    language?: 'am' | 'ar' | 'en';
   };
 }
 
@@ -44,14 +48,46 @@ export interface Intent {
 export function matchIntent(userInput: string): Intent {
   const input = userInput.toLowerCase().trim();
 
-  // Greetings
-  if (/^(selam|salam|hello|hi|assalam|aleykum|wa\s*aleykum)/i.test(input)) {
+  // Greetings only — short/exact, never hijack real requests
+  if (
+    /^(selam|salam|salaam|hello|hi|hey|assalamu?\s*alaikum|as[- ]?salamu?\s*alaikum|السلام\s*عليكم|ሰላም)([!.\s]*)$/i.test(
+      input
+    )
+  ) {
     return { type: 'GREETING', confidence: 1.0 };
   }
 
-  // Home navigation
-  if (/^(home|go\s*home|homepage|main\s*page)$/i.test(input)) {
-    return { type: 'NAVIGATE_HOME', confidence: 1.0, params: { route: '/' } };
+  // Language change (before other matches) — only when user asks to change language
+  const wantsLanguageChange =
+    /(change|switch|set|ቀይር|غير|بدّل).{0,20}(lang|language|ቋንቋ|لغة)/i.test(input) ||
+    /^(language|ቋንቋ|لغة|change\s*lang)/i.test(input) ||
+    /\b(amharic|english|arabic|አማርኛ|العربية|እንግሊዝኛ)\b/i.test(input);
+
+  if (wantsLanguageChange) {
+    const language = extractLanguage(input);
+    return {
+      type: 'CHANGE_LANGUAGE',
+      confidence: 1.0,
+      params: language ? { language, query: input } : { query: input },
+    };
+  }
+
+  // What's new / latest updates
+  if (
+    /(what'?s?\s*new|what\s*new|anything\s*new|new\s*there|latest|updates?|አዲስ\s*ምን|ምን\s*አዲስ|ما\s*الجديد)/i.test(
+      input
+    )
+  ) {
+    return { type: 'WHAT_NEW', confidence: 1.0, params: { query: input } };
+  }
+
+  // Go to / open new or latest ders
+  if (
+    /(new|latest|newest|recent|አዲስ|الجديد).{0,15}(ders|lesson|audio|lecture|ድርስ|درس)/i.test(input) ||
+    /(ders|lesson|audio|lecture|ድርስ).{0,15}(new|latest|newest|አዲስ)/i.test(input) ||
+    /^(go\s*to\s*)?(new\s*)?(ders|lessons?)(\s*page)?$/i.test(input)
+  ) {
+    return { type: 'LATEST_DERS', confidence: 1.0, params: { query: input } };
   }
 
   const kitabSlug = extractKitabSlug(input);
@@ -80,66 +116,71 @@ export function matchIntent(userInput: string): Intent {
     };
   }
 
+  // Home navigation
+  if (/\b(home|homepage|main\s*page|መነሻ)\b/i.test(input) && /go|open|take|show|^home$/i.test(input)) {
+    return { type: 'NAVIGATE_HOME', confidence: 1.0, params: { route: '/' } };
+  }
+  if (/^(home|homepage|መነሻ)$/i.test(input)) {
+    return { type: 'NAVIGATE_HOME', confidence: 1.0, params: { route: '/' } };
+  }
+
   // Kitab library
-  if (/^(kitab|go\s*to\s*kitab|kitabpage|show\s*kitab|open\s*kitab|kitab\s*page|kitab\s*library)$/i.test(input) ||
-      /^(go\s*to\s*|open\s*|show\s*)?kitabs?\b/i.test(input)) {
+  if (/\bkitabs?\b/i.test(input) || /ኪታብ|كتب/.test(userInput)) {
     return { type: 'NAVIGATE_KITAB', confidence: 1.0, params: { route: '/kitab' } };
   }
 
-  // Audio/Ders navigation
-  if (/^(audio|go\s*to\s*audio|audio\s*lecture|audio\s*page|ders)$/i.test(input)) {
+  // Audio / ders archive
+  if (
+    /\b(audio|lecture|lectures|ders|ድርስ)\b/i.test(input) &&
+    /(go|open|show|browse|listen|page|take)/i.test(input)
+  ) {
+    return { type: 'NAVIGATE_AUDIO', confidence: 1.0, params: { route: '/audio-lecture' } };
+  }
+  if (/^(audio|audio\s*lecture|ders|lectures?)$/i.test(input)) {
     return { type: 'NAVIGATE_AUDIO', confidence: 1.0, params: { route: '/audio-lecture' } };
   }
 
   // Play audio
-  if (/^(play|listen|hear)/i.test(input)) {
+  if (/^(play|listen|hear)\b/i.test(input)) {
     return { type: 'PLAY_AUDIO', confidence: 0.9, params: { query: input } };
   }
 
-  // Muhadara navigation
-  if (/^(muhadara|muhadera|go\s*to\s*muhadara|muhadara\s*page|open\s*muhadara|discourse)/i.test(input)) {
+  // Muhadara
+  if (/\b(muhadara|muhadera|discourse)\b/i.test(input)) {
+    if (/random|any|give\s*me/i.test(input)) {
+      return { type: 'RANDOM_MUHADARA', confidence: 1.0 };
+    }
     return { type: 'NAVIGATE_MUHADARA', confidence: 1.0, params: { route: '/muhadara' } };
   }
 
-  // Random Muhadara
-  if (/random\s*muhadara|muhadara\s*random|any\s*muhadara/i.test(input)) {
-    return { type: 'RANDOM_MUHADARA', confidence: 1.0 };
-  }
-
-  // Videos navigation (including "go to video latest")
-  if (/\b(video|videos)\b/i.test(input) && /go\s*to|open|show|latest|watch/i.test(input)) {
-    return { type: 'NAVIGATE_VIDEOS', confidence: 1.0, params: { route: '/video-lecture' } };
-  }
-  if (/^(video|go\s*to\s*video|video\s*page|open\s*video|videos|show\s*videos)/i.test(input)) {
+  // Videos
+  if (/\b(video|videos)\b/i.test(input)) {
     return { type: 'NAVIGATE_VIDEOS', confidence: 1.0, params: { route: '/video-lecture' } };
   }
 
-  // Reminders navigation
-  if (/^(reminder|go\s*to\s*reminder|reminder\s*page|open\s*reminder|reminders|show\s*reminders)/i.test(input)) {
+  // Reminders
+  if (/\breminders?\b/i.test(input) || /ተዝኪራ|تذكير/.test(userInput)) {
+    if (/random|any|give\s*me/i.test(input)) {
+      return { type: 'RANDOM_REMINDER', confidence: 1.0 };
+    }
     return { type: 'NAVIGATE_REMINDERS', confidence: 1.0, params: { route: '/reminders' } };
   }
 
-  // Random Reminder
-  if (/random\s*reminder|reminder\s*random|any\s*reminder|give\s*me\s*a\s*reminder/i.test(input)) {
-    return { type: 'RANDOM_REMINDER', confidence: 1.0 };
-  }
-
-  // Knowledge navigation
-  if (/^(knowledge|go\s*to\s*knowledge|knowledge\s*page|quran|hadith|qur'an)/i.test(input)) {
+  // Knowledge
+  if (/\b(knowledge|quran|hadith|qur'an)\b/i.test(input) || /ቁርኣን|قران|حديث/.test(userInput)) {
     return { type: 'NAVIGATE_KNOWLEDGE', confidence: 1.0, params: { route: '/knowledge' } };
   }
 
-  // Sahabah navigation
-  if (/^(sahabah|go\s*to\s*sahabah|sahabah\s*page|companions|sahaba)/i.test(input)) {
+  // Sahabah
+  if (/\b(sahabah|sahaba|companions)\b/i.test(input) || /ሰሐባ|صحابة/.test(userInput)) {
     return { type: 'NAVIGATE_SAHABAH', confidence: 1.0, params: { route: '/sahabah' } };
   }
 
-  // Contact navigation
-  if (/^(contact|go\s*to\s*contact|contact\s*page|contact\s*us|social)/i.test(input)) {
+  // Contact / social
+  if (/\b(contact|social)\b/i.test(input)) {
     return { type: 'NAVIGATE_CONTACT', confidence: 1.0, params: { route: '/contact' } };
   }
 
-  // Social links
   if (/(?:give|show|find|what|tell).*(?:telegram|tiktok|youtube|social)/i.test(input)) {
     const platform = extractSocialPlatform(input);
     if (platform) {
@@ -148,7 +189,7 @@ export function matchIntent(userInput: string): Intent {
   }
 
   // Search Kitab
-  if (/(?:find|search|show|look\s*for).*(?:kitab|book)/i.test(input) && !(/page/i.test(input))) {
+  if (/(?:find|search|show|look\s*for).*(?:kitab|book)/i.test(input) && !/page/i.test(input)) {
     return { type: 'SEARCH_KITAB', confidence: 0.85, params: { query: input } };
   }
 
@@ -157,12 +198,27 @@ export function matchIntent(userInput: string): Intent {
     return { type: 'SEARCH_AUDIO', confidence: 0.85, params: { query: input } };
   }
 
-  // General content search — keep local so navigation works without Groq
-  if (/(?:find|search|show|tell|what|about|explain|give\s*me)/i.test(input)) {
+  // General content search — only when there is a real topic word beyond filler
+  if (/(?:find|search|look\s*for|about|explain)\b/i.test(input)) {
     return { type: 'SEARCH_CONTENT', confidence: 0.85, params: { query: input } };
   }
 
   return { type: 'UNKNOWN', confidence: 0.0, params: { query: input } };
+}
+
+/**
+ * Extract target UI language
+ */
+function extractLanguage(input: string): 'am' | 'ar' | 'en' | null {
+  if (/\b(amharic|አማርኛ)\b/i.test(input)) return 'am';
+  if (/\b(arabic|العربية|عربي)\b/i.test(input)) return 'ar';
+  if (/\b(english|እንግሊዝኛ)\b/i.test(input)) return 'en';
+  const coded = input.match(/\b(?:to|language|lang|ቋንቋ|لغة)\s*[:\-]?\s*(am|ar|en)\b/i);
+  if (coded) return coded[1].toLowerCase() as 'am' | 'ar' | 'en';
+  if (/^(am|ar|en)$/i.test(input.trim())) {
+    return input.trim().toLowerCase() as 'am' | 'ar' | 'en';
+  }
+  return null;
 }
 
 /**
@@ -171,7 +227,7 @@ export function matchIntent(userInput: string): Intent {
 export function extractKitabSlug(input: string): string | null {
   const lowerInput = input.toLowerCase();
 
-  if (/intebih|murakeb|murakeb/i.test(lowerInput)) return 'intebih-ante-murakeb';
+  if (/intebih|murakeb/i.test(lowerInput)) return 'intebih-ante-murakeb';
   if (/\b(adewae|adewa|adawa|ad-?da['’]?|ad-dawa|ad\s*da)\b/i.test(lowerInput) || /الداء|الدواء/.test(input)) {
     return 'adewae-kitab';
   }
@@ -212,59 +268,46 @@ function extractSocialPlatform(input: string): string | null {
 export function getIntentResponse(intent: Intent, data?: any): string {
   switch (intent.type) {
     case 'GREETING':
-      return 'Wa alaykumussalam wa rahmatullahi wa barakatuh 🌙\n\nWelcome to Sle Qelbachin. How can I help you today?\n\n📖 Kitab\n🎧 Audio Ders\n🎙️ Muhadara\n💭 Reminders\n🕌 Islamic Knowledge';
+      return 'Wa alaykumussalam wa rahmatullahi wa barakatuh 🌙\n\nI can open kitabs, play ders, switch language, or show what’s new. What do you need?';
+
+    case 'WHAT_NEW':
+      return data?.message || 'Here are the latest ders on the site.';
+
+    case 'LATEST_DERS':
+      return data?.message || 'Opening the newest ders.';
+
+    case 'CHANGE_LANGUAGE':
+      return data?.message || 'Language updated.';
 
     case 'NAVIGATE_HOME':
       return '🏠 Taking you to the homepage.';
 
     case 'NAVIGATE_KITAB':
-      return '📖 Opening the Kitab Library with 7 Islamic books.';
+      return '📖 Opening the Kitab Library.';
 
     case 'NAVIGATE_KITAB_DETAIL':
       return `📖 Opening ${data?.title || 'the Kitab'}.`;
 
     case 'NAVIGATE_AUDIO':
-      return '🎧 Opening Audio Lectures page.';
+      return '🎧 Opening Audio Lectures.';
 
     case 'NAVIGATE_MUHADARA':
-      return '🎙️ Opening Muhadara (Islamic Discourses) page.';
+      return '🎙️ Opening Muhadara.';
 
     case 'NAVIGATE_VIDEOS':
-      return '🎥 Opening Videos page.';
+      return '🎥 Opening Videos.';
 
     case 'NAVIGATE_REMINDERS':
-      return '💭 Opening Daily Reminders page.';
+      return '💭 Opening Reminders.';
 
     case 'NAVIGATE_KNOWLEDGE':
-      return '📜 Opening Qur\'an & Hadith Knowledge page.';
+      return "📜 Opening Qur'an & Hadith Knowledge.";
 
     case 'NAVIGATE_SAHABAH':
-      return '🕌 Opening Sahabah (Companions) Stories page.';
+      return '🕌 Opening Sahabah stories.';
 
     case 'NAVIGATE_CONTACT':
-      return '📱 Opening Contact page with social links.';
-
-    case 'GET_SOCIAL_LINK':
-      if (data?.url) {
-        return `📱 **${data.platform}**: ${data.handle}\n\n${data.url}`;
-      } else {
-        return `${data?.platform || 'That social link'} is not currently available on Sle Qelbachin.\n\nVerified platforms:\n📱 Telegram: https://t.me/Sle_qelbachn1\n🎵 TikTok: https://www.tiktok.com/@sle_qelbachn1`;
-      }
-
-    case 'PLAY_AUDIO':
-      return data?.title
-        ? `🎧 **${data.title}**\n\nReady to play.`
-        : '🎧 Please specify which audio you\'d like to play.';
-
-    case 'RANDOM_MUHADARA':
-      return data?.title
-        ? `🎙️ **Random Muhadara**\n\n${data.title}\nSpeaker: ${data.speaker}`
-        : '🎙️ No Muhadara available at this time.';
-
-    case 'RANDOM_REMINDER':
-      return data?.content
-        ? `💭 **Daily Reminder**\n\n${data.content}\n\nSource: ${data.source}`
-        : '💭 No reminders available at this time.';
+      return '📱 Opening Contact.';
 
     default:
       return '';
