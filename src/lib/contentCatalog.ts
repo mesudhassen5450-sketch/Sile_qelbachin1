@@ -83,13 +83,13 @@ export function normalizeSpeakerKey(raw: string): string {
   return raw
     .toLowerCase()
     .replace(/^by\s+brother\s+/i, '')
-    .replace(/^በ\s*ወንድም\s+/u, '')
+    .replace(/^በ\s*ወንድም\s+/, '')
     .replace(/^ustaz\s+/i, '')
     .replace(/^ustadh\s+/i, '')
-    .replace(/^ኡስታዝ\s+/u, '')
-    .replace(/^الأستاذ\s+/u, '')
-    .replace(/^بالأخ\s+/u, '')
-    .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
+    .replace(/^ኡስታዝ\s+/, '')
+    .replace(/^الأستاذ\s+/, '')
+    .replace(/^بالأخ\s+/, '')
+    .replace(/[^\w\s\u1200-\u137F\u0600-\u06FF-]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -109,8 +109,8 @@ export function extractPartNumber(title: string | LocalizedString, dersId?: stri
   const patterns = [
     /ders[-_\s]*(\d+)/i,
     /part[-_\s]*0*(\d+)/i,
-    /ክፍል[-_\s]*0*(\d+)/u,
-    /الجزء[-_\s]*0*(\d+)/u,
+    /ክፍል[-_\s]*0*(\d+)/,
+    /الجزء[-_\s]*0*(\d+)/,
     /\b0*(\d+)\b/,
   ];
   for (const re of patterns) {
