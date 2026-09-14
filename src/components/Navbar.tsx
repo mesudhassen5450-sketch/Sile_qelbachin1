@@ -17,6 +17,8 @@ import {
   ShieldCheck,
   Headphones,
   Video,
+  Search,
+  Users,
 } from 'lucide-react';
 import { siteMetadata } from '@/data/channelData';
 
@@ -90,8 +92,13 @@ export default function Navbar() {
     },
     {
       label: t('nav.videos'),
-      href: '/video-lecture',
+      href: '/videos',
       icon: <Video className="w-4 h-4 text-red-500" />,
+    },
+    {
+      label: t('nav.speakers'),
+      href: '/speakers',
+      icon: <Users className="w-4 h-4 text-red-500" />,
     },
   ];
 
@@ -172,6 +179,20 @@ export default function Navbar() {
             }`}
           >
             {t('nav.audioLecture')}
+          </Link>
+
+          {/* Search */}
+          <Link
+            href="/search"
+            className={`px-3 py-2 rounded-lg text-sm transition-all inline-flex items-center gap-1.5 ${
+              isActive('/search')
+                ? 'bg-red-700/10 dark:bg-red-600/20 text-red-700 dark:text-red-400 font-semibold'
+                : 'text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800'
+            }`}
+            aria-label={t('nav.search')}
+          >
+            <Search className="w-4 h-4" />
+            <span>{t('nav.search')}</span>
           </Link>
 
           {/* 4. 📚 ትምህርታዊ ክፍሎች (Educational Subpages Dropdown) */}
@@ -321,6 +342,16 @@ export default function Navbar() {
                 }`}
               >
                 {t('nav.audioLecture')}
+              </Link>
+              <Link
+                href="/search"
+                onClick={() => setIsMenuOpen(false)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-base font-medium transition ${
+                  isActive('/search') ? 'bg-red-600 text-white font-semibold shadow-md' : 'text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100'
+                }`}
+              >
+                <Search className="w-4 h-4" />
+                {t('nav.search')}
               </Link>
               <Link
                 href="/contact"

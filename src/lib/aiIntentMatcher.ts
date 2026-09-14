@@ -4,6 +4,8 @@
  * Works WITHOUT AI API for simple navigation
  */
 
+import { mapKitabHintToSlug } from './contentCatalog';
+
 export type IntentType =
   | 'NAVIGATE_HOME'
   | 'NAVIGATE_KITAB'
@@ -14,8 +16,11 @@ export type IntentType =
   | 'NAVIGATE_REMINDERS'
   | 'NAVIGATE_KNOWLEDGE'
   | 'NAVIGATE_SAHABAH'
+  | 'NAVIGATE_SPEAKERS'
+  | 'NAVIGATE_SEARCH'
   | 'NAVIGATE_CONTACT'
   | 'PLAY_AUDIO'
+  | 'PLAY_DERS'
   | 'OPEN_PDF'
   | 'GET_SOCIAL_LINK'
   | 'SEARCH_KITAB'
@@ -33,6 +38,8 @@ export interface Intent {
     route?: string;
     kitabId?: string;
     audioId?: string;
+    dersId?: string;
+    partNumber?: number;
     platform?: string;
     query?: string;
   };
@@ -49,9 +56,28 @@ export function matchIntent(userInput: string): Intent {
     return { type: 'GREETING', confidence: 1.0 };
   }
 
+  // Exact ders play: "play intebih ders 3", "intebih ante murakeb part 3"
+  const dersPlay = matchPlayDers(input);
+  if (dersPlay) return dersPlay;
+
   // Home navigation
   if (/^(home|go\s*home|homepage|main\s*page)/i.test(input)) {
     return { type: 'NAVIGATE_HOME', confidence: 1.0, params: { route: '/' } };
+  }
+
+  // Search
+  if (/^(search|find\s*content|global\s*search)/i.test(input) || /^search\s+/i.test(input)) {
+    const q = input.replace(/^search\s*/i, '').trim();
+    return {
+      type: 'NAVIGATE_SEARCH',
+      confidence: 0.95,
+      params: { route: q ? `/search?q=${encodeURIComponent(q)}` : '/search', query: q || input },
+    };
+  }
+
+  // Speakers
+  if (/^(speaker|speakers|ustaaz|ustaz|go\s*to\s*speaker)/i.test(input)) {
+    return { type: 'NAVIGATE_SPEAKERS', confidence: 1.0, params: { route: '/speakers' } };
   }
 
   // Kitab navigation
@@ -60,26 +86,30 @@ export function matchIntent(userInput: string): Intent {
   }
 
   // Specific Kitab navigation
-  const kitabMatches = input.match(/(?:go\s*to\s*|open\s*|show\s*)?(?:intebih|intebihkitab|adewae|fatihu|alkesidu|teshilu|yekelb|betewbet)(?:\s*kitab)?/i);
-  if (kitabMatches) {
-    const kitabSlug = extractKitabSlug(input);
-    if (kitabSlug) {
-      return {
-        type: 'NAVIGATE_KITAB_DETAIL',
-        confidence: 1.0,
-        params: { route: `/kitab/${kitabSlug}`, kitabId: kitabSlug }
-      };
-    }
+  const kitabSlug = extractKitabSlug(input);
+  if (kitabSlug && /(?:go\s*to|open|show|kitab)/i.test(input) && !/(?:ders|part|ክፍል|play|listen)/i.test(input)) {
+    return {
+      type: 'NAVIGATE_KITAB_DETAIL',
+      confidence: 1.0,
+      params: { route: `/kitab/${kitabSlug}`, kitabId: kitabSlug },
+    };
+  }
+  if (kitabSlug && /^(intebih|adewae|fatihu|alwasail|teshilu|yekelb|betewbet)/i.test(input) && !/(?:ders|part|ክፍል|play|listen)/i.test(input)) {
+    return {
+      type: 'NAVIGATE_KITAB_DETAIL',
+      confidence: 0.95,
+      params: { route: `/kitab/${kitabSlug}`, kitabId: kitabSlug },
+    };
   }
 
   // Audio/Ders navigation or playback
-  if (/^(audio|go\s*to\s*audio|audio\s*lecture|audio\s*page|ders)/i.test(input)) {
+  if (/^(audio|go\s*to\s*audio|audio\s*lecture|audio\s*page)$/i.test(input)) {
     return { type: 'NAVIGATE_AUDIO', confidence: 1.0, params: { route: '/audio-lecture' } };
   }
 
   // Play audio
   if (/^(play|listen|hear)/i.test(input)) {
-    return { type: 'PLAY_AUDIO', confidence: 0.9, params: { query: input } };
+    return { type: 'PLAY_AUDIO', confidence: 0.85, params: { query: input } };
   }
 
   // Muhadara navigation
@@ -145,29 +175,47 @@ export function matchIntent(userInput: string): Intent {
     return { type: 'SEARCH_CONTENT', confidence: 0.6, params: { query: input } };
   }
 
-  // Unknown
   return { type: 'UNKNOWN', confidence: 0.0, params: { query: input } };
 }
 
-/**
- * Extract Kitab slug from user input
- */
-function extractKitabSlug(input: string): string | null {
-  const lowerInput = input.toLowerCase();
+function matchPlayDers(input: string): Intent | null {
+  const partMatch =
+    input.match(/(?:ders|part|ክፍል|الجزء)\s*#?\s*0*(\d+)/i) ||
+    input.match(/(?:play|listen|open)\s+.*?(\d+)\s*$/i);
+  const partNumber = partMatch ? parseInt(partMatch[1], 10) : null;
+  const kitabSlug = extractKitabSlug(input);
 
-  if (/intebih/i.test(lowerInput)) return 'intebih-ante-murakeb';
-  if (/adewae|dawa|disease|cure/i.test(lowerInput)) return 'adewae-kitab';
-  if (/fatihu|awliya/i.test(lowerInput)) return 'fatihu-awliya';
-  if (/alkesidu|leyse|algerib/i.test(lowerInput)) return 'alkesidu-leyse-algerib';
-  if (/teshilu|alimu|sheria/i.test(lowerInput)) return 'teshilu-alimu-sheria';
-  if (/yekelb|betewbet/i.test(lowerInput)) return 'yekelb-betewbet-kitab';
+  if (kitabSlug && partNumber != null && !Number.isNaN(partNumber)) {
+    return {
+      type: 'PLAY_DERS',
+      confidence: 1.0,
+      params: {
+        kitabId: kitabSlug,
+        partNumber,
+        query: input,
+      },
+    };
+  }
+
+  // "play ders 3 of intebih" already covered; also bare "intebih ders 3"
+  if (kitabSlug && /(?:ders|part|ክፍል)/i.test(input) && partNumber != null) {
+    return {
+      type: 'PLAY_DERS',
+      confidence: 0.95,
+      params: { kitabId: kitabSlug, partNumber, query: input },
+    };
+  }
 
   return null;
 }
 
 /**
- * Extract social platform from user input
+ * Extract Kitab slug from user input — only real kitabs in the library
  */
+function extractKitabSlug(input: string): string | null {
+  return mapKitabHintToSlug(input);
+}
+
 function extractSocialPlatform(input: string): string | null {
   if (/telegram/i.test(input)) return 'telegram';
   if (/tiktok|tik\s*tok/i.test(input)) return 'tiktok';
@@ -175,65 +223,68 @@ function extractSocialPlatform(input: string): string | null {
   return null;
 }
 
-/**
- * Get natural language response for intent
- */
-export function getIntentResponse(intent: Intent, data?: any): string {
+export function getIntentResponse(intent: Intent, data?: { title?: string; platform?: string; handle?: string; url?: string; speaker?: string; content?: string; source?: string }): string {
   switch (intent.type) {
     case 'GREETING':
-      return 'Wa alaykumussalam wa rahmatullahi wa barakatuh 🌙\n\nWelcome to Sle Qelbachin. How can I help you today?\n\n📖 Kitab\n🎧 Audio Ders\n🎙️ Muhadara\n💭 Reminders\n🕌 Islamic Knowledge';
+      return 'Wa alaykumussalam wa rahmatullahi wa barakatuh.\n\nWelcome to Sile Qelbachin. How can I help you find content today?\n\nKitab · Audio Ders · Muhadara · Reminders · Search';
 
     case 'NAVIGATE_HOME':
-      return '🏠 Taking you to the homepage.';
+      return 'Taking you to the homepage.';
 
     case 'NAVIGATE_KITAB':
-      return '📖 Opening the Kitab Library with 7 Islamic books.';
+      return 'Opening the Kitab Library.';
 
     case 'NAVIGATE_KITAB_DETAIL':
-      return `📖 Opening ${data?.title || 'the Kitab'}.`;
+      return `Opening ${data?.title || 'the Kitab'}.`;
 
     case 'NAVIGATE_AUDIO':
-      return '🎧 Opening Audio Lectures page.';
+      return 'Opening Audio Lectures.';
 
     case 'NAVIGATE_MUHADARA':
-      return '🎙️ Opening Muhadara (Islamic Discourses) page.';
+      return 'Opening Muhadara.';
 
     case 'NAVIGATE_VIDEOS':
-      return '🎥 Opening Videos page.';
+      return 'Opening Videos.';
 
     case 'NAVIGATE_REMINDERS':
-      return '💭 Opening Daily Reminders page.';
+      return 'Opening Reminders.';
 
     case 'NAVIGATE_KNOWLEDGE':
-      return '📜 Opening Qur\'an & Hadith Knowledge page.';
+      return "Opening Qur'an & Hadith Knowledge.";
 
     case 'NAVIGATE_SAHABAH':
-      return '🕌 Opening Sahabah (Companions) Stories page.';
+      return 'Opening Sahabah.';
+
+    case 'NAVIGATE_SPEAKERS':
+      return 'Opening Speakers.';
+
+    case 'NAVIGATE_SEARCH':
+      return 'Opening Search.';
 
     case 'NAVIGATE_CONTACT':
-      return '📱 Opening Contact page with social links.';
+      return 'Opening Contact.';
 
     case 'GET_SOCIAL_LINK':
       if (data?.url) {
-        return `📱 **${data.platform}**: ${data.handle}\n\n${data.url}`;
-      } else {
-        return `${data?.platform || 'That social link'} is not currently available on Sle Qelbachin.\n\nVerified platforms:\n📱 Telegram: https://t.me/Sle_qelbachn1\n🎵 TikTok: https://www.tiktok.com/@sle_qelbachn1`;
+        return `${data.platform}: ${data.handle}\n\n${data.url}`;
       }
+      return 'That social link is not listed on Sile Qelbachin. Verified: Telegram https://t.me/Sle_qelbachn1 · TikTok https://www.tiktok.com/@sle_qelbachn1 · YouTube https://youtube.com/@sle_qelbachn1';
 
     case 'PLAY_AUDIO':
+    case 'PLAY_DERS':
       return data?.title
-        ? `🎧 **${data.title}**\n\nReady to play.`
-        : '🎧 Please specify which audio you\'d like to play.';
+        ? `${data.title}\n\nOpening the exact Ders page.`
+        : 'I could not find that Ders in the available Sile Qelbachin content.';
 
     case 'RANDOM_MUHADARA':
       return data?.title
-        ? `🎙️ **Random Muhadara**\n\n${data.title}\nSpeaker: ${data.speaker}`
-        : '🎙️ No Muhadara available at this time.';
+        ? `Random Muhadara\n\n${data.title}\nSpeaker: ${data.speaker}`
+        : 'No Muhadara available at this time.';
 
     case 'RANDOM_REMINDER':
       return data?.content
-        ? `💭 **Daily Reminder**\n\n${data.content}\n\nSource: ${data.source}`
-        : '💭 No reminders available at this time.';
+        ? `Reminder\n\n${data.content}\n\nSource: ${data.source}`
+        : 'No reminders available at this time.';
 
     default:
       return '';

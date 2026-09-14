@@ -3,6 +3,14 @@
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { AudioTrack } from '@/data/channelData';
 
+const CONTINUE_KEY = 'sile-continue-listening';
+
+interface ContinueState {
+  track: AudioTrack;
+  currentTime: number;
+  playlist?: AudioTrack[];
+}
+
 interface AudioContextType {
   currentTrack: AudioTrack | null;
   isPlaying: boolean;
@@ -11,7 +19,9 @@ interface AudioContextType {
   volume: number;
   playbackRate: number;
   playlist: AudioTrack[];
+  continueTrack: ContinueState | null;
   playTrack: (track: AudioTrack, playlist?: AudioTrack[]) => void;
+  resumeContinueListening: () => void;
   togglePlayPause: () => void;
   seek: (time: number) => void;
   setVolume: (vol: number) => void;
@@ -22,21 +32,55 @@ interface AudioContextType {
 
 const AudioContext = createContext<AudioContextType | undefined>(undefined);
 
+function loadContinue(): ContinueState | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(CONTINUE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as ContinueState;
+  } catch {
+    return null;
+  }
+}
+
+function saveContinue(state: ContinueState | null) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (!state) localStorage.removeItem(CONTINUE_KEY);
+    else localStorage.setItem(CONTINUE_KEY, JSON.stringify(state));
+  } catch {
+    /* quota */
+  }
+}
+
 export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentTrack, setCurrentTrack] = useState<AudioTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
-  const [duration, setDuration] = useState<number>(300); // 5 min default presentation
+  const [duration, setDuration] = useState<number>(300);
   const [volume, setVolumeState] = useState<number>(0.8);
   const [playbackRate, setPlaybackRateState] = useState<number>(1);
   const [playlist, setPlaylist] = useState<AudioTrack[]>([]);
+  const [continueTrack, setContinueTrack] = useState<ContinueState | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const oscRef = useRef<OscillatorNode | null>(null);
+  const audioCtxRef = useRef<globalThis.AudioContext | null>(null);
+  const playlistRef = useRef<AudioTrack[]>([]);
+  const trackRef = useRef<AudioTrack | null>(null);
 
   useEffect(() => {
-    // Create HTML5 Audio element
+    setContinueTrack(loadContinue());
+  }, []);
+
+  useEffect(() => {
+    playlistRef.current = playlist;
+  }, [playlist]);
+
+  useEffect(() => {
+    trackRef.current = currentTrack;
+  }, [currentTrack]);
+
+  useEffect(() => {
     audioRef.current = new Audio();
     const audio = audioRef.current;
 
@@ -44,16 +88,34 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (audio && audio.duration) {
         setCurrentTime(audio.currentTime);
         setDuration(audio.duration);
+        const track = trackRef.current;
+        if (track && audio.currentTime > 3) {
+          const state: ContinueState = {
+            track,
+            currentTime: audio.currentTime,
+            playlist: playlistRef.current,
+          };
+          saveContinue(state);
+          setContinueTrack(state);
+        }
       }
     };
 
     const handleEnded = () => {
       setIsPlaying(false);
-      playNext();
+      const list = playlistRef.current;
+      const track = trackRef.current;
+      if (!track || list.length === 0) return;
+      const currentIndex = list.findIndex((t) => t.id === track.id);
+      if (currentIndex !== -1 && currentIndex < list.length - 1) {
+        const next = list[currentIndex + 1];
+        setCurrentTrack(next);
+        audio.src = next.audioUrl;
+        audio.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(true));
+      }
     };
 
     const handleError = () => {
-      // Fallback synthetic audio simulation if static mp3 cannot be decoded
       console.log('Using synthetic lecture audio tone fallback');
     };
 
@@ -69,11 +131,12 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, []);
 
-  // Internal Synthetic Tone generator for live lecture simulation
   const startSyntheticAudio = () => {
     try {
       if (!audioCtxRef.current) {
-        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        const AudioCtx =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof window.AudioContext }).webkitAudioContext;
         audioCtxRef.current = new AudioCtx();
       }
       if (audioCtxRef.current.state === 'suspended') {
@@ -84,7 +147,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const playTrack = (track: AudioTrack, newPlaylist?: AudioTrack[]) => {
+  const playTrack = (track: AudioTrack, newPlaylist?: AudioTrack[], startAt = 0) => {
     setCurrentTrack(track);
     if (newPlaylist) {
       setPlaylist(newPlaylist);
@@ -94,16 +157,30 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       audioRef.current.src = track.audioUrl;
       audioRef.current.playbackRate = playbackRate;
       audioRef.current.volume = volume;
+      const onMeta = () => {
+        if (startAt > 0 && audioRef.current) {
+          audioRef.current.currentTime = startAt;
+        }
+        audioRef.current?.removeEventListener('loadedmetadata', onMeta);
+      };
+      if (startAt > 0) {
+        audioRef.current.addEventListener('loadedmetadata', onMeta);
+      }
       audioRef.current.play()
         .then(() => setIsPlaying(true))
         .catch(() => {
-          // Playback started (simulated)
           setIsPlaying(true);
           startSyntheticAudio();
         });
     } else {
       setIsPlaying(true);
     }
+  };
+
+  const resumeContinueListening = () => {
+    const saved = continueTrack || loadContinue();
+    if (!saved) return;
+    playTrack(saved.track, saved.playlist, saved.currentTime);
   };
 
   const togglePlayPause = () => {
@@ -172,7 +249,9 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         volume,
         playbackRate,
         playlist,
+        continueTrack,
         playTrack,
+        resumeContinueListening,
         togglePlayPause,
         seek,
         setVolume,

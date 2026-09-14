@@ -11,8 +11,24 @@ import AIAssistant from '@/components/AIAssistant';
 import AIErrorBoundary from '@/components/AIErrorBoundary';
 
 export const metadata: Metadata = {
-  title: 'ስለ ቀልባችን - Islamic Educational Channel',
+  metadataBase: new URL('https://sileqelbachin1.com'),
+  title: {
+    default: 'ስለ ቀልባችን - Islamic Educational Channel',
+    template: '%s | ስለ ቀልባችን',
+  },
   description: 'ከቁርኣንና ከሐዲሥ ቀልባችንን የምናክምበትን ጥበብ በጋራ የምንፈልግበት የእስልምና ትምህርታዊ መድረክ።',
+  alternates: {
+    canonical: '/',
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'am_ET',
+    url: 'https://sileqelbachin1.com',
+    siteName: 'ስለ ቀልባችን',
+    title: 'ስለ ቀልባችን - Islamic Educational Channel',
+    description: 'Islamic educational platform — Kitab, Ders, Muhadara, Reminders.',
+    images: [{ url: '/logo2hero.jpg', width: 1200, height: 630, alt: 'ስለ ቀልባችን' }],
+  },
   other: {
     google: 'notranslate',
   },

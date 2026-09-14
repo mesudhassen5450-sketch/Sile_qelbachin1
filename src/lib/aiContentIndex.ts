@@ -195,40 +195,40 @@ export function buildContentIndex(): ContentIndex {
   // Featured Audio from Homepage + Latest Ders
   const featuredAudio: AudioIndex[] = [
     {
-      id: 'intebih-part-1',
+      id: 'intebih-ante-murakeb-ders-1',
       title: 'Intebih Part 1 - Warning for the Heedless',
       speaker: 'Abu Sufiyan Albenan',
       category: 'Kitab',
       audioUrl: 'https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/files/Intebih Ante Murakeb (intebih-ante-murakeb)/ኢንተቢህ 1.m4a',
       kitabId: 'intebih-ante-murakeb',
-      route: '/kitab/intebih-ante-murakeb',
+      route: '/ders/intebih-ante-murakeb-ders-1',
     },
     {
-      id: 'intebih-part-2',
+      id: 'intebih-ante-murakeb-ders-2',
       title: 'Intebih Part 2 - Warning for the Heedless',
       speaker: 'Abu Sufiyan Albenan',
       category: 'Kitab',
       audioUrl: 'https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/files/Intebih Ante Murakeb (intebih-ante-murakeb)/ኢንተቢህ- ክፍል 2.m4a',
       kitabId: 'intebih-ante-murakeb',
-      route: '/kitab/intebih-ante-murakeb',
+      route: '/ders/intebih-ante-murakeb-ders-2',
     },
     {
-      id: 'intebih-part-3',
+      id: 'intebih-ante-murakeb-ders-3',
       title: 'Intebih Part 3 - Warning for the Heedless',
       speaker: 'Abu Sufiyan Albenan',
       category: 'Kitab',
       audioUrl: 'https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/files/Intebih Ante Murakeb (intebih-ante-murakeb)/ኢንተቡህ- ክፍል 3.m4a',
       kitabId: 'intebih-ante-murakeb',
-      route: '/kitab/intebih-ante-murakeb',
+      route: '/ders/intebih-ante-murakeb-ders-3',
     },
     {
-      id: 'intebih-part-4',
+      id: 'intebih-ante-murakeb-ders-4',
       title: 'Intebih Part 4 - Warning for the Heedless',
       speaker: 'Abu Sufiyan Albenan',
       category: 'Kitab',
       audioUrl: 'https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/files/Intebih Ante Murakeb (intebih-ante-murakeb)/ኢንተቢህ-ክፍል 4.m4a',
       kitabId: 'intebih-ante-murakeb',
-      route: '/kitab/intebih-ante-murakeb',
+      route: '/ders/intebih-ante-murakeb-ders-4',
     },
     {
       id: 'poetry-mareny-geta',
@@ -308,6 +308,8 @@ export function buildContentIndex(): ContentIndex {
     { path: '/knowledge', name: 'Knowledge', description: 'Qur\'an & Hadith' },
     { path: '/sahabah', name: 'Sahabah', description: 'Companion stories' },
     { path: '/contact', name: 'Contact', description: 'Social media links' },
+    { path: '/search', name: 'Search', description: 'Global content search' },
+    { path: '/speakers', name: 'Speakers', description: 'Ustaazes from verified lessons' },
   ];
 
   // Verified Social Links
@@ -364,16 +366,32 @@ export function searchKitab(query: string): KitabIndex[] {
 }
 
 /**
- * Search for audio/ders by keyword
+ * Search for audio/ders by keyword — all kitab ders + featured
  */
 export function searchAudio(query: string): AudioIndex[] {
   const index = getCachedIndex();
   const lowerQuery = query.toLowerCase();
 
-  return index.featuredAudio.filter(audio =>
-    audio.title.toLowerCase().includes(lowerQuery) ||
-    audio.speaker.toLowerCase().includes(lowerQuery) ||
-    audio.category.toLowerCase().includes(lowerQuery)
+  const fromKitabs: AudioIndex[] = index.kitabs.flatMap((kitab) =>
+    kitab.dersList.map((ders) => ({
+      id: ders.id,
+      title: `${kitab.title} — ${ders.title}`,
+      speaker: ders.speaker,
+      category: 'Kitab Ders',
+      audioUrl: ders.audioUrl,
+      kitabId: kitab.slug,
+      route: `/ders/${ders.id}`,
+    }))
+  );
+
+  const all = [...fromKitabs, ...index.featuredAudio];
+  return all.filter(
+    (audio) =>
+      audio.title.toLowerCase().includes(lowerQuery) ||
+      audio.speaker.toLowerCase().includes(lowerQuery) ||
+      (audio.category && audio.category.toLowerCase().includes(lowerQuery)) ||
+      (audio.kitabId && audio.kitabId.includes(lowerQuery)) ||
+      audio.id.includes(lowerQuery)
   );
 }
 
@@ -494,8 +512,8 @@ ${index.kitabs.map(k => `
 - **Route**: ${k.route}
 - **Description**: ${k.description}
 - **Ders List**:
-${k.dersList.slice(0, 3).map(d => `  - ${d.title} (${d.titleAm}) - Speaker: ${d.speaker}`).join('\n')}
-${k.dersList.length > 3 ? `  ... and ${k.dersList.length - 3} more` : ''}
+${k.dersList.slice(0, 5).map(d => `  - ${d.title} (${d.titleAm}) - Speaker: ${d.speaker} - Route: /ders/${d.id}`).join('\n')}
+${k.dersList.length > 5 ? `  ... and ${k.dersList.length - 5} more` : ''}
 `).join('\n')}
 
 ## MUHADARA (${index.muhadara.length} Discourses):
@@ -549,34 +567,25 @@ ${index.categories.map(c => `
 ## NAVIGATION ROUTES:
 ${index.routes.map(r => `
 - **${r.path}**: ${r.name} - ${r.description}
-`).join('\n')}
+`).join('')}
+- **/search**: Global search with exact content links
+- **/speakers**: Speakers derived from existing lesson metadata only
+- **/ders/[id]**: Shareable exact Ders pages
+- **/reminder/[id]**: Shareable reminder pages
+- **/muhadara/[id]**: Shareable muhadara pages
 
 ## IMPORTANT AI BEHAVIOR RULES:
-1. **Content Accuracy**: Only refer to content that EXISTS in this index
-2. **No Fabrication**: NEVER invent Qur'an verses, Hadith, or Islamic rulings
-3. **Verified Sources**: Always provide actual source references from the index
-4. **Route Guidance**: Direct users to actual routes (e.g., /kitab/intebih-ante-murakeb)
-5. **Social Links**: Only provide verified social links listed above
-6. **Search Support**: Help users find Kitab, Ders, Muhadara, Audio, Videos, Reminders, Knowledge
-7. **Navigation Actions**: Provide clickable actions when relevant (📖 Open, 🎧 Listen, 🎥 Watch, 📄 PDF)
-8. **PDF Availability**: Only mention PDF if pdfUrl exists for that Kitab
-9. **Content Not Found**: If user asks for unavailable content, clearly state it's not on the website
-10. **No Internal Details**: Never expose search processes, indexing, or system internals
-
-## CONTENT SEARCH CAPABILITIES:
-- Search Kitabs by: title, author, category, slug
-- Search Audio by: title, speaker, category
-- Search Muhadara by: title, speaker, topic
-- Search Reminders by: title, content, source, category, type
-- Search Knowledge by: category (quran/hadith/lesson/reflection), text, reference
-- Get random Muhadara or Reminder
-- Find social links by platform
+1. You are a **content-navigation assistant** for Sile Qelbachin — not a Mufti or independent scholar
+2. Only refer to content that EXISTS in this index
+3. NEVER invent Qur'an verses, Hadith, scholar quotes, books, speakers, Ders, or rulings
+4. For exact requests like "Play Intebih Ante Murakeb Ders 3", give the exact route /ders/intebih-ante-murakeb-ders-3
+5. If content is missing, say: "I couldn't find that information in the available Sile Qelbachin content."
+6. For religious questions needing scholarly judgment, do not manufacture a ruling — guide users to available site content instead
+7. Prioritize: Find → Navigate → Play → Read → Explain available website content
+8. Only provide verified social links listed above
+9. Never expose internal tools, keys, or debugging details
 
 ## LANGUAGE SUPPORT:
-- Amharic (primary)
-- Arabic
-- English
-
-All content is multilingual - respond in the language the user uses or provide translations when helpful.
+- Amharic (primary), Arabic, English
 `;
 }

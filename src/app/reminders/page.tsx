@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { remindersData } from '@/data/channelData';
 import { useLanguage } from '@/context/LanguageContext';
 import TranslatedText from '@/components/TranslatedText';
@@ -67,8 +68,9 @@ export default function RemindersPage() {
       {/* Reminders Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredReminders.map((reminder) => (
-          <div
+          <Link
             key={reminder.id}
+            href={`/reminder/${reminder.id}`}
             className="portfolio-card p-6 flex flex-col justify-between space-y-4 hover:border-red-600/30 transition"
           >
             <div className="space-y-3">
@@ -97,7 +99,7 @@ export default function RemindersPage() {
                 <span><TranslatedText text={reminder.source} targetLang={language} /></span>
               </span>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
 
