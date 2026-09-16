@@ -4,7 +4,7 @@
 
 > A modern Islamic educational platform created to make beneficial Islamic knowledge easier to discover, read, listen to, and share through digital technology.
 
-[![Live Website](https://img.shields.io/badge/🌐_Live_Website-Sle_Qelbachin-red?style=for-the-badge)](https://sileqelbachin1.netlify.app/)
+[![Live Website](https://img.shields.io/badge/🌐_Live_Website-Sle_Qelbachin-red?style=for-the-badge)](https://sileqelbachin1.com/)
 [![Next.js](https://img.shields.io/badge/Next.js-16.3.4-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
@@ -13,7 +13,7 @@
 
 ## 🌐 Live Website
 
-**Visit:** [https://sileqelbachin1.netlify.app/](https://sileqelbachin1.netlify.app/)
+**Visit:** [https://sileqelbachin1.netlify.app/](https://sileqelbachin1.com/)
 
 ## 📱 Connect With Us
 
