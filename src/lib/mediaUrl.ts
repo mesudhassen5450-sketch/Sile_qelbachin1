@@ -64,11 +64,9 @@ export function buildR2MediaUrl(relativePath: string): string {
   return `${PUBLIC_BASE}/${OBJECT_PREFIX}/${encodePathSegments(normalized)}`;
 }
 
+/** Only keep small site assets on this host — everything else under / goes to R2. */
 function isLocalPublicPath(pathname: string): boolean {
   const lower = pathname.toLowerCase();
-  if (lower.startsWith('/telegram_media/') || lower === '/telegram_media') {
-    return false;
-  }
   return (
     lower.startsWith('/covers/') ||
     lower === '/covers' ||
@@ -78,8 +76,8 @@ function isLocalPublicPath(pathname: string): boolean {
     lower.startsWith('/favicon') ||
     lower.startsWith('/icons/') ||
     lower.startsWith('/_next/') ||
-    // Generic local public asset (leading slash, not a remote scheme)
-    (pathname.startsWith('/') && !pathname.startsWith('//'))
+    lower.startsWith('/assets/') ||
+    lower.startsWith('/css/')
   );
 }
 
@@ -107,7 +105,7 @@ export function resolveMediaUrl(url?: string | null): string {
   const trimmed = url.trim();
   if (!trimmed) return '';
 
-  // Relative local public paths such as covers/...
+  // Relative site assets such as covers/... → /covers/...
   if (
     !trimmed.includes('://') &&
     !trimmed.startsWith('//') &&
@@ -117,20 +115,19 @@ export function resolveMediaUrl(url?: string | null): string {
       trimmed.startsWith('favicon'))
   ) {
     const { pathname, suffix } = splitPathAndSuffix(trimmed);
-    return `${encodePathSegments(pathname)}${suffix}`;
+    return `/${encodePathSegments(pathname)}${suffix}`;
   }
 
-  // Absolute local public paths
+  // Absolute paths: local site assets stay; telegram_media + other /files → R2
   if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
     const { pathname, suffix } = splitPathAndSuffix(trimmed);
-
-    if (pathname.toLowerCase().startsWith('/telegram_media/')) {
-      return `${buildR2MediaUrl(pathname.slice(1))}${suffix}`;
-    }
 
     if (isLocalPublicPath(pathname)) {
       return `${encodePathSegments(pathname)}${suffix}`;
     }
+
+    // /telegram_media/files/... or /files/... or leftover /intebih5.m4a style
+    return `${buildR2MediaUrl(pathname.slice(1))}${suffix}`;
   }
 
   const prefixMatch =
