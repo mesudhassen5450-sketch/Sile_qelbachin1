@@ -1,80 +1,65 @@
 # Deployment Guide for Sle Qelbachin Website
 
-## 🚨 Important: Missing Media Files
+## Media playback (Cloudflare R2)
 
-The repository **does not include** the `public/telegram_media/` folder (1.9 GB, 800 files) due to size constraints. You need to upload these separately.
+**Production audio / PDF / video / remote covers** are served from **Cloudflare R2**. See `CLOUDFLARE_R2.md`.
 
-## Option 1: Manual Upload to Netlify (Recommended for Quick Fix)
+- Public base: `https://pub-03bea4f667534df5ab6c67f073c73d1e.r2.dev`
+- Object prefix: `sileqelbachin-meadia`
+- Resolver: `src/lib/mediaUrl.ts` (rewrites legacy GitHub / jsDelivr URLs)
+
+The GitHub media repo `sileqelbachin-media` is an **optional archive**, not the live playback CDN.
+
+Set on Netlify (optional — code has the same defaults):
+
+- `NEXT_PUBLIC_R2_PUBLIC_BASE`
+- `NEXT_PUBLIC_R2_OBJECT_PREFIX`
+
+Never put R2 Access Keys in `NEXT_PUBLIC_*` or client code.
+
+---
+
+## Important: Local telegram_media folder
+
+The repository **does not include** a full `public/telegram_media/` tree (historically ~1.9 GB). Production does **not** need that folder on Netlify — files live on R2. Keep a local copy only for archival or re-upload scripts.
+
+## Option 1: Deploy the Next.js site to Netlify
 
 ### Step 1: Deploy to Netlify
+
 1. Go to https://app.netlify.com/
 2. Connect your GitHub repository: `mesudhassen5450-sketch/Sile_qelbachin1`
 3. Build settings:
    - Build command: `npm run build`
    - Publish directory: `.next`
-4. Add environment variable in Netlify (Site settings → Environment variables):
-   - Key: `GROQ_API_KEY`
-   - Value: your Groq API key (never commit keys to git)
-   - Key: `NEXT_PUBLIC_SITE_URL`
-   - Value: `https://sileqelbachin1.netlify.app`
+4. Add environment variables in Netlify (Site settings → Environment variables):
+   - `GROQ_API_KEY` — your Groq API key (never commit keys to git)
+   - `NEXT_PUBLIC_SITE_URL` — e.g. `https://sileqelbachin1.netlify.app`
+   - `NEXT_PUBLIC_R2_PUBLIC_BASE` — R2 public URL (see `.env.example`)
+   - `NEXT_PUBLIC_R2_OBJECT_PREFIX` — `sileqelbachin-meadia`
 
-### Step 2: Upload Media Files
-After your site deploys:
+### Step 2: Confirm media on R2
 
-1. Install Netlify CLI:
+After deploy, open a Kitab lesson and verify audio/PDF load from `*.r2.dev` (not `githubusercontent` / `jsdelivr`).
+
+If you need to re-upload objects to the bucket, use a **server/CI** script with private R2 credentials from `.env.example` placeholders — never commit real secrets.
+
+## Option 2 (legacy): Manual Netlify static media upload
+
+Only if you are not using R2. Prefer R2 for production.
+
 ```bash
 npm install -g netlify-cli
-```
-
-2. Login to Netlify:
-```bash
 netlify login
-```
-
-3. Link your site:
-```bash
-cd c:\Users\user\Documents\multiplepage-portfolio-1.0.0
 netlify link
-```
-
-4. Upload the telegram_media folder:
-```bash
 netlify deploy --dir=public/telegram_media --prod --alias=telegram_media
 ```
 
-Or manually via Netlify Dashboard:
-- Go to **Deploys** > **Deploy settings** > **Asset optimization**
-- Upload `public/telegram_media` folder as **Static files**
+## Option 3 (legacy): Other CDNs
 
-## Option 2: Use CDN for Media (Recommended for Production)
+Older docs mentioned Cloudinary / S3. The current production path is **Cloudflare R2** as documented above.
 
-### Using Cloudinary (Free tier: 25GB storage, 25GB bandwidth/month)
-
-1. Sign up at https://cloudinary.com/
-2. Upload your media files to Cloudinary
-3. Update paths in your code:
-
-Replace `/telegram_media/files/...` with Cloudinary URLs:
-- Files to update:
-  - `src/data/kitabs.ts`
-  - `src/lib/aiContentIndex.ts`
-  - `src/app/page.tsx`
-  - `src/data/channelData.ts`
-
-Example:
-```typescript
-// Before
-audioUrl: "/telegram_media/files/Intebih%20Ante%20Murakeb/audio.m4a"
-
-// After
-audioUrl: "https://res.cloudinary.com/your-cloud-name/video/upload/v1/Intebih%20Ante%20Murakeb/audio.m4a"
-```
-
-## Option 3: Host on AWS S3 or DigitalOcean Spaces
-
-Similar to Option 2, upload to S3/Spaces and update URLs in code.
-
-## 🔧 Fixing API Routes on Netlify
+## Fixing API Routes on Netlify
 
 The `netlify.toml` file is already configured. Ensure you install the Netlify Next.js plugin:
 
@@ -83,72 +68,73 @@ npm install --save-dev @netlify/plugin-nextjs
 ```
 
 Then commit and push:
+
 ```bash
 git add netlify.toml package.json package-lock.json
 git commit -m "chore: Add Netlify configuration"
 git push
 ```
 
-## 📁 Files Requiring Media Upload
+## Media object layout (R2 prefix)
 
-### Required Audio Files (Referenced in Code):
 ```
-public/telegram_media/files/
-├── Intebih Ante Murakeb (intebih-ante-murakeb)/
-│   ├── intebih ante muakeb.webp (cover image)
-│   ├── انتَبه أنتَ مُراقَب.pdf
-│   ├── ኢንተቢህ 1.m4a
-│   ├── ኢንተቢህ- ክፍል 2.m4a
-│   ├── ኢንተቡህ- ክፍል 3.m4a
-│   └── ኢንተቢህ-ክፍል 4.m4a
-├── home page audio/
-│   ├── ማረኝ_የኔ_ጌታ…!የ_ኡስታዝ_መመሀመድ_ሲራጁ_ግጥም.m4a
-│   ├── ከጭንቀት_እና_ከ_ሐሳብ_መውጫ_መንገዶች!.mp3
-│   └── ትዳር እና እስልምና.ogg
-└── [All other Kitab folders and audio files]
+sileqelbachin-meadia/
+├── files/
+│   ├── Intebih Ante Murakeb (intebih-ante-murakeb)/
+│   │   ├── intebih ante muakeb.webp
+│   │   ├── انتَبه أنتَ مُراقَب.pdf
+│   │   ├── intebih5.m4a
+│   │   └── …
+│   ├── home page audio/
+│   └── [other Kitab folders]
+├── voice_messages/
+└── …
 ```
 
-## 🔍 Testing Locally
+## Testing Locally
 
-To test with media files locally:
-
-1. Ensure `public/telegram_media/` folder exists with all files
-2. Run development server:
 ```bash
 npm run dev
 ```
-3. Visit http://localhost:3000
 
-## 🚀 After Deployment
+Visit http://localhost:3000 — playback should hit R2 public URLs via `resolveMediaUrl`.
 
-1. Check that media files load (no 404 errors)
+## After Deployment
+
+1. Check that media files load from `*.r2.dev` (no 404 errors)
 2. Test AI Assistant (should connect to API routes)
 3. Test PDF viewer on Kitab pages
 4. Verify audio playback
 
-## 🔎 Google Search Console (SEO)
+## Google Search Console (SEO)
 
 After the site is live:
 
 1. Open [Google Search Console](https://search.google.com/search-console)
 2. Add property for your domain (or URL prefix matching `NEXT_PUBLIC_SITE_URL`)
 3. Verify ownership (HTML tag, DNS, or Netlify method)
-4. Submit sitemap: `{NEXT_PUBLIC_SITE_URL}/sitemap.xml`  
+4. Submit sitemap: `{NEXT_PUBLIC_SITE_URL}/sitemap.xml`
    Example: `https://sileqelbachin1.netlify.app/sitemap.xml`
 5. Confirm robots is reachable: `{NEXT_PUBLIC_SITE_URL}/robots.txt`
 
 Set `NEXT_PUBLIC_SITE_URL` in Netlify to your final public URL (Netlify or custom domain such as `https://sileqelbachin1.com`) so canonicals, Open Graph, sitemap, and robots stay correct.
 
-## 📝 Environment Variables
+## Environment Variables
 
-Required for production:
-- `GROQ_API_KEY`: Your Groq API key for AI features
+Required / recommended for production:
+
+- `GROQ_API_KEY`: Groq API key for AI features (server-only)
 - `NEXT_PUBLIC_SITE_URL`: Public site URL for sitemap / OG / canonicals
+- `NEXT_PUBLIC_R2_PUBLIC_BASE`: R2 public base URL
+- `NEXT_PUBLIC_R2_OBJECT_PREFIX`: R2 object prefix (`sileqelbachin-meadia`)
 
-## 💡 Pro Tip
+Private R2 upload keys (`R2_ACCESS_KEY_ID`, etc.) are for upload scripts only — see `.env.example` and `CLOUDFLARE_R2.md`.
 
-For the best performance, use Option 2 (CDN) for production deployment. This will:
-- Reduce GitHub repo size
-- Speed up deployments
-- Provide better global content delivery
-- Allow independent media updates without redeploying code
+## Pro Tip
+
+Use R2 for production media so you can:
+
+- Keep the frontend git repo small
+- Speed up deploys
+- Serve large audio without GitHub/jsDelivr limits
+- Update media without redeploying the Next.js app

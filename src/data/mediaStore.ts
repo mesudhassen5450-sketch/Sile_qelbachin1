@@ -1,6 +1,6 @@
 import rawData from './content.json';
 import { kitabsData } from './channelData';
-import { resolveMediaUrl } from '@/lib/mediaUrl';
+import { mediaFileUrl, resolveMediaUrl } from '@/lib/mediaUrl';
 
 export interface LocalizedTextObj {
   am: string;
@@ -30,26 +30,19 @@ const safeEncodeSegment = (segment: string): string => {
   }
 };
 
-// Clean and normalize file paths with CDN URL for jsDelivr
-const CDN_BASE = 'https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main';
-
 const items: MediaItem[] = (rawData as any[]).map((item) => {
   let cleanUrl = item.fileUrl || '';
 
-  if (cleanUrl && !cleanUrl.startsWith('http')) {
-    // Strip leading dots or slashes
-    cleanUrl = cleanUrl.replace(/^(\.\/|\/)/, '');
-
-    // Remove telegram_media/ prefix if exists
-    cleanUrl = cleanUrl.replace(/^telegram_media\//, '');
-
-    // Build CDN URL, then rewrite to GitHub raw with encoded paths
-    cleanUrl = `${CDN_BASE}/${cleanUrl}`;
+  if (cleanUrl && !cleanUrl.startsWith('http') && !cleanUrl.startsWith('//')) {
+    // Relative catalog path → Cloudflare R2 via mediaUrl helper
+    cleanUrl = mediaFileUrl(cleanUrl);
+  } else {
+    cleanUrl = resolveMediaUrl(cleanUrl);
   }
 
   return {
     ...item,
-    fileUrl: resolveMediaUrl(cleanUrl),
+    fileUrl: cleanUrl,
   };
 });
 
@@ -111,7 +104,7 @@ export const getGroupedPdfsByMonthYear = (): MediaGroup[] => {
               en: `Part ${index + 1} Audio Lesson`,
               ar: `الجزء ${index + 1}`,
             },
-            fileUrl: ders.audioUrl,
+            fileUrl: resolveMediaUrl(ders.audioUrl),
             type: 'audio' as const,
             category: pdf.category || 'Kitab Audio',
           }))

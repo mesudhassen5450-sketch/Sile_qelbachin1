@@ -5,7 +5,9 @@
 **Snapshot date:** 2026-09-14  
 **Live site:** https://sileqelbachin1.netlify.app/  
 **Frontend repo:** https://github.com/mesudhassen5450-sketch/Sile_qelbachin1  
-**Media repo:** https://github.com/mesudhassen5450-sketch/sileqelbachin-media  
+**Media playback (production):** Cloudflare R2 — see `CLOUDFLARE_R2.md`  
+**Media archive (optional):** https://github.com/mesudhassen5450-sketch/sileqelbachin-media  
+
 
 ---
 
@@ -145,14 +147,15 @@ Flutter: use same keys; set `TextDirection.rtl` when `ar`.
 
 ## 6. How media connects (critical for Flutter)
 
-### 6.1 Two GitHub repos
+### 6.1 App repo + R2 (GitHub media = optional archive)
 
-| Repo | Role |
+| Source | Role |
 |------|------|
 | `Sile_qelbachin1` | App UI + JSON/TS data (small) |
-| `sileqelbachin-media` | Large **audio / PDF / video / covers** |
+| **Cloudflare R2** | Production **audio / PDF / video / remote covers** (playback) |
+| `sileqelbachin-media` (GitHub) | Optional **archive / backup** — not the live CDN |
 
-Media root on CDN/raw:
+Object layout under the R2 prefix `sileqelbachin-meadia`:
 
 ```text
 files/{Kitab Folder Name (slug)}/{filename}
@@ -166,38 +169,44 @@ Example folder names:
 - `alwasail-almufida`
 - …
 
+Full docs: `CLOUDFLARE_R2.md`
+
 ### 6.2 URL rules (must copy)
 
 Website helper: `src/lib/mediaUrl.ts`
 
 | Asset type | Preferred URL | Why |
 |------------|---------------|-----|
-| **Audio** (often >20MB) | `https://raw.githubusercontent.com/mesudhassen5450-sketch/sileqelbachin-media/main/{path}` | jsDelivr rejects large files |
-| **PDF** (embed / download) | `https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/{path}` | Works well for PDFs |
-| **Images / covers** | jsDelivr or raw | Either OK if small |
+| **Audio / PDF / video / remote images** | `https://pub-03bea4f667534df5ab6c67f073c73d1e.r2.dev/sileqelbachin-meadia/{path}` | Production playback source |
+| **Local covers / logo** | `/covers/...`, `/logo...` | Bundled in `public/` |
 
-Data files may store **jsDelivr** URLs; at runtime audio is rewritten to **GitHub raw**.
+Data files may still store legacy **jsDelivr / GitHub** URLs; at runtime `resolveMediaUrl` rewrites them to **R2**.
 
 **Always:**
 
 1. URL-encode each path segment (spaces, Amharic, Arabic filenames)
 2. Fix alias: `Ad-Da' wa Ad-Dawa'` → `Ad-Da_ wa Ad-Dawa_`
+3. Strip leading `telegram_media/` when building from relative paths
 
 ### 6.3 Flutter URL helpers (recommended)
 
 ```dart
-const mediaOwner = 'mesudhassen5450-sketch';
-const mediaRepo = 'sileqelbachin-media';
-const mediaRef = 'main';
+const r2PublicBase = 'https://pub-03bea4f667534df5ab6c67f073c73d1e.r2.dev';
+const r2ObjectPrefix = 'sileqelbachin-meadia';
 
 String encodeMediaPath(String path) =>
   path.split('/').map(Uri.encodeComponent).join('/');
 
-String audioUrl(String relativePath) =>
-  'https://raw.githubusercontent.com/$mediaOwner/$mediaRepo/$mediaRef/${encodeMediaPath(relativePath)}';
+String mediaUrl(String relativePath) {
+  final cleaned = relativePath
+      .replaceFirst(RegExp(r'^(\./|/)'), '')
+      .replaceFirst(RegExp(r'^telegram_media/'), '');
+  return '$r2PublicBase/$r2ObjectPrefix/${encodeMediaPath(cleaned)}';
+}
 
-String pdfUrl(String relativePath) =>
-  'https://cdn.jsdelivr.net/gh/$mediaOwner/$mediaRepo@$mediaRef/${encodeMediaPath(relativePath)}';
+// Audio, PDF embed, and remote covers all use the same R2 base.
+String audioUrl(String relativePath) => mediaUrl(relativePath);
+String pdfUrl(String relativePath) => mediaUrl(relativePath);
 ```
 
 ### 6.4 Video
@@ -205,16 +214,16 @@ String pdfUrl(String relativePath) =>
 - Catalog: `src/data/mediaStore.ts` + `src/data/content.json` (`type: "video"`)
 - Platforms: `tiktok` | `youtube` | `telegram`
 - Prefer opening platform URL / WebView / `url_launcher`
-- Large `video_files/` live in media / telegram export — not all in frontend git
+- Large `video_files/` live on R2 (and optionally the GitHub media archive) — not all in frontend git
 
 ### 6.5 Local vs remote
 
 | Local `public/` (web) | Production media |
 |-----------------------|------------------|
-| `/covers/...` | Prefer media repo covers when available |
+| `/covers/...` | Prefer R2 covers when available |
 | `/logo.jpg` | Bundle in Flutter assets |
-| Home page audio under `telegram_media/files/home page audio/` | Can stay CDN/raw later |
-| `intebih5.m4a`, `muktasar.pdf` | Pushed to media repo; kitabs point to CDN |
+| Home page audio under `files/home page audio/` | Serve from R2 |
+| `intebih5.m4a`, `muktasar.pdf` | On R2 under `sileqelbachin-meadia/files/...` |
 
 ---
 
@@ -283,7 +292,7 @@ Web: `src/context/AudioContext.tsx` + `AudioPlayerBar.tsx`
 
 Flutter packages (suggested): `just_audio` + `audio_service` (background), or `audioplayers`.
 
-Resolve every `audioUrl` with the **raw** helper before play.
+Resolve every `audioUrl` with the **R2** helper (`resolveMediaUrl` / `mediaUrl`) before play.
 
 ---
 
@@ -292,11 +301,11 @@ Resolve every `audioUrl` with the **raw** helper before play.
 Web: `KitabDetailClient.tsx`
 
 - Show PDF beside / above audio (dual pane)
-- Embed via iframe using **jsDelivr** PDF URL
+- Embed via iframe using **Cloudflare R2** PDF URL (`resolvePdfEmbedUrl`)
 - Download button uses resolved media URL
 - Expand / fullscreen supported on web
 
-Flutter: `pdfx` / `syncfusion_flutter_pdfviewer` / `webview_flutter` loading jsDelivr URL.
+Flutter: `pdfx` / `syncfusion_flutter_pdfviewer` / `webview_flutter` loading the R2 PDF URL.
 
 ---
 
@@ -342,7 +351,7 @@ Endpoints:
 
 1. **Theme:** dark default, red `#C52828` / `#DC2626`, grid bg, Noto + Amiri  
 2. **Language:** am default, ar RTL, persist key `islamic-resources-language`  
-3. **Media:** audio → GitHub raw; PDF → jsDelivr; encode paths  
+3. **Media:** all remote audio/PDF/video/images → Cloudflare R2; encode path segments; rewrite legacy GitHub/jsDelivr URLs  
 4. **Data:** copy `kitabs` / `sahabah` / translations as JSON assets or API  
 5. **Screens:** Home, Kitab list/detail, Audio, Muhadara, Video, Reminders, Knowledge, Sahabah, Contact  
 6. **Player:** global mini-player + playlist + speed  
@@ -360,7 +369,8 @@ src/data/sahabah.ts             # Four Khalifas
 src/data/channelData.ts         # siteMetadata, SITE_URL
 src/data/translations.ts        # UI strings AM/AR/EN
 src/data/mediaStore.ts          # Audio/video/PDF catalog
-src/lib/mediaUrl.ts             # Audio raw / PDF CDN rules
+src/lib/mediaUrl.ts             # R2 resolve / legacy GitHub+jsDelivr rewrite
+CLOUDFLARE_R2.md                # R2 public base, prefix, env vars
 src/context/AudioContext.tsx    # Player state
 src/context/LanguageContext.tsx # i18n
 src/app/globals.css             # Colors + grid background
@@ -398,7 +408,7 @@ As of this snapshot the website is considered **finished for web production** wi
 - Kitab dual pane + PDF + ders deep links
 - Honest Stay Tuned (no fake live)
 - AI that navigates / plays / switches language
-- Media hosted on `sileqelbachin-media`
+- Media playback from **Cloudflare R2** (`sileqelbachin-meadia`); GitHub `sileqelbachin-media` is optional archive
 - Deployed on Netlify: https://sileqelbachin1.netlify.app/
 
 **Next production step:** Flutter mobile app using this document as the single source of truth for design + media wiring.
