@@ -14,6 +14,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 
 // Util Imports
 import { cn } from '@/lib/utils'
+import { getAppOrigin, getMetadataBaseUrl } from '@/lib/supabase/env'
 
 // Style Imports
 import './globals.css'
@@ -36,17 +37,19 @@ const geistMono = Geist_Mono({
   subsets: ['latin']
 })
 
+const appOrigin = getAppOrigin()
+
 export const metadata: Metadata = {
   title: 'ስለ ቀልባችን Admin | Sile Qelbachin Admin',
   description:
     'Sile Qelbachin Admin — CMS to manage website and mobile content from a central hub.',
-  metadataBase: new URL(`${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3001'}`),
+  metadataBase: getMetadataBaseUrl(),
   openGraph: {
     title: 'Sile Qelbachin Admin',
     description: 'Central content admin for Sile Qelbachin website and mobile apps.',
     type: 'website',
     siteName: 'Sile Qelbachin Admin',
-    url: process.env.NEXT_PUBLIC_APP_URL
+    url: appOrigin
   },
   twitter: {
     card: 'summary',
