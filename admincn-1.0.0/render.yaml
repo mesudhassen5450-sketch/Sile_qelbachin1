@@ -1,0 +1,44 @@
+# Render Blueprint — Sile Qelbachin Admin (Next.js server)
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: sile-qelbachin-admin
+    runtime: node
+    plan: starter
+    region: oregon
+    rootDir: admincn-1.0.0
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    healthCheckPath: /pages/auth/login
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_APP_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: NEXT_PUBLIC_R2_PUBLIC_BASE
+        value: https://pub-03bea4f667534df5ab6c67f073c73d1e.r2.dev
+      - key: NEXT_PUBLIC_R2_OBJECT_PREFIX
+        value: sileqelbachin-meadia
+      - key: R2_PUBLIC_BASE_URL
+        value: https://pub-03bea4f667534df5ab6c67f073c73d1e.r2.dev
+      - key: CLOUDFLARE_ACCOUNT_ID
+        sync: false
+      - key: R2_BUCKET_NAME
+        value: sileqelbachinmediea
+      - key: R2_ENDPOINT
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
