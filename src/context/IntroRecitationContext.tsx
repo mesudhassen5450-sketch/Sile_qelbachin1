@@ -12,9 +12,9 @@ import {
 } from 'react'
 
 const INTRO_SRC = '/assets/quran_then_hadith_hero.mp4'
-/** One play per browser. Bump to reset old sessions. */
-const PLAYED_KEY = 'sq_intro_recitation_played_v3'
-/** Medium volume (not high, not low) */
+/** One play per browser visit session storage of completion. Bump to reset old keys. */
+const PLAYED_KEY = 'sq_intro_once_v4'
+/** Medium volume */
 const INTRO_VOLUME = 0.45
 
 type IntroPhase = 'pending' | 'playing' | 'done'
@@ -34,10 +34,10 @@ export function useIntroRecitation() {
 }
 
 /**
- * Site intro (once per browser, any first page):
- * - Starts as soon as the app loads (Home, Kitab, Contact, …)
- * - Continues while navigating; stops when the track ends
- * - Medium volume; if autoplay is blocked, first tap starts from 0 with sound
+ * One intro when the user opens any site link (Home / Kitab / Contact / …).
+ * - Independent of page changes: navigating does not restart or stop it
+ * - Plays once at medium volume, then never again in this browser
+ * - Hidden player (hero card stays a static image)
  */
 export function IntroRecitationProvider({ children }: { children: ReactNode }) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
@@ -76,6 +76,7 @@ export function IntroRecitationProvider({ children }: { children: ReactNode }) {
     el.playsInline = true
     el.preload = 'auto'
     el.volume = INTRO_VOLUME
+    el.muted = false
 
     let unlocked = false
 
@@ -101,8 +102,9 @@ export function IntroRecitationProvider({ children }: { children: ReactNode }) {
       el.volume = INTRO_VOLUME
       try {
         await el.play()
-        return
       } catch {
+        // Browsers often block autoplay-with-sound until one user gesture.
+        // First tap/key anywhere unlocks — still the same single play, from the start.
         el.pause()
         try {
           el.currentTime = 0
@@ -117,6 +119,7 @@ export function IntroRecitationProvider({ children }: { children: ReactNode }) {
 
     void start()
 
+    // Do NOT pause on cleanup — layout stays mounted across client navigations.
     return () => {
       window.removeEventListener('pointerdown', playWithSoundFromStart, true)
       window.removeEventListener('touchstart', playWithSoundFromStart, true)
