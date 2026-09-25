@@ -28,7 +28,7 @@ function trimEnv(value: string | undefined): string {
 }
 
 /** Reject common placeholders mistakenly pasted into Render / .env */
-function sanitizeCredential(value: string): string {
+function sanitizeCredential(value: string | undefined): string {
   const v = trimEnv(value)
   if (!v) return ''
   const lower = v.toLowerCase()
