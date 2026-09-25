@@ -93,6 +93,14 @@ R2_ENDPOINT=https://26e435690c62468180455b796d21b3ab.r2.cloudflarestorage.com
 R2_PUBLIC_BASE_URL=https://pub-03bea4f667534df5ab6c67f073c73d1e.r2.dev
 ```
 
+**Image upload error `Credential access key has length 3`:**  
+`R2_ACCESS_KEY_ID` on Render is a placeholder (e.g. `key`), not the real 32-character Access Key ID.
+
+1. On your laptop: `cd admincn-1.0.0 && npm run r2:print-render-env`  
+2. Render → **Sile_qelbachin1-1** → **Environment** → set `R2_ACCESS_KEY_ID` (32 chars) + `R2_SECRET_ACCESS_KEY` (~64 chars)  
+3. **Manual Deploy → Deploy latest commit**  
+4. Retry Sahabah / Kitab cover upload
+
 Optional:
 
 ```text

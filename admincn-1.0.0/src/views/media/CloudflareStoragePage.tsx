@@ -84,6 +84,9 @@ const CloudflareStoragePage = () => {
   const [phase, setPhase] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [r2Hint, setR2Hint] = useState<{ ok: boolean; issues?: string[]; fix?: string } | null>(
+    null
+  )
 
   const refresh = useCallback(async () => {
     const res = await fetch('/api/admin/media/status', { cache: 'no-store' })
@@ -93,6 +96,10 @@ const CloudflareStoragePage = () => {
 
   useEffect(() => {
     void refresh().catch(err => setError(String(err)))
+    void fetch('/api/admin/media/r2-status', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(data => setR2Hint(data))
+      .catch(() => setR2Hint(null))
   }, [refresh])
 
   const runScan = async () => {
@@ -208,6 +215,22 @@ const CloudflareStoragePage = () => {
           </Button>
         </div>
       </div>
+
+      {r2Hint && !r2Hint.ok ? (
+        <Card className='border-destructive/50 bg-destructive/5'>
+          <CardContent className='space-y-2 py-4 text-sm'>
+            <p className='text-destructive font-medium'>Storage credentials are wrong on Render</p>
+            {r2Hint.issues?.length ? (
+              <ul className='text-destructive/90 list-disc space-y-1 pl-5'>
+                {r2Hint.issues.map(issue => (
+                  <li key={issue}>{issue}</li>
+                ))}
+              </ul>
+            ) : null}
+            {r2Hint.fix ? <p className='text-muted-foreground'>{r2Hint.fix}</p> : null}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {phase ? (
         <Card>

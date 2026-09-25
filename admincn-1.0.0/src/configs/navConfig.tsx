@@ -68,10 +68,7 @@ export const navItems: NavItem[] = [
           { label: 'PDFs', href: '/content/pdfs' },
           { label: 'Muhadara', href: '/content/muhadara' },
           { label: 'Reminders', href: '/content/reminders' },
-          { label: 'Knowledge', href: '/content/knowledge' },
-          { label: 'Sahabah', href: '/content/sahabah' },
-          { label: 'Speakers', href: '/content/speakers' },
-          { label: 'Categories', href: '/content/categories' }
+          { label: 'Sahabah', href: '/content/sahabah' }
         ]
       },
       {

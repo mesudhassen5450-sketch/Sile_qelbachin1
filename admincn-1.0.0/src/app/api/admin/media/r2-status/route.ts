@@ -25,6 +25,6 @@ export async function GET() {
     issues: live.error ? [...diag.issues, live.error] : diag.issues,
     sample_keys: live.sampleKeys,
     fix:
-      'Cloudflare dashboard → R2 → Overview → Manage R2 API Tokens → Create API token (Object Read & Write). Copy Access Key ID (32 chars) and Secret Access Key (~64 chars) into admincn-1.0.0/.env.local as R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY, set R2_BUCKET_NAME to your exact bucket name, then restart Admin.'
+      'Render → Sile_qelbachin1-1 → Environment: set R2_ACCESS_KEY_ID (exactly 32 chars) and R2_SECRET_ACCESS_KEY (~64 chars) from Cloudflare → R2 → Manage R2 API Tokens → Object Read & Write. Then Manual Deploy → Deploy latest commit. Do not put “key”, “value”, or a short placeholder.'
   })
 }

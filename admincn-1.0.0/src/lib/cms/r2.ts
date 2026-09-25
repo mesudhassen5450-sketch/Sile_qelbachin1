@@ -27,9 +27,29 @@ function trimEnv(value: string | undefined): string {
   return (value || '').trim().replace(/^["']|["']$/g, '')
 }
 
+/** Reject common placeholders mistakenly pasted into Render / .env */
+function sanitizeCredential(value: string): string {
+  const v = trimEnv(value)
+  if (!v) return ''
+  const lower = v.toLowerCase()
+  if (
+    lower === 'value' ||
+    lower === 'changeme' ||
+    lower === 'your_key' ||
+    lower === 'xxx' ||
+    lower === 'key' ||
+    lower === 'n/a' ||
+    /^x+$/i.test(v) ||
+    /^\.+$/.test(v)
+  ) {
+    return ''
+  }
+  return v
+}
+
 export function getR2Env(): R2Env {
   const accountId =
-    trimEnv(process.env.CLOUDFLARE_ACCOUNT_ID || process.env.R2_ACCOUNT_ID) ||
+    sanitizeCredential(process.env.CLOUDFLARE_ACCOUNT_ID || process.env.R2_ACCOUNT_ID) ||
     '26e435690c62468180455b796d21b3ab'
   const endpoint =
     trimEnv(process.env.R2_ENDPOINT || process.env.R2_S3_ENDPOINT) ||
@@ -37,8 +57,8 @@ export function getR2Env(): R2Env {
 
   return {
     accountId,
-    accessKeyId: trimEnv(process.env.R2_ACCESS_KEY_ID),
-    secretAccessKey: trimEnv(process.env.R2_SECRET_ACCESS_KEY),
+    accessKeyId: sanitizeCredential(process.env.R2_ACCESS_KEY_ID),
+    secretAccessKey: sanitizeCredential(process.env.R2_SECRET_ACCESS_KEY),
     // CF dashboard / API bucket name (legacy spelling: mediea)
     bucket: trimEnv(process.env.R2_BUCKET_NAME) || 'sileqelbachinmediea',
     endpoint,
@@ -67,13 +87,13 @@ export function diagnoseR2Credentials(env = getR2Env()): {
   if (!env.accessKeyId) issues.push('R2_ACCESS_KEY_ID is missing.')
   else if (env.accessKeyId.length !== 32) {
     issues.push(
-      `R2_ACCESS_KEY_ID length is ${env.accessKeyId.length} (expected 32). Check you did not paste the secret into the access key field.`
+      `R2_ACCESS_KEY_ID on this server is ${env.accessKeyId.length} characters (must be exactly 32). On Render → Sile_qelbachin1-1 → Environment: paste the Access Key ID from Cloudflare R2 → Manage R2 API Tokens (not the secret, not “key”).`
     )
   }
-  if (!env.secretAccessKey) issues.push('R2_SECRET_ACCESS_KEY is missing.')
+  if (!env.secretAccessKey) issues.push('R2_SECRET_ACCESS_KEY is missing on this server (Render env).')
   else if (env.secretAccessKey.length < 40) {
     issues.push(
-      `R2_SECRET_ACCESS_KEY looks truncated (${env.secretAccessKey.length} chars). Cloudflare shows it once — paste the full ~64 character secret into admincn-1.0.0/.env.local and restart.`
+      `R2_SECRET_ACCESS_KEY looks truncated (${env.secretAccessKey.length} chars). Paste the full ~64 character Secret Access Key into Render Environment, then Manual Deploy.`
     )
   }
   if (!env.bucket) issues.push('R2_BUCKET_NAME is missing.')

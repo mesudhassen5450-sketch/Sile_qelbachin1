@@ -450,9 +450,17 @@ const ContentListPage = ({
           <CardContent className='space-y-2 py-4 text-sm'>
             <p className='text-destructive font-medium'>File uploads are unavailable</p>
             <p className='text-destructive/90'>
-              Storage is not connected. Ask a technical admin to check online storage settings, then
-              try again.
+              Online storage (Cloudflare R2) is not connected on this Admin server. Image / PDF /
+              audio uploads will fail until credentials are fixed on Render.
             </p>
+            {r2Status.issues && r2Status.issues.length > 0 ? (
+              <ul className='text-destructive/90 list-disc space-y-1 pl-5'>
+                {r2Status.issues.map(issue => (
+                  <li key={issue}>{issue}</li>
+                ))}
+              </ul>
+            ) : null}
+            {r2Status.fix ? <p className='text-muted-foreground'>{r2Status.fix}</p> : null}
           </CardContent>
         </Card>
       ) : null}

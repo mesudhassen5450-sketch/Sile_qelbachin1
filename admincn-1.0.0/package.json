@@ -13,7 +13,8 @@
     "clean": "rm -rf .next dist",
     "clean:node_modules": "rm -rf .next dist node_modules",
     "cms:scan": "tsx scripts/cms-scan-import.ts",
-    "auth:bootstrap": "tsx scripts/bootstrap-super-admin.ts"
+    "auth:bootstrap": "tsx scripts/bootstrap-super-admin.ts",
+    "r2:print-render-env": "tsx scripts/print-r2-render-env.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1139.0",
