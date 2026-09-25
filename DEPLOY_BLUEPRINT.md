@@ -111,8 +111,15 @@ After saving → **Manual Deploy → Deploy latest commit**.
 
 | Hostname | Points to |
 |----------|-----------|
-| `admin.sileqelbachin1.com` | Render custom domain for `Sile_qelbachin1-1` |
+| `admin.sileqelbachin1.com` | Render custom domain for `Sile_qelbachin1-1` (CNAME → `sile-qelbachin1-1.onrender.com` or the target Render shows) |
 | `sileqelbachin1.com` / `www` | Netlify site |
+
+**If `admin.sileqelbachin1.com` shows `DNS_PROBE_FINISHED_NXDOMAIN`:** the subdomain is not in DNS yet. Until DNS is fixed, open Admin / API at:
+
+- Admin: `https://sile-qelbachin1-1.onrender.com`
+- API: `https://sile-qelbachin1-1.onrender.com/api/public/v1/kitabs`
+
+In Render → your service → **Custom Domains** → add `admin.sileqelbachin1.com`, then add the exact CNAME/A record Render shows in your domain registrar (where `sileqelbachin1.com` is managed).
 
 ---
 
