@@ -84,7 +84,7 @@ async function main() {
         display_name: 'Super Admin',
         role: 'super_admin',
         status: 'active',
-        must_change_password: true,
+        must_change_password: false,
         updated_at: new Date().toISOString()
       })
       .eq('user_id', user.id)
@@ -92,7 +92,7 @@ async function main() {
       console.error('Failed to update staff_profiles:', error.message)
       process.exit(1)
     }
-    console.log('Updated staff_profiles → super_admin (must_change_password=true).')
+    console.log('Updated staff_profiles → super_admin.')
   } else {
     const { error } = await admin.from('staff_profiles').insert({
       user_id: user.id,
@@ -100,16 +100,16 @@ async function main() {
       display_name: 'Super Admin',
       role: 'super_admin',
       status: 'active',
-      must_change_password: true
+      must_change_password: false
     })
     if (error) {
       console.error('Failed to insert staff_profiles:', error.message)
       process.exit(1)
     }
-    console.log('Inserted staff_profiles → super_admin (must_change_password=true).')
+    console.log('Inserted staff_profiles → super_admin.')
   }
 
-  console.log('Done. Sign in with the bootstrap email, then change the password immediately.')
+  console.log('Done. Sign out and sign in again with the Super Admin email.')
   console.log('(Password was not printed.)')
 }
 

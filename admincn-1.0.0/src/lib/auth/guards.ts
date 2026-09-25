@@ -7,6 +7,7 @@ import {
   type StaffProfile,
   type StaffRole
 } from '@/lib/auth/permissions'
+import { ensureDefaultSuperAdmin } from '@/lib/auth/ensure-super-admin'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/admin'
 import { isSupabaseAdminConfigured } from '@/lib/supabase/env'
@@ -83,6 +84,9 @@ export async function resolveStaffAuth(): Promise<
         .maybeSingle()
       if (adminRow) profile = adminRow as StaffProfile
     }
+
+    // Default owner email is always Super Admin
+    profile = await ensureDefaultSuperAdmin(user, profile)
 
     if (!profile) {
       return {

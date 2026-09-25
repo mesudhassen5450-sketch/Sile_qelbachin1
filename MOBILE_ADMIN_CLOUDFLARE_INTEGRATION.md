@@ -37,11 +37,13 @@ GET /api/public/v1/*   ← published only, CORS *
 
 ## 2. Cloudflare DNS — fix Admin subdomain (what you did wrong)
 
-In Cloudflare DNS you currently have:
+**Important:** `sile-qelbachin1.onrender.com` is the **public website**. Admin is **`sile-qelbachin1-1.onrender.com`**.
+
+In Cloudflare DNS fix the `admin` record:
 
 | Wrong | Correct |
 |-------|---------|
-| `admin` CNAME → `//onrender.com` | `admin` CNAME → **`sile-qelbachin1.onrender.com`** |
+| `admin` CNAME → `sile-qelbachin1.onrender.com` (public site) | `admin` CNAME → **`sile-qelbachin1-1.onrender.com`** (Admin CMS) |
 
 **Exact Cloudflare record (DNS only / grey cloud):**
 
@@ -49,17 +51,16 @@ In Cloudflare DNS you currently have:
 |-------|--------|
 | Type | **CNAME** |
 | Name | **admin** |
-| Target | **sile-qelbachin1.onrender.com** |
+| Target | **sile-qelbachin1-1.onrender.com** |
 | Proxy | **DNS only** (grey cloud) |
 | TTL | Auto |
 
-Then in Render → Custom Domain → add `admin.sileqelbachin1.com` and wait until verification is green (can take minutes–hours).
+Then in Render → service **`Sile_qelbachin1-1`** → Custom Domain → add `admin.sileqelbachin1.com` and wait until verification is green.
 
-**Until DNS is green, use:**
+**Until DNS is fixed, open Admin here:**
 
-- Admin UI: `https://sile-qelbachin1.onrender.com`  
-  (if that 404s, try `https://sile-qelbachin1-1.onrender.com` — use the hostname shown on your Render service)  
-- API: `https://<that-host>/api/public/v1/kitabs`
+- Admin UI: **https://sile-qelbachin1-1.onrender.com/pages/auth/login**
+- API: `https://sile-qelbachin1-1.onrender.com/api/public/v1/kitabs`
 
 ---
 
@@ -67,8 +68,8 @@ Then in Render → Custom Domain → add `admin.sileqelbachin1.com` and wait unt
 
 ```text
 CMS_API_BASE=https://admin.sileqelbachin1.com/api/public/v1
-# Until DNS works, temporarily:
-# CMS_API_BASE=https://sile-qelbachin1.onrender.com/api/public/v1
+# Until admin DNS points to Sile_qelbachin1-1, use:
+# CMS_API_BASE=https://sile-qelbachin1-1.onrender.com/api/public/v1
 
 R2_PUBLIC_BASE=https://pub-03bea4f667534df5ab6c67f073c73d1e.r2.dev
 R2_OBJECT_PREFIX=sileqelbachin-meadia
@@ -207,7 +208,7 @@ NEXT_PUBLIC_CMS_API_BASE=https://sile-qelbachin1.onrender.com/api/public/v1
 
 ## 7. Acceptance checklist
 
-1. Cloudflare `admin` CNAME → `sile-qelbachin1.onrender.com` (DNS only)  
+1. Cloudflare `admin` CNAME → `sile-qelbachin1-1.onrender.com` (DNS only)  
 2. Render verifies `admin.sileqelbachin1.com`  
 3. Open Admin → edit Intebih title AM/EN → Save → `/api/public/v1/kitabs` shows new title  
 4. Flutter pull-to-refresh shows the same title  

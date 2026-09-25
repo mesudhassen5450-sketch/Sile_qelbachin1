@@ -12,8 +12,9 @@ import {
 } from 'react'
 
 const INTRO_SRC = '/assets/quran_then_hadith_hero.mp4'
-/** One play per browser profile. Never auto-replays after it ends. */
-const PLAYED_KEY = 'sq_intro_recitation_played_v1'
+/** One play per browser. Bump to reset old sessions. */
+const PLAYED_KEY = 'sq_intro_recitation_played_v3'
+/** Medium volume (not high, not low) */
 const INTRO_VOLUME = 0.45
 
 type IntroPhase = 'pending' | 'playing' | 'done'
@@ -33,10 +34,10 @@ export function useIntroRecitation() {
 }
 
 /**
- * Site intro audio (once per browser):
- * - Hidden player — never injected into page layout (avoids leaking onto Kitab / Contact)
- * - Continues while navigating
- * - If the browser blocks sound, waits for first tap then plays WITH sound from the start
+ * Site intro (once per browser, any first page):
+ * - Starts as soon as the app loads (Home, Kitab, Contact, …)
+ * - Continues while navigating; stops when the track ends
+ * - Medium volume; if autoplay is blocked, first tap starts from 0 with sound
  */
 export function IntroRecitationProvider({ children }: { children: ReactNode }) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
@@ -96,15 +97,12 @@ export function IntroRecitationProvider({ children }: { children: ReactNode }) {
     }
 
     const start = async () => {
-      // Prefer audible from the first second.
       el.muted = false
       el.volume = INTRO_VOLUME
       try {
         await el.play()
         return
       } catch {
-        // Autoplay with sound blocked — do NOT play muted mid-track.
-        // Wait for first tap, then start from 0 with sound.
         el.pause()
         try {
           el.currentTime = 0
