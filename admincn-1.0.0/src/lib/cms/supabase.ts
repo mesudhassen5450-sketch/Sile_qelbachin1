@@ -64,6 +64,8 @@ export async function loadSupabaseSnapshot(): Promise<CmsStoreSnapshot | null> {
     video_items: video.data || [],
     pdf_items: pdfs.data || [],
     sahabah_items: [],
+    reminders: [],
+    analytics_events: [],
     scan_runs: (scans.data || []) as ScanRun[],
     audit_logs: audits.data || [],
     meta: { last_scan_at: lastScan, backend: 'supabase' }
