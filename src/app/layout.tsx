@@ -5,11 +5,13 @@ import Footer from '@/components/Footer';
 import MarqueeBanner from '@/components/MarqueeBanner';
 import { AudioProvider } from '@/context/AudioContext';
 import { LanguageProvider } from '@/context/LanguageContext';
+import { IntroRecitationProvider } from '@/context/IntroRecitationContext';
 import AudioPlayerBar from '@/components/AudioPlayerBar';
 import ThemeProvider from '@/components/ThemeProvider';
 import GoogleTranslate from '@/components/GoogleTranslate';
 import AIAssistant from '@/components/AIAssistant';
 import AIErrorBoundary from '@/components/AIErrorBoundary';
+import AnalyticsBeacon from '@/components/AnalyticsBeacon';
 import SiteJsonLd from '@/components/SiteJsonLd';
 import PageSeo from '@/components/PageSeo';
 import { SITE_URL } from '@/data/channelData';
@@ -66,22 +68,25 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <LanguageProvider>
             <AudioProvider>
-              <div className="flex flex-col min-h-screen">
-                <div className="fixed top-0 left-0 right-0 z-40">
-                  <Navbar />
-                  <MarqueeBanner />
+              <IntroRecitationProvider>
+                <div className="flex flex-col min-h-screen">
+                  <div className="fixed top-0 left-0 right-0 z-40">
+                    <Navbar />
+                    <MarqueeBanner />
+                  </div>
+                  <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full pb-28 pt-[calc(var(--site-header-height)+2.5rem)]">
+                    <PageSeo />
+                    <AnalyticsBeacon />
+                    {children}
+                  </main>
+                  <Footer />
+                  <AudioPlayerBar />
+                  <GoogleTranslate />
+                  <AIErrorBoundary>
+                    <AIAssistant />
+                  </AIErrorBoundary>
                 </div>
-                <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full pb-28 pt-[calc(var(--site-header-height)+2.5rem)]">
-                  <PageSeo />
-                  {children}
-                </main>
-                <Footer />
-                <AudioPlayerBar />
-                <GoogleTranslate />
-                <AIErrorBoundary>
-                  <AIAssistant />
-                </AIErrorBoundary>
-              </div>
+              </IntroRecitationProvider>
             </AudioProvider>
           </LanguageProvider>
         </ThemeProvider>

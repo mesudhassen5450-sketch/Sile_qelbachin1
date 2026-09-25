@@ -1,11 +1,23 @@
 import { NextResponse } from 'next/server'
 
 import { loadLocalStore } from '@/lib/cms/local-store'
+import { sortKitabsForDisplay } from '@/lib/cms/kitab-order'
 import { isSupabaseConfigured, loadSupabaseSnapshot } from '@/lib/cms/supabase'
 import type { CmsStoreSnapshot } from '@/lib/cms/types'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+function withCors(res: NextResponse) {
+  res.headers.set('Access-Control-Allow-Origin', '*')
+  res.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+  res.headers.set('Access-Control-Allow-Headers', 'Content-Type')
+  return res
+}
+
+export async function OPTIONS() {
+  return withCors(new NextResponse(null, { status: 204 }))
+}
 
 async function getStore(): Promise<CmsStoreSnapshot> {
   if (isSupabaseConfigured()) {
@@ -33,9 +45,9 @@ export async function GET(
   const assets = new Map(store.media_assets.map(a => [a.id, a]))
 
   if (resource === 'kitabs') {
-    const rows = store.kitabs
-      .filter(k => k.status === 'published')
-      .map(k => {
+    const rows = sortKitabsForDisplay(
+      [...store.kitabs].filter(k => k.status === 'published')
+    ).map(k => {
         const cover = k.cover_asset_id ? assets.get(k.cover_asset_id) : undefined
         const pdf = k.pdf_asset_id ? assets.get(k.pdf_asset_id) : undefined
         const dersList = store.ders
@@ -66,17 +78,25 @@ export async function GET(
           coverBg: k.cover_bg,
           pdfUrl: pdf?.public_url || null,
           dersCount: dersList.length,
-          dersList
+          dersList,
+          legacy_source: k.legacy_source,
+          created_at: k.created_at,
+          updated_at: k.updated_at
         }
       })
-    return NextResponse.json({ ok: true, source: store.meta.backend, count: rows.length, data: rows })
+    return withCors(
+      NextResponse.json({ ok: true, source: store.meta.backend, count: rows.length, data: rows })
+    )
   }
 
   if (resource === 'audio' || resource === 'muhadara') {
-    const rows = store.audio_items
+    const rows = [...store.audio_items]
       .filter(a => a.status === 'published')
+      .sort((a, b) => Date.parse(b.updated_at || b.created_at) - Date.parse(a.updated_at || a.created_at))
       .map(a => {
         const media = a.media_asset_id ? assets.get(a.media_asset_id) : undefined
+        const coverId = (a.metadata?.cover_asset_id as string | undefined) || null
+        const cover = coverId ? assets.get(coverId) : undefined
         return {
           id: a.legacy_id || a.id,
           title: { am: a.title_am, ar: a.title_ar, en: a.title_en },
@@ -86,6 +106,7 @@ export async function GET(
             en: a.description_en
           },
           fileUrl: media?.public_url || '',
+          coverUrl: cover?.public_url || null,
           type: 'audio',
           category: a.category,
           isMuhadara: a.is_muhadara
@@ -95,8 +116,9 @@ export async function GET(
   }
 
   if (resource === 'video') {
-    const rows = store.video_items
+    const rows = [...store.video_items]
       .filter(v => v.status === 'published')
+      .sort((a, b) => Date.parse(b.updated_at || b.created_at) - Date.parse(a.updated_at || a.created_at))
       .map(v => {
         const media = v.video_asset_id ? assets.get(v.video_asset_id) : undefined
         const thumb = v.thumbnail_asset_id ? assets.get(v.thumbnail_asset_id) : undefined
@@ -110,6 +132,7 @@ export async function GET(
           },
           fileUrl: media?.public_url || '',
           thumbnailUrl: thumb?.public_url || null,
+          coverUrl: thumb?.public_url || null,
           type: 'video',
           category: v.category
         }
@@ -118,19 +141,96 @@ export async function GET(
   }
 
   if (resource === 'pdfs' || resource === 'pdf') {
-    const rows = store.pdf_items
+    const rows = [...store.pdf_items]
       .filter(p => p.status === 'published')
+      .sort((a, b) => Date.parse(b.updated_at || b.created_at) - Date.parse(a.updated_at || a.created_at))
       .map(p => {
         const media = p.media_asset_id ? assets.get(p.media_asset_id) : undefined
+        const coverId = (p.metadata?.cover_asset_id as string | undefined) || null
+        const cover = coverId ? assets.get(coverId) : undefined
         return {
           id: p.legacy_id || p.id,
           title: { am: p.title_am, ar: p.title_ar, en: p.title_en },
           fileUrl: media?.public_url || '',
+          coverUrl: cover?.public_url || null,
           type: 'pdf'
         }
       })
     return NextResponse.json({ ok: true, source: store.meta.backend, count: rows.length, data: rows })
   }
 
-  return NextResponse.json({ ok: false, error: `Unknown resource: ${resource}` }, { status: 404 })
+  if (resource === 'sahabah') {
+    const local = loadLocalStore()
+    const rows = [...(local.sahabah_items || store.sahabah_items || [])]
+      .filter(s => s.status === 'published')
+      .sort((a, b) => Date.parse(b.updated_at || b.created_at) - Date.parse(a.updated_at || a.created_at))
+      .map(s => {
+        const cover = s.cover_asset_id ? assets.get(s.cover_asset_id) : undefined
+        return {
+          slug: s.slug,
+          name: { am: s.name_am, ar: s.name_ar, en: s.name_en },
+          title: { am: s.title_am, ar: s.title_ar, en: s.title_en },
+          shortDescription: {
+            am: s.description_am,
+            ar: s.description_ar,
+            en: s.description_en
+          },
+          fullBiography: {
+            am: s.biography_am,
+            ar: s.biography_ar,
+            en: s.biography_en
+          },
+          coverImage: cover?.public_url || null
+        }
+      })
+    return NextResponse.json({ ok: true, source: 'local', count: rows.length, data: rows })
+  }
+
+  if (resource === 'reminders') {
+    const local = loadLocalStore()
+    const rows = [...(local.reminders || [])]
+      .filter(r => r.status === 'published')
+      .sort((a, b) => a.sort_order - b.sort_order || Date.parse(b.updated_at) - Date.parse(a.updated_at))
+      .map(r => ({
+        id: r.id,
+        title: { am: r.title_am, ar: r.title_ar, en: r.title_en },
+        description: {
+          am: r.description_am,
+          ar: r.description_ar,
+          en: r.description_en
+        },
+        updatedAt: r.updated_at
+      }))
+    return withCors(NextResponse.json({ ok: true, count: rows.length, data: rows }))
+  }
+
+  return withCors(NextResponse.json({ ok: false, error: `Unknown resource: ${resource}` }, { status: 404 }))
+}
+
+/** Public website/app can POST analytics events (page_view, audio_play, …). No auth. */
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ resource: string }> }
+) {
+  const { resource } = await context.params
+  if (resource !== 'events') {
+    return withCors(NextResponse.json({ ok: false, error: 'POST only for events.' }, { status: 404 }))
+  }
+
+  const body = await request.json().catch(() => ({}))
+  const event = String(body.event || '').trim()
+  if (!event) {
+    return withCors(NextResponse.json({ ok: false, error: 'event required.' }, { status: 400 }))
+  }
+
+  const { recordAnalyticsEvent } = await import('@/lib/cms/reminders')
+  const platform =
+    body.platform === 'mobile' ? 'mobile' : body.platform === 'unknown' ? 'unknown' : 'website'
+  recordAnalyticsEvent({
+    event,
+    path: typeof body.path === 'string' ? body.path : null,
+    platform,
+    meta: typeof body.meta === 'object' && body.meta ? body.meta : undefined
+  })
+  return withCors(NextResponse.json({ ok: true }))
 }

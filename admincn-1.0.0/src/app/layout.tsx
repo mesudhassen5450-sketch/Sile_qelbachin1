@@ -44,6 +44,13 @@ export const metadata: Metadata = {
   description:
     'Sile Qelbachin Admin — CMS to manage website and mobile content from a central hub.',
   metadataBase: getMetadataBaseUrl(),
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/icon.png', type: 'image/png', sizes: '1024x1024' }
+    ],
+    apple: [{ url: '/apple-icon.png', sizes: '180x180', type: 'image/png' }]
+  },
   openGraph: {
     title: 'Sile Qelbachin Admin',
     description: 'Central content admin for Sile Qelbachin website and mobile apps.',

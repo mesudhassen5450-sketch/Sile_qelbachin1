@@ -1,14 +1,11 @@
 import PlaceholderPage from '@/views/shared/PlaceholderPage'
 
-const Page = () => {
-  return (
-    <PlaceholderPage
-      title='Content Analytics'
-      description='Performance by content type.'
-      actionLabel='Export'
-      rows={undefined}
-    />
-  )
-}
+const Page = () => (
+  <PlaceholderPage
+    title='Content Analytics'
+    description='Live activity appears on Overview and Dashboard when the website records visits.'
+    emptyMessage='No separate breakdown yet. See Analytics → Overview for real totals.'
+  />
+)
 
 export default Page

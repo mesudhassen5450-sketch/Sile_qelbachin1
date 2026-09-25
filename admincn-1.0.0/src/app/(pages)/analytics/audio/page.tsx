@@ -1,14 +1,11 @@
 import PlaceholderPage from '@/views/shared/PlaceholderPage'
 
-const Page = () => {
-  return (
-    <PlaceholderPage
-      title='Audio Analytics'
-      description='Audio play counts and completion rates.'
-      actionLabel='Export'
-      rows={undefined}
-    />
-  )
-}
+const Page = () => (
+  <PlaceholderPage
+    title='Audio Analytics'
+    description='Live activity appears on Overview and Dashboard when the website records visits.'
+    emptyMessage='No separate breakdown yet. See Analytics → Overview for real totals.'
+  />
+)
 
 export default Page

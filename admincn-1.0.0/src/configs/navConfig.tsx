@@ -78,7 +78,7 @@ export const navItems: NavItem[] = [
         icon: 'Image',
         label: 'Media',
         childItems: [
-          { label: 'Cloudflare Storage', href: '/media/cloudflare' },
+          { label: 'Storage sync', href: '/media/cloudflare' },
           { label: 'Library', href: '/media/library' },
           { label: 'Uploads', href: '/media/uploads' },
           { label: 'Media Health', href: '/media/health' }
@@ -89,8 +89,7 @@ export const navItems: NavItem[] = [
         label: 'Users',
         childItems: [
           { label: 'Website Users', href: '/users/website' },
-          { label: 'Mobile Users', href: '/users/mobile' },
-          { label: 'Accounts', href: '/users/accounts' }
+          { label: 'Mobile Users', href: '/users/mobile' }
         ]
       }
     ]
@@ -105,24 +104,8 @@ export const navItems: NavItem[] = [
           { label: 'Overview', href: '/analytics/overview' },
           { label: 'Website', href: '/analytics/website' },
           { label: 'Mobile', href: '/analytics/mobile' },
-          { label: 'Content', href: '/analytics/content' },
-          { label: 'Audio', href: '/analytics/audio' },
-          { label: 'Video', href: '/analytics/video' },
-          { label: 'PDF', href: '/analytics/pdf' },
-          { label: 'Downloads', href: '/analytics/downloads' },
-          { label: 'Search', href: '/analytics/search' },
-          { label: 'AI', href: '/analytics/ai' }
+          { label: 'Content', href: '/analytics/content' }
         ]
-      },
-      {
-        icon: 'Bell',
-        label: 'Notifications',
-        href: '/notifications'
-      },
-      {
-        icon: 'FileText',
-        label: 'Reports',
-        href: '/reports'
       }
     ]
   },
@@ -135,18 +118,14 @@ export const navItems: NavItem[] = [
         childItems: [
           { label: 'Admins', href: '/security/admins' },
           { label: 'Roles & Permissions', href: '/security/roles' },
-          { label: 'Sessions', href: '/security/sessions' },
-          { label: 'Audit Logs', href: '/security/audit-logs' }
+          { label: 'Activity log', href: '/security/audit-logs' }
         ]
       },
       {
         icon: 'Settings',
         label: 'System',
         childItems: [
-          { label: 'Health', href: '/system/health' },
-          { label: 'Errors', href: '/system/errors' },
-          { label: 'Configuration', href: '/system/configuration' },
-          { label: 'Backups', href: '/system/backups' }
+          { label: 'Health', href: '/system/health' }
         ]
       }
     ]

@@ -93,7 +93,14 @@ const ALL_PERMISSIONS: Permission[] = [
   'account.view'
 ]
 
-const CONTENT_PERMS: Permission[] = [
+/** Super Admin — everything, including Storage sync. */
+const SUPER_ADMIN_PERMS: Permission[] = [...ALL_PERMISSIONS]
+
+/** Content Admin — same as Super Admin except Storage sync. */
+const CONTENT_PERMS: Permission[] = ALL_PERMISSIONS.filter(p => p !== 'media.scan')
+
+/** Media Admin — upload/edit content + analytics. No staff, no Storage sync. */
+const MEDIA_PERMS: Permission[] = [
   'dashboard.view',
   'kitabs.view',
   'kitabs.create',
@@ -120,21 +127,9 @@ const CONTENT_PERMS: Permission[] = [
   'pdf.edit',
   'pdf.publish',
   'media.view',
-  'account.view',
-  'notifications.view'
-]
-
-const MEDIA_PERMS: Permission[] = [
-  'dashboard.view',
-  'media.view',
-  'media.scan',
-  'media.health',
   'media.upload',
-  'audio.view',
-  'video.view',
-  'pdf.view',
-  'kitabs.view',
-  'ders.view',
+  'media.health',
+  'analytics.view',
   'account.view'
 ]
 
@@ -172,13 +167,60 @@ const READ_ONLY_PERMS: Permission[] = [
 ]
 
 export const ROLE_PERMISSIONS: Record<StaffRole, Permission[]> = {
-  super_admin: ALL_PERMISSIONS,
+  super_admin: SUPER_ADMIN_PERMS,
   content_admin: CONTENT_PERMS,
   media_admin: MEDIA_PERMS,
   analytics_admin: ANALYTICS_PERMS,
   moderator: MODERATOR_PERMS,
   read_only: READ_ONLY_PERMS
 }
+
+export const STAFF_ROLE_META: Record<
+  StaffRole,
+  { label: string; summary: string; surfaces: string[] }
+> = {
+  super_admin: {
+    label: 'Super Admin',
+    summary: 'Full power: staff, content, media, analytics, system, and Storage sync.',
+    surfaces: ['Staff', 'Content', 'Media', 'Analytics', 'Storage sync', 'System']
+  },
+  content_admin: {
+    label: 'Content Admin',
+    summary: 'Same as Super Admin except Storage sync (cannot run R2 storage sync).',
+    surfaces: ['Staff', 'Content', 'Media', 'Analytics', 'System']
+  },
+  media_admin: {
+    label: 'Media Admin',
+    summary: 'Upload/edit kitabs & media, and view analytics. Cannot add staff or use Storage sync.',
+    surfaces: ['Kitabs', 'Media uploads', 'Analytics']
+  },
+  analytics_admin: {
+    label: 'Analytics Admin',
+    summary: 'View analytics and reports only.',
+    surfaces: ['Analytics']
+  },
+  moderator: {
+    label: 'Moderator',
+    summary: 'Review content and users; no publish or staff management.',
+    surfaces: ['Admin review']
+  },
+  read_only: {
+    label: 'Read Only',
+    summary: 'View dashboards and content; cannot edit or publish.',
+    surfaces: ['Admin (view)']
+  }
+}
+
+export const STAFF_ROLES: StaffRole[] = [
+  'super_admin',
+  'content_admin',
+  'media_admin',
+  'analytics_admin',
+  'moderator',
+  'read_only'
+]
+
+export const STAFF_STATUSES: StaffStatus[] = ['active', 'pending', 'disabled', 'suspended']
 
 export function permissionsForRole(role: StaffRole): Permission[] {
   return ROLE_PERMISSIONS[role] || []
@@ -192,7 +234,6 @@ export function hasAnyPermission(role: StaffRole, permissions: Permission[]): bo
   return permissions.some(p => hasPermission(role, p))
 }
 
-/** Map nav href prefixes to required permissions (any match grants visibility). */
 export const NAV_PERMISSION_MAP: Array<{ match: RegExp; permissions: Permission[] }> = [
   { match: /^\/dashboard/, permissions: ['dashboard.view'] },
   { match: /^\/content\/kitabs/, permissions: ['kitabs.view'] },

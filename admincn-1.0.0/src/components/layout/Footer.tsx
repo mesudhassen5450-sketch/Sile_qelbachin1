@@ -9,7 +9,7 @@ const Footer = () => {
     <footer>
       <div className='text-muted-foreground mx-auto flex size-full max-w-360 items-center justify-between gap-3 px-4 py-3 max-sm:flex-col sm:gap-6 sm:px-6'>
         <p className='text-sm text-balance max-sm:text-center'>
-          {`©${new Date().getFullYear()}`} {themeConfig.templateNameAmharic} · Local admin UI
+          {`©${new Date().getFullYear()}`} {themeConfig.templateNameAmharic} Admin
         </p>
         <div className='flex items-center gap-5 max-sm:hidden'>
           <Link

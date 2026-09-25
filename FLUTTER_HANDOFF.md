@@ -412,3 +412,26 @@ As of this snapshot the website is considered **finished for web production** wi
 - Deployed on Netlify: https://sileqelbachin1.netlify.app/
 
 **Next production step:** Flutter mobile app using this document as the single source of truth for design + media wiring.
+
+---
+
+## 17. Live CMS API (Admin → Cloudflare R2 → mobile) — 2026-09-24
+
+**Full workflow doc:** `admincn-1.0.0/docs/admin/CMS-WEBSITE-MOBILE-WORKFLOW.md`
+
+Staff publish content in Admin; files are stored on **Cloudflare R2** (not Cloudinary). Mobile must consume the **public CMS API**:
+
+| Base | `https://sile-qelbachin1-1.onrender.com/api/public/v1` |
+|------|------------------------------------------------------|
+| Kitabs | `GET /kitabs` |
+| Audio | `GET /audio` |
+| Video | `GET /video` |
+| PDFs | `GET /pdfs` |
+
+Only `status=published` rows are returned. Playback URLs are R2 `https://pub-….r2.dev/…` fields (`fileUrl`, `audioUrl`, `coverImage`).
+
+**Flutter must:** fetch these endpoints, play R2 HTTPS URLs, keep design/screens from sections 1–16.  
+**Flutter must not:** embed Supabase service keys, staff login, or Cloudinary.
+
+Until the app ships with the CMS base URL, you may still bundle a JSON snapshot — but production target is the live public API so Admin publishes appear on phone without an app store rebuild.
+

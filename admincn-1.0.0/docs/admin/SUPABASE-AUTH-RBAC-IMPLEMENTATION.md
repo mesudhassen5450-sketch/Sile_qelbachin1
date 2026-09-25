@@ -104,12 +104,15 @@ Blueprint: `render.yaml`
 ### Supabase dashboard settings (required for production email)
 
 1. Authentication → Providers → Email enabled; confirm email ON.  
-2. Redirect URLs include:
-   - `http://localhost:3001/pages/auth/reset-password`
-   - `https://<production-host>/pages/auth/reset-password`  
-3. Configure custom SMTP (default Supabase mail is test-only / rate-limited).  
-4. Apply migrations `001_cms_schema.sql` + `002_auth_rbac.sql`.  
-5. Run `npm run auth:bootstrap` with bootstrap password in env once.
+2. Authentication → URL Configuration:
+   - **Site URL:** `https://sile-qelbachin1-1.onrender.com` (production Admin)
+   - **Redirect URLs** must include:
+     - `http://localhost:3001/pages/auth/reset-password`
+     - `https://sile-qelbachin1-1.onrender.com/pages/auth/reset-password`
+3. Configure **custom SMTP** (Authentication → Emails). Default Supabase mail is test-only / often blocked — that is why Forgot Password can show “sent” with **no inbox mail**. Login + My Account password change do **not** use email; only Forgot Password does.
+4. If mail never arrives: Authentication → Logs → filter recovery / email errors.
+5. Apply migrations `001_cms_schema.sql` + `002_auth_rbac.sql`.  
+6. Run `npm run auth:bootstrap` with bootstrap password in env once.
 
 ---
 

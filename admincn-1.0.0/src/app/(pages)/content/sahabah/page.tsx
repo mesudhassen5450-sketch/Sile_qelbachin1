@@ -1,14 +1,13 @@
-import PlaceholderPage from '@/views/shared/PlaceholderPage'
+import ContentListPage from '@/views/content/ContentListPage'
 
-const Page = () => {
-  return (
-    <PlaceholderPage
-      title='Sahabah'
-      description='Sahabah profile placeholders.'
-      actionLabel='Add Profile'
-      rows={undefined}
-    />
-  )
-}
+const Page = () => (
+  <ContentListPage
+    title='Sahabah'
+    description='Add Sahabah profiles with title, description, biography, and optional cover. Newest first on the website and in the app.'
+    type='sahabah'
+    columns={['title', 'meta', 'media', 'status', 'updated']}
+    allowCreate
+  />
+)
 
 export default Page

@@ -1,6 +1,5 @@
 import Link from 'next/link'
 
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -26,22 +25,17 @@ type PlaceholderPageProps = {
   rows?: PlaceholderRow[]
   actionLabel?: string
   actionHref?: string
+  emptyMessage?: string
 }
 
-const defaultRows: PlaceholderRow[] = [
-  { id: '1', title: 'Item A', status: 'Published', meta: 'Category 01', updated: '2026-09-20' },
-  { id: '2', title: 'Item B', status: 'Draft', meta: 'Category 02', updated: '2026-09-18' },
-  { id: '3', title: 'Item C', status: 'Published', meta: 'Category 01', updated: '2026-09-15' },
-  { id: '4', title: 'Item D', status: 'Draft', meta: 'Category 03', updated: '2026-09-12' },
-  { id: '5', title: 'Item E', status: 'Published', meta: 'Category 02', updated: '2026-09-10' }
-]
-
+/** Empty/real records only — never invents demo rows. */
 const PlaceholderPage = ({
   title,
   description,
-  rows = defaultRows,
+  rows = [],
   actionLabel = 'Add new',
-  actionHref
+  actionHref,
+  emptyMessage = 'No records yet.'
 }: PlaceholderPageProps) => {
   return (
     <div className='space-y-6'>
@@ -54,44 +48,41 @@ const PlaceholderPage = ({
           <Button render={<Link href={actionHref} />} nativeButton={false}>
             {actionLabel}
           </Button>
-        ) : (
-          <Button type='button'>{actionLabel}</Button>
-        )}
+        ) : null}
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Records</CardTitle>
-          <CardDescription>Static placeholder data — ready for API wiring later.</CardDescription>
+          <CardDescription>
+            {rows.length ? `${rows.length} record${rows.length === 1 ? '' : 's'}` : 'Nothing to show yet'}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Title</TableHead>
-                <TableHead>Meta</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Updated</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map(row => (
-                <TableRow key={row.id}>
-                  <TableCell className='font-medium'>{row.title}</TableCell>
-                  <TableCell className='text-muted-foreground'>{row.meta ?? '—'}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant='outline'
-                      className={row.status === 'Published' ? 'badge-publish' : 'badge-draft'}
-                    >
-                      {row.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className='text-muted-foreground'>{row.updated ?? '—'}</TableCell>
+          {rows.length === 0 ? (
+            <p className='text-muted-foreground py-8 text-center text-sm'>{emptyMessage}</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Meta</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Updated</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {rows.map(row => (
+                  <TableRow key={row.id}>
+                    <TableCell className='font-medium'>{row.title}</TableCell>
+                    <TableCell className='text-muted-foreground'>{row.meta ?? '—'}</TableCell>
+                    <TableCell>{row.status}</TableCell>
+                    <TableCell className='text-muted-foreground'>{row.updated ?? '—'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>

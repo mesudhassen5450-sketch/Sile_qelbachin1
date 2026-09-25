@@ -102,7 +102,7 @@ const CloudflareStoragePage = () => {
     try {
       setPhase('Scanning…')
       await new Promise(r => setTimeout(r, 200))
-      setPhase('Reading R2 objects…')
+      setPhase('Reading online files…')
       const res = await fetch('/api/admin/media/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -127,7 +127,7 @@ const CloudflareStoragePage = () => {
     setBusy(true)
     setError(null)
     try {
-      setPhase('Matching static Kitabs / Ders / Audio / Video / PDFs…')
+      setPhase('Matching kitabs, ders, audio, video, and PDFs…')
       const res = await fetch('/api/admin/media/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -164,18 +164,47 @@ const CloudflareStoragePage = () => {
     <div className='space-y-6'>
       <div className='flex flex-wrap items-start justify-between gap-4'>
         <div>
-          <h1 className='text-2xl font-semibold tracking-tight'>Cloudflare Storage</h1>
+          <h1 className='text-2xl font-semibold tracking-tight'>Media library</h1>
           <p className='text-muted-foreground mt-1 max-w-2xl text-sm'>
-            Scan existing R2 media into the content database. Secrets stay server-side. Future uploads
-            still go through Admin → R2 → publish.
+            Refresh online files into Admin so you can manage kitabs, audio, video, and PDFs.
           </p>
         </div>
         <div className='flex flex-wrap gap-2'>
+          <Button
+            type='button'
+            className='bg-primary text-primary-foreground'
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true)
+              setError(null)
+              try {
+                setPhase('Refreshing library…')
+                const res = await fetch('/api/admin/media/sync-r2', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ publish: true })
+                })
+                const data = await res.json()
+                if (!res.ok || !data.ok) throw new Error(data.error || 'Refresh failed')
+                setScan(data)
+                setMatchResult({ ...(data.match || {}), orphans: data.orphans })
+                await refresh()
+                setPhase(null)
+              } catch (err) {
+                setError(err instanceof Error ? err.message : String(err))
+                setPhase(null)
+              } finally {
+                setBusy(false)
+              }
+            }}
+          >
+            {busy ? 'Refreshing…' : 'Refresh library'}
+          </Button>
           <Button type='button' disabled={busy} onClick={() => void runScan()}>
-            {busy && phase?.startsWith('Scan') ? 'Scanning…' : 'Scan Cloudflare Storage'}
+            {busy && phase?.startsWith('Scan') ? 'Scanning…' : 'Scan storage'}
           </Button>
           <Button type='button' variant='outline' disabled={busy} onClick={() => void runMatch()}>
-            Match Static Content
+            Match existing content
           </Button>
         </div>
       </div>

@@ -1,4 +1,10 @@
-import { ListObjectsV2Command, S3Client, HeadObjectCommand } from '@aws-sdk/client-s3'
+import {
+  DeleteObjectCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client
+} from '@aws-sdk/client-s3'
 import { createReadStream, existsSync, readdirSync, statSync } from 'fs'
 import { join, relative, sep } from 'path'
 import { createHash } from 'crypto'
@@ -17,36 +23,62 @@ export type R2Env = {
   mediaMirrorPath: string | null
 }
 
+function trimEnv(value: string | undefined): string {
+  return (value || '').trim().replace(/^["']|["']$/g, '')
+}
+
 export function getR2Env(): R2Env {
   const accountId =
-    process.env.CLOUDFLARE_ACCOUNT_ID || process.env.R2_ACCOUNT_ID || '26e435690c62468180455b796d21b3ab'
+    trimEnv(process.env.CLOUDFLARE_ACCOUNT_ID || process.env.R2_ACCOUNT_ID) ||
+    '26e435690c62468180455b796d21b3ab'
   const endpoint =
-    process.env.R2_ENDPOINT ||
-    process.env.R2_S3_ENDPOINT ||
+    trimEnv(process.env.R2_ENDPOINT || process.env.R2_S3_ENDPOINT) ||
     `https://${accountId}.r2.cloudflarestorage.com`
 
   return {
     accountId,
-    accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
-    bucket: process.env.R2_BUCKET_NAME || 'sileqelbachinmediea',
+    accessKeyId: trimEnv(process.env.R2_ACCESS_KEY_ID),
+    secretAccessKey: trimEnv(process.env.R2_SECRET_ACCESS_KEY),
+    // CF dashboard / API bucket name (legacy spelling: mediea)
+    bucket: trimEnv(process.env.R2_BUCKET_NAME) || 'sileqelbachinmediea',
     endpoint,
     publicBaseUrl: (
-      process.env.R2_PUBLIC_BASE_URL ||
-      process.env.NEXT_PUBLIC_R2_PUBLIC_BASE ||
+      trimEnv(process.env.R2_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_R2_PUBLIC_BASE) ||
       'https://pub-03bea4f667534df5ab6c67f073c73d1e.r2.dev'
     ).replace(/\/+$/, ''),
     objectPrefix: (
-      process.env.NEXT_PUBLIC_R2_OBJECT_PREFIX ||
-      process.env.R2_OBJECT_PREFIX ||
+      trimEnv(process.env.NEXT_PUBLIC_R2_OBJECT_PREFIX || process.env.R2_OBJECT_PREFIX) ||
       'sileqelbachin-meadia'
     ).replace(/^\/+|\/+$/g, ''),
-    mediaMirrorPath: process.env.R2_MEDIA_MIRROR_PATH || null
+    mediaMirrorPath: trimEnv(process.env.R2_MEDIA_MIRROR_PATH) || null
   }
 }
 
 export function hasR2ApiCredentials(env = getR2Env()): boolean {
   return Boolean(env.accessKeyId && env.secretAccessKey)
+}
+
+/** Cloudflare R2 Access Key ID is 32 chars; Secret Access Key is typically 64. */
+export function diagnoseR2Credentials(env = getR2Env()): {
+  ok: boolean
+  issues: string[]
+} {
+  const issues: string[] = []
+  if (!env.accessKeyId) issues.push('R2_ACCESS_KEY_ID is missing.')
+  else if (env.accessKeyId.length !== 32) {
+    issues.push(
+      `R2_ACCESS_KEY_ID length is ${env.accessKeyId.length} (expected 32). Check you did not paste the secret into the access key field.`
+    )
+  }
+  if (!env.secretAccessKey) issues.push('R2_SECRET_ACCESS_KEY is missing.')
+  else if (env.secretAccessKey.length < 40) {
+    issues.push(
+      `R2_SECRET_ACCESS_KEY looks truncated (${env.secretAccessKey.length} chars). Cloudflare shows it once — paste the full ~64 character secret into admincn-1.0.0/.env.local and restart.`
+    )
+  }
+  if (!env.bucket) issues.push('R2_BUCKET_NAME is missing.')
+  if (!env.endpoint) issues.push('R2_ENDPOINT is missing.')
+  return { ok: issues.length === 0, issues }
 }
 
 export function buildPublicUrl(objectKey: string, env = getR2Env()): string {
@@ -68,7 +100,10 @@ function createS3Client(env: R2Env): S3Client {
       accessKeyId: env.accessKeyId,
       secretAccessKey: env.secretAccessKey
     },
-    forcePathStyle: true
+    forcePathStyle: true,
+    // Avoid AWS SDK v3 default checksum headers that break R2 PutObject signatures
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED'
   })
 }
 
@@ -178,6 +213,145 @@ export async function headObjectExists(objectKey: string): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+/**
+ * Upload bytes to Cloudflare R2 (S3 PutObject). Server-only — never expose R2 secrets to the browser.
+ */
+function formatR2SdkError(err: unknown): Error {
+  const msg = err instanceof Error ? err.message : String(err)
+  const name = err && typeof err === 'object' && 'name' in err ? String((err as { name: unknown }).name) : ''
+  if (name === 'SignatureDoesNotMatch' || /signature we calculated does not match/i.test(msg)) {
+    const diag = diagnoseR2Credentials()
+    const hint = diag.issues.length
+      ? diag.issues.join(' ')
+      : 'Regenerate the R2 API token in Cloudflare → R2 → Manage R2 API Tokens, then set R2_ACCESS_KEY_ID + R2_SECRET_ACCESS_KEY in .env.local and restart Admin.'
+    return new Error(`Cloudflare R2 auth failed (SignatureDoesNotMatch). ${hint}`)
+  }
+  return err instanceof Error ? err : new Error(msg)
+}
+
+export async function putObjectToR2(input: {
+  objectKey: string
+  body: Buffer | Uint8Array
+  contentType?: string | null
+  cacheControl?: string
+}): Promise<{ objectKey: string; publicUrl: string; etag: string | null }> {
+  const env = getR2Env()
+  if (!hasR2ApiCredentials(env)) {
+    throw new Error(
+      'R2 upload requires R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY on the Admin server.'
+    )
+  }
+  const diag = diagnoseR2Credentials(env)
+  if (!diag.ok) {
+    throw new Error(diag.issues.join(' '))
+  }
+
+  const client = createS3Client(env)
+  try {
+    const res = await client.send(
+      new PutObjectCommand({
+        Bucket: env.bucket,
+        Key: input.objectKey,
+        Body: input.body,
+        ContentType: input.contentType || guessMimeFromExtension(input.objectKey) || undefined,
+        CacheControl: input.cacheControl || 'public, max-age=31536000, immutable'
+      })
+    )
+
+    return {
+      objectKey: input.objectKey,
+      publicUrl: buildPublicUrl(input.objectKey, env),
+      etag: res.ETag?.replace(/"/g, '') ?? null
+    }
+  } catch (err) {
+    throw formatR2SdkError(err)
+  }
+}
+
+/** Delete one object from Cloudflare R2. Missing keys are treated as success. */
+export async function deleteObjectFromR2(objectKey: string): Promise<{ deleted: boolean; objectKey: string }> {
+  const env = getR2Env()
+  if (!hasR2ApiCredentials(env)) {
+    throw new Error('R2 delete requires R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY.')
+  }
+  if (!objectKey?.trim()) return { deleted: false, objectKey }
+
+  const client = createS3Client(env)
+  try {
+    await client.send(new DeleteObjectCommand({ Bucket: env.bucket, Key: objectKey }))
+    return { deleted: true, objectKey }
+  } catch (err) {
+    throw formatR2SdkError(err)
+  }
+}
+
+export async function verifyR2Connection(): Promise<{
+  ok: boolean
+  bucket: string
+  endpoint: string
+  issues: string[]
+  sampleKeys: string[]
+  error?: string
+}> {
+  const env = getR2Env()
+  const diag = diagnoseR2Credentials(env)
+  if (!diag.ok) {
+    return {
+      ok: false,
+      bucket: env.bucket,
+      endpoint: env.endpoint,
+      issues: diag.issues,
+      sampleKeys: []
+    }
+  }
+  try {
+    const client = createS3Client(env)
+    const res = await client.send(
+      new ListObjectsV2Command({
+        Bucket: env.bucket,
+        Prefix: env.objectPrefix ? `${env.objectPrefix}/` : undefined,
+        MaxKeys: 5
+      })
+    )
+    return {
+      ok: true,
+      bucket: env.bucket,
+      endpoint: env.endpoint,
+      issues: [],
+      sampleKeys: (res.Contents || []).map(c => c.Key || '').filter(Boolean)
+    }
+  } catch (err) {
+    const formatted = formatR2SdkError(err)
+    return {
+      ok: false,
+      bucket: env.bucket,
+      endpoint: env.endpoint,
+      issues: diag.issues,
+      sampleKeys: [],
+      error: formatted.message
+    }
+  }
+}
+
+export function buildStaffUploadObjectKey(input: {
+  mediaType: string
+  fileName: string
+  folder?: string
+}): string {
+  const env = getR2Env()
+  const now = new Date()
+  const yyyy = String(now.getFullYear())
+  const mm = String(now.getMonth() + 1).padStart(2, '0')
+  const safe = input.fileName
+    .replace(/[^a-zA-Z0-9._\-\u1200-\u137F]+/g, '_')
+    .replace(/_+/g, '_')
+    .slice(0, 120)
+  const folder = (input.folder || 'staff-uploads').replace(/^\/+|\/+$/g, '')
+  const typeFolder = input.mediaType || 'other'
+  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return `${env.objectPrefix}/${folder}/${typeFolder}/${yyyy}/${mm}/${stamp}-${safe}`
 }
 
 export async function checksumLocalMirrorFile(objectKey: string): Promise<string | null> {

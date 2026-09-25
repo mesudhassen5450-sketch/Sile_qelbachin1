@@ -10,6 +10,8 @@ import type {
   KitabRecord,
   MediaAsset,
   PdfItemRecord,
+  ReminderRecord,
+  SahabahRecord,
   ScanRun,
   VideoItemRecord
 } from './types'
@@ -25,6 +27,9 @@ function emptyStore(): CmsStoreSnapshot {
     audio_items: [],
     video_items: [],
     pdf_items: [],
+    sahabah_items: [],
+    reminders: [],
+    analytics_events: [],
     scan_runs: [],
     audit_logs: [],
     meta: { last_scan_at: null, backend: 'local' }
@@ -38,6 +43,9 @@ export function loadLocalStore(): CmsStoreSnapshot {
     return {
       ...emptyStore(),
       ...raw,
+      sahabah_items: raw.sahabah_items || [],
+      reminders: raw.reminders || [],
+      analytics_events: Array.isArray(raw.analytics_events) ? raw.analytics_events.slice(0, 50000) : [],
       meta: { ...emptyStore().meta, ...(raw.meta || {}), backend: 'local' }
     }
   } catch {

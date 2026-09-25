@@ -30,9 +30,11 @@ export default function KitabDetailClient({ kitab }: { kitab: Kitab }) {
   const { t, getLocalized, language } = useLanguage();
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const [isDualPaneMode, setIsDualPaneMode] = useState(false);
-  const [stackVertical, setStackVertical] = useState(false);
+  /** Dual always stacks: PDF on top (full-screen style), audio choices underneath. */
+  const [stackVertical, setStackVertical] = useState(true);
   const [isPdfExpanded, setIsPdfExpanded] = useState(false);
-  const [audioShare, setAudioShare] = useState(34);
+  /** Share of space for the audio pane (bottom when stacked). PDF gets the rest. */
+  const [audioShare, setAudioShare] = useState(24);
   const autoPlayedRef = useRef(false);
   const splitRef = useRef<HTMLDivElement | null>(null);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
@@ -93,8 +95,8 @@ export default function KitabDetailClient({ kitab }: { kitab: Kitab }) {
   }, [kitab.dersList, playDers]);
 
   useEffect(() => {
-    const media = window.matchMedia('(max-width: 767px)');
-    setStackVertical(media.matches);
+    // Dual mode prefers stacked PDF-top / audio-bottom on all viewports.
+    setStackVertical(true);
   }, []);
 
   const enterBrowserFullscreen = useCallback(async (el: HTMLElement | null) => {
@@ -159,15 +161,19 @@ export default function KitabDetailClient({ kitab }: { kitab: Kitab }) {
   const isStacked = stackVertical;
   stackedRef.current = isStacked;
   const playerOffset = currentTrack ? '6.5rem' : '0px';
-  const coversSiteChrome = isPdfExpanded;
+  // Dual matches PDF-only: cover the site chrome; audio strip sits under the PDF.
+  const coversSiteChrome = true;
 
   const updateShareFromPoint = useCallback((clientX: number, clientY: number) => {
     const box = splitRef.current?.getBoundingClientRect();
     if (!box) return;
-    const next = stackedRef.current
-      ? ((clientY - box.top) / box.height) * 100
-      : ((document.documentElement.dir === 'rtl' ? box.right - clientX : clientX - box.left) / box.width) * 100;
-    setAudioShare(Math.min(78, Math.max(22, next)));
+    // Stacked = PDF on top, audio under. Side-by-side = PDF first, audio second.
+    // Grip position always maps to the PDF share; audio gets the remainder.
+    const fromStart = stackedRef.current
+      ? (clientY - box.top) / box.height
+      : (document.documentElement.dir === 'rtl' ? box.right - clientX : clientX - box.left) / box.width;
+    const next = (1 - fromStart) * 100;
+    setAudioShare(Math.min(45, Math.max(18, next)));
   }, []);
 
   useEffect(() => {
@@ -355,6 +361,8 @@ export default function KitabDetailClient({ kitab }: { kitab: Kitab }) {
             <div className="flex flex-wrap items-center gap-3">
               <button
                 onClick={() => {
+                  setStackVertical(true);
+                  setAudioShare(24);
                   setIsPdfExpanded(false);
                   setIsDualPaneMode(true);
                 }}
@@ -472,23 +480,19 @@ export default function KitabDetailClient({ kitab }: { kitab: Kitab }) {
             ref={splitRef}
             className={`flex flex-1 min-h-0 overflow-hidden p-2 ${isStacked && !isPdfExpanded ? 'flex-col' : 'flex-row'}`}
           >
-            {!isPdfExpanded && (
-              <div
-                className="bg-white dark:bg-neutral-900 rounded-lg border border-neutral-800 flex flex-col overflow-hidden min-w-0 min-h-0"
-                style={audioPaneStyle}
-              >
-                <div className="p-4 border-b border-neutral-200 dark:border-neutral-800 flex-shrink-0">
-                  <div className="flex items-center gap-2 text-xs font-bold text-red-600 dark:text-red-400 mb-1">
-                    <Headphones className="w-4 h-4" />
-                    <span>{t('kitabAudioLectures')}</span>
-                  </div>
-                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
-                    {kitab.dersList.length} {t('kitabLessons')}
-                  </h3>
+            <div
+              className="flex flex-col bg-neutral-950 rounded-lg overflow-hidden min-w-0 min-h-0 border border-neutral-800"
+              style={pdfPaneStyle}
+            >
+              {pdfEmbedSrc ? (
+                <iframe src={pdfEmbedSrc} className="w-full flex-1 min-h-0 border-none bg-white" title="Kitab PDF Viewer" />
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center gap-3 text-neutral-400 p-6 text-center">
+                  <FileText className="w-10 h-10 text-red-700" />
+                  <p className="text-sm">{t('kitabPdfUnavailable')}</p>
                 </div>
-                {renderPlaylist(true)}
-              </div>
-            )}
+              )}
+            </div>
 
             {!isPdfExpanded && (
               <button
@@ -508,19 +512,23 @@ export default function KitabDetailClient({ kitab }: { kitab: Kitab }) {
               </button>
             )}
 
-            <div
-              className="flex flex-col bg-neutral-950 rounded-lg overflow-hidden min-w-0 min-h-0 border border-neutral-800"
-              style={pdfPaneStyle}
-            >
-              {pdfEmbedSrc ? (
-                <iframe src={pdfEmbedSrc} className="w-full flex-1 min-h-0 border-none bg-white" title="Kitab PDF Viewer" />
-              ) : (
-                <div className="flex-1 flex flex-col items-center justify-center gap-3 text-neutral-400 p-6 text-center">
-                  <FileText className="w-10 h-10 text-red-700" />
-                  <p className="text-sm">{t('kitabPdfUnavailable')}</p>
+            {!isPdfExpanded && (
+              <div
+                className="bg-white dark:bg-neutral-900 rounded-lg border border-neutral-800 flex flex-col overflow-hidden min-w-0 min-h-0"
+                style={audioPaneStyle}
+              >
+                <div className="p-3 sm:p-4 border-b border-neutral-200 dark:border-neutral-800 flex-shrink-0">
+                  <div className="flex items-center gap-2 text-xs font-bold text-red-600 dark:text-red-400 mb-1">
+                    <Headphones className="w-4 h-4" />
+                    <span>{t('kitabAudioLectures')}</span>
+                  </div>
+                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
+                    {kitab.dersList.length} {t('kitabLessons')}
+                  </h3>
                 </div>
-              )}
-            </div>
+                {renderPlaylist(true)}
+              </div>
+            )}
           </div>
         </div>
       )}

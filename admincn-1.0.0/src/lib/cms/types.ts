@@ -167,6 +167,55 @@ export type PdfItemRecord = {
   published_at: string | null
 }
 
+export type SahabahRecord = {
+  id: string
+  slug: string
+  name_am: string | null
+  name_ar: string | null
+  name_en: string | null
+  title_am: string | null
+  title_ar: string | null
+  title_en: string | null
+  description_am: string | null
+  description_ar: string | null
+  description_en: string | null
+  biography_am: string | null
+  biography_ar: string | null
+  biography_en: string | null
+  cover_asset_id: string | null
+  status: ContentStatus
+  metadata: Record<string, unknown>
+  created_at: string
+  updated_at: string
+  published_at: string | null
+}
+
+/** Home-page reminder cards managed in Admin (title + description). */
+export type ReminderRecord = {
+  id: string
+  title_en: string | null
+  title_am: string | null
+  title_ar: string | null
+  description_en: string | null
+  description_am: string | null
+  description_ar: string | null
+  status: ContentStatus
+  sort_order: number
+  metadata: Record<string, unknown>
+  created_at: string
+  updated_at: string
+  published_at: string | null
+}
+
+export type AnalyticsEvent = {
+  id: string
+  event: string
+  path: string | null
+  platform: 'website' | 'mobile' | 'unknown'
+  created_at: string
+  meta?: Record<string, unknown>
+}
+
 export type ScanRun = {
   id: string
   started_at: string
@@ -215,6 +264,9 @@ export type CmsStoreSnapshot = {
   audio_items: AudioItemRecord[]
   video_items: VideoItemRecord[]
   pdf_items: PdfItemRecord[]
+  sahabah_items: SahabahRecord[]
+  reminders: ReminderRecord[]
+  analytics_events: AnalyticsEvent[]
   scan_runs: ScanRun[]
   audit_logs: AuditLog[]
   meta: {

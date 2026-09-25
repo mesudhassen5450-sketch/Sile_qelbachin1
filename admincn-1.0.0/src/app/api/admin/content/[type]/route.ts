@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { requireApiPermission } from '@/lib/auth/guards'
+import { sortKitabsForDisplay } from '@/lib/cms/kitab-order'
 import { loadLocalStore } from '@/lib/cms/local-store'
 import { isSupabaseConfigured, loadSupabaseSnapshot } from '@/lib/cms/supabase'
 import type { CmsStoreSnapshot } from '@/lib/cms/types'
@@ -9,15 +10,66 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 async function getStore(): Promise<CmsStoreSnapshot> {
+  const local = loadLocalStore()
   if (isSupabaseConfigured()) {
     try {
       const remote = await loadSupabaseSnapshot()
-      if (remote) return remote
+      if (remote) {
+        // Prefer remote CMS tables, but keep local-only sahabah + any newer local media
+        const mediaByKey = new Map(
+          [...remote.media_assets, ...local.media_assets].map(a => [
+            `${a.storage_provider}:${a.bucket}:${a.object_key}`,
+            a
+          ])
+        )
+        return {
+          ...remote,
+          media_assets: Array.from(mediaByKey.values()),
+          sahabah_items: local.sahabah_items?.length ? local.sahabah_items : remote.sahabah_items || [],
+          // Prefer local kitabs/audio if they have newer admin_ui creates not yet in remote count
+          kitabs: mergeById(remote.kitabs, local.kitabs),
+          ders: mergeById(remote.ders, local.ders),
+          audio_items: mergeById(remote.audio_items, local.audio_items),
+          video_items: mergeById(remote.video_items, local.video_items),
+          pdf_items: mergeById(remote.pdf_items, local.pdf_items)
+        }
+      }
     } catch {
       // fall through
     }
   }
-  return loadLocalStore()
+  return local
+}
+
+function mergeById<T extends { id: string; updated_at?: string; created_at?: string }>(
+  remote: T[],
+  local: T[]
+): T[] {
+  const map = new Map<string, T>()
+  for (const row of remote) map.set(row.id, row)
+  for (const row of local) {
+    const prev = map.get(row.id)
+    if (!prev) {
+      map.set(row.id, row)
+      continue
+    }
+    const prevT = Date.parse(prev.updated_at || prev.created_at || '') || 0
+    const nextT = Date.parse(row.updated_at || row.created_at || '') || 0
+    if (nextT >= prevT) map.set(row.id, row)
+  }
+  return Array.from(map.values()).sort((a, b) => {
+    const ta = Date.parse(a.updated_at || a.created_at || '') || 0
+    const tb = Date.parse(b.updated_at || b.created_at || '') || 0
+    return tb - ta
+  })
+}
+
+function sortRecent<T extends { updated_at?: string | null; created_at?: string | null }>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => {
+    const ta = Date.parse(a.updated_at || a.created_at || '') || 0
+    const tb = Date.parse(b.updated_at || b.created_at || '') || 0
+    return tb - ta
+  })
 }
 
 function assetMap(store: CmsStoreSnapshot) {
@@ -46,7 +98,7 @@ export async function GET(
   const status = url.searchParams.get('status')
 
   if (type === 'kitabs') {
-    let rows = store.kitabs.map(k => {
+    let rows = sortKitabsForDisplay(store.kitabs).map(k => {
       const cover = k.cover_asset_id ? assets.get(k.cover_asset_id) : undefined
       const pdf = k.pdf_asset_id ? assets.get(k.pdf_asset_id) : undefined
       const dersCount = store.ders.filter(d => d.kitab_id === k.id).length
@@ -101,11 +153,14 @@ export async function GET(
   }
 
   if (type === 'audio') {
-    let rows = store.audio_items.map(a => {
+    let rows = sortRecent(store.audio_items).map(a => {
       const media = a.media_asset_id ? assets.get(a.media_asset_id) : undefined
+      const coverId = (a.metadata?.cover_asset_id as string | undefined) || null
+      const cover = coverId ? assets.get(coverId) : undefined
       return {
         ...a,
         media_url: media?.public_url || null,
+        cover_url: cover?.public_url || null,
         object_key: media?.object_key || null,
         file_size: media?.file_size || null,
         media_health: media?.health_status || 'unknown',
@@ -124,13 +179,14 @@ export async function GET(
   }
 
   if (type === 'video') {
-    let rows = store.video_items.map(v => {
+    let rows = sortRecent(store.video_items).map(v => {
       const media = v.video_asset_id ? assets.get(v.video_asset_id) : undefined
       const thumb = v.thumbnail_asset_id ? assets.get(v.thumbnail_asset_id) : undefined
       return {
         ...v,
         media_url: media?.public_url || null,
         object_key: media?.object_key || null,
+        cover_url: thumb?.public_url || null,
         thumbnail_url: thumb?.public_url || null,
         file_size: media?.file_size || null,
         media_health: media?.health_status || 'unknown',
@@ -149,12 +205,15 @@ export async function GET(
   }
 
   if (type === 'pdfs' || type === 'pdf') {
-    let rows = store.pdf_items.map(p => {
+    let rows = sortRecent(store.pdf_items).map(p => {
       const media = p.media_asset_id ? assets.get(p.media_asset_id) : undefined
       const kitab = p.kitab_id ? store.kitabs.find(k => k.id === p.kitab_id) : undefined
+      const coverId = (p.metadata?.cover_asset_id as string | undefined) || null
+      const cover = coverId ? assets.get(coverId) : undefined
       return {
         ...p,
         media_url: media?.public_url || null,
+        cover_url: cover?.public_url || null,
         object_key: media?.object_key || null,
         file_size: media?.file_size || null,
         kitab_slug: kitab?.slug || null,
@@ -166,6 +225,26 @@ export async function GET(
     if (q) {
       rows = rows.filter(r =>
         [r.title_am, r.title_en, r.object_key, r.kitab_slug]
+          .filter(Boolean)
+          .some(v => String(v).toLowerCase().includes(q))
+      )
+    }
+    return NextResponse.json({ ok: true, count: rows.length, rows })
+  }
+
+  if (type === 'sahabah') {
+    let rows = sortRecent(store.sahabah_items || []).map(s => {
+      const cover = s.cover_asset_id ? assets.get(s.cover_asset_id) : undefined
+      return {
+        ...s,
+        cover_url: cover?.public_url || null,
+        title: s.name_en || s.name_am || s.title_en || s.slug
+      }
+    })
+    if (status) rows = rows.filter(r => r.status === status)
+    if (q) {
+      rows = rows.filter(r =>
+        [r.slug, r.name_en, r.name_am, r.title_en, r.description_en]
           .filter(Boolean)
           .some(v => String(v).toLowerCase().includes(q))
       )
@@ -196,3 +275,266 @@ export async function GET(
 
   return NextResponse.json({ ok: false, error: `Unknown type: ${type}` }, { status: 404 })
 }
+
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ type: string }> }
+) {
+  const { type } = await context.params
+  const body = await request.json().catch(() => ({}))
+
+  try {
+    if (type === 'kitabs') {
+      const gate = await requireApiPermission(['kitabs.create', 'kitabs.publish'])
+      if ('response' in gate) return gate.response
+      const { createKitabWithDers } = await import('@/lib/cms/create-content')
+      const result = await createKitabWithDers({
+        title_am: body.title_am,
+        title_ar: body.title_ar,
+        title_en: body.title_en,
+        author_am: body.author_am,
+        author_ar: body.author_ar,
+        author_en: body.author_en,
+        description_am: body.description_am,
+        description_ar: body.description_ar,
+        description_en: body.description_en,
+        category_en: body.category_en,
+        cover_asset_id: body.cover_asset_id || null,
+        pdf_asset_id: body.pdf_asset_id || null,
+        slug: body.slug,
+        status: body.status || 'published',
+        ders: Array.isArray(body.ders) ? body.ders : []
+      })
+      return NextResponse.json({
+        ok: true,
+        kitab: result.kitab,
+        ders: result.ders,
+        message: 'Kitab published. Media is on Cloudflare R2; website/mobile read public API.'
+      })
+    }
+
+    if (type === 'sahabah') {
+      const gate = await requireApiPermission(['kitabs.create', 'kitabs.publish', 'audio.create'])
+      if ('response' in gate) return gate.response
+      const { createSahabahItem } = await import('@/lib/cms/create-content')
+      const row = await createSahabahItem({
+        name_am: body.name_am,
+        name_ar: body.name_ar,
+        name_en: body.name_en,
+        title_am: body.title_am,
+        title_ar: body.title_ar,
+        title_en: body.title_en,
+        description_am: body.description_am,
+        description_ar: body.description_ar,
+        description_en: body.description_en,
+        biography_am: body.biography_am,
+        biography_ar: body.biography_ar,
+        biography_en: body.biography_en,
+        cover_asset_id: body.cover_asset_id || null,
+        slug: body.slug,
+        status: body.status || 'published'
+      })
+      return NextResponse.json({ ok: true, row, message: 'Sahabah published.' })
+    }
+
+    if (type === 'audio') {
+      const gate = await requireApiPermission(['audio.create', 'audio.publish'])
+      if ('response' in gate) return gate.response
+      const { createAudioItem } = await import('@/lib/cms/create-content')
+      const mediaAssetId = String(body.media_asset_id || '')
+      if (!mediaAssetId) {
+        return NextResponse.json({ ok: false, error: 'media_asset_id required.' }, { status: 400 })
+      }
+      const row = await createAudioItem({
+        title_am: body.title_am,
+        title_ar: body.title_ar,
+        title_en: body.title_en,
+        description_am: body.description_am,
+        description_ar: body.description_ar,
+        description_en: body.description_en,
+        category: body.category,
+        is_muhadara: Boolean(body.is_muhadara),
+        media_asset_id: mediaAssetId,
+        cover_asset_id: body.cover_asset_id || null,
+        status: body.status || 'published'
+      })
+      return NextResponse.json({ ok: true, row, published: true })
+    }
+
+    if (type === 'video') {
+      const gate = await requireApiPermission(['video.create', 'video.publish'])
+      if ('response' in gate) return gate.response
+      const { createVideoItem } = await import('@/lib/cms/create-content')
+      const videoAssetId = String(body.video_asset_id || body.media_asset_id || '')
+      if (!videoAssetId) {
+        return NextResponse.json({ ok: false, error: 'video_asset_id required.' }, { status: 400 })
+      }
+      const row = await createVideoItem({
+        title_am: body.title_am,
+        title_ar: body.title_ar,
+        title_en: body.title_en,
+        description_am: body.description_am,
+        description_ar: body.description_ar,
+        description_en: body.description_en,
+        category: body.category,
+        video_asset_id: videoAssetId,
+        cover_asset_id: body.cover_asset_id || body.thumbnail_asset_id || null,
+        status: body.status || 'published'
+      })
+      return NextResponse.json({ ok: true, row, published: true })
+    }
+
+    if (type === 'pdfs' || type === 'pdf') {
+      const gate = await requireApiPermission(['pdf.create', 'pdf.publish'])
+      if ('response' in gate) return gate.response
+      const { createPdfItem } = await import('@/lib/cms/create-content')
+      const mediaAssetId = String(body.media_asset_id || '')
+      if (!mediaAssetId) {
+        return NextResponse.json({ ok: false, error: 'media_asset_id required.' }, { status: 400 })
+      }
+      const row = await createPdfItem({
+        title_am: body.title_am,
+        title_ar: body.title_ar,
+        title_en: body.title_en,
+        media_asset_id: mediaAssetId,
+        cover_asset_id: body.cover_asset_id || null,
+        status: body.status || 'published'
+      })
+      return NextResponse.json({ ok: true, row, published: true })
+    }
+
+    return NextResponse.json({ ok: false, error: `POST not supported for ${type}` }, { status: 400 })
+  } catch (err) {
+    return NextResponse.json(
+      { ok: false, error: err instanceof Error ? err.message : 'Create failed.' },
+      { status: 400 }
+    )
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  context: { params: Promise<{ type: string }> }
+) {
+  const { type } = await context.params
+  const allowed = ['audio', 'video', 'pdfs', 'pdf', 'kitabs', 'ders', 'sahabah'] as const
+  if (!allowed.includes(type as (typeof allowed)[number])) {
+    return NextResponse.json({ ok: false, error: 'Unsupported type.' }, { status: 400 })
+  }
+
+  const perm =
+    type === 'kitabs' || type === 'sahabah'
+      ? (['kitabs.publish', 'kitabs.edit'] as const)
+      : type === 'ders'
+        ? (['ders.publish', 'ders.edit'] as const)
+        : type === 'video'
+          ? (['video.publish', 'video.edit'] as const)
+          : type === 'audio'
+            ? (['audio.publish', 'audio.edit'] as const)
+            : (['pdf.publish', 'pdf.edit'] as const)
+
+  const gate = await requireApiPermission([...perm])
+  if ('response' in gate) return gate.response
+
+  const body = await request.json().catch(() => ({}))
+  const id = String(body.id || '')
+  if (!id) {
+    return NextResponse.json({ ok: false, error: 'id required.' }, { status: 400 })
+  }
+
+  const normalized =
+    type === 'pdf' ? 'pdfs' : (type as 'audio' | 'video' | 'pdfs' | 'kitabs' | 'ders' | 'sahabah')
+
+  try {
+    const status = body.status as string | undefined
+    if (status) {
+      const { setContentStatus } = await import('@/lib/cms/publish-content')
+      await setContentStatus({
+        type: normalized,
+        id,
+        status: status as import('@/lib/cms/types').ContentStatus
+      })
+      return NextResponse.json({
+        ok: true,
+        message:
+          status === 'published'
+            ? 'Published to public API (website + mobile).'
+            : `Status set to ${status}.`
+      })
+    }
+
+    const { updateContentMeta } = await import('@/lib/cms/delete-content')
+    await updateContentMeta({
+      type: normalized as import('@/lib/cms/delete-content').DeletableContentType,
+      id,
+      title_en: body.title_en,
+      title_am: body.title_am,
+      author_en: body.author_en,
+      description_en: body.description_en,
+      description_am: body.description_am
+    })
+    return NextResponse.json({ ok: true, message: 'Updated. Website/mobile read public API.' })
+  } catch (err) {
+    return NextResponse.json(
+      { ok: false, error: err instanceof Error ? err.message : 'Update failed.' },
+      { status: 400 }
+    )
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ type: string }> }
+) {
+  const { type } = await context.params
+  const allowed = ['audio', 'video', 'pdfs', 'pdf', 'kitabs', 'ders', 'sahabah'] as const
+  if (!allowed.includes(type as (typeof allowed)[number])) {
+    return NextResponse.json({ ok: false, error: 'Unsupported type.' }, { status: 400 })
+  }
+
+  const perm =
+    type === 'kitabs' || type === 'sahabah'
+      ? (['kitabs.archive', 'kitabs.edit'] as const)
+      : type === 'ders'
+        ? (['ders.edit', 'ders.publish'] as const)
+        : type === 'video'
+          ? (['video.archive', 'video.edit'] as const)
+          : type === 'audio'
+            ? (['audio.archive', 'audio.edit'] as const)
+            : (['pdf.edit', 'pdf.publish'] as const)
+
+  const gate = await requireApiPermission([...perm])
+  if ('response' in gate) return gate.response
+
+  const url = new URL(request.url)
+  const body = await request.json().catch(() => ({}))
+  const id = String(body.id || url.searchParams.get('id') || '')
+  if (!id) {
+    return NextResponse.json({ ok: false, error: 'id required.' }, { status: 400 })
+  }
+
+  const deleteR2Files = body.delete_r2 !== false && url.searchParams.get('delete_r2') !== '0'
+  const normalized =
+    type === 'pdf' ? 'pdfs' : (type as 'audio' | 'video' | 'pdfs' | 'kitabs' | 'ders' | 'sahabah')
+
+  try {
+    const { deleteContentItem } = await import('@/lib/cms/delete-content')
+    const result = await deleteContentItem({
+      type: normalized as import('@/lib/cms/delete-content').DeletableContentType,
+      id,
+      adminEmail: gate.ctx.user.email,
+      deleteR2Files
+    })
+    return NextResponse.json({
+      ...result,
+      message:
+        'Deleted from Admin CMS and public API (official website/mobile). Linked Cloudflare R2 files removed when credentials work.'
+    })
+  } catch (err) {
+    return NextResponse.json(
+      { ok: false, error: err instanceof Error ? err.message : 'Delete failed.' },
+      { status: 400 }
+    )
+  }
+}
+

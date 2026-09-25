@@ -1,14 +1,5 @@
-import PlaceholderPage from '@/views/shared/PlaceholderPage'
+import RemindersPage from '@/views/content/RemindersPage'
 
-const Page = () => {
-  return (
-    <PlaceholderPage
-      title='Reminders'
-      description='Reminder content for push and in-app surfaces.'
-      actionLabel='Add Reminder'
-      rows={undefined}
-    />
-  )
-}
+const Page = () => <RemindersPage />
 
 export default Page

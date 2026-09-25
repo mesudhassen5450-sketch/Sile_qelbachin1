@@ -1,16 +1,11 @@
 import PlaceholderPage from '@/views/shared/PlaceholderPage'
 
-const Page = () => {
-  return (
-    <PlaceholderPage
-      title='Mobile Analytics'
-      description='App opens, retention, and media plays (mock).'
-      actionLabel='Export'
-      rows={[{ id: '1', title: 'Daily opens', status: 'Published', meta: '1,240', updated: '2026-09-22' },
-    { id: '2', title: 'Retention D7', status: 'Published', meta: '42%', updated: '2026-09-22' },
-    { id: '3', title: 'Crash-free', status: 'Published', meta: '99.2%', updated: '2026-09-22' }]}
-    />
-  )
-}
+const Page = () => (
+  <PlaceholderPage
+    title='Mobile Analytics'
+    description='Live activity appears on Overview and Dashboard when the website records visits.'
+    emptyMessage='No separate breakdown yet. See Analytics → Overview for real totals.'
+  />
+)
 
 export default Page
