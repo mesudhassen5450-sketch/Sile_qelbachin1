@@ -1,11 +1,18 @@
+# Netlify = PUBLIC WEBSITE only (repo root).
+# Admin CMS is a separate app on Render (root directory: admincn-1.0.0).
 [build]
   command = "npm run build"
   publish = ".next"
+  # Do not set base = admincn — that breaks the public site.
 
 [build.environment]
   NEXT_TELEMETRY_DISABLED = "1"
+  # Website env (set in Netlify UI as well):
+  # NEXT_PUBLIC_SITE_URL=https://sileqelbachin1.com
+  # NEXT_PUBLIC_CMS_API_BASE=https://admin.sileqelbachin1.com/api/public/v1
+  # NEXT_PUBLIC_R2_PUBLIC_BASE=https://pub-03bea4f667534df5ab6c67f073c73d1e.r2.dev
+  # NEXT_PUBLIC_R2_OBJECT_PREFIX=sileqelbachin-meadia
 
-# Cache Next.js build
 [[headers]]
   for = "/_next/static/*"
   [headers.values]
