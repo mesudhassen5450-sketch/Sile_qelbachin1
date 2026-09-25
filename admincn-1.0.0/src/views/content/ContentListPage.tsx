@@ -32,6 +32,7 @@ import {
   TableRow
 } from '@/components/ui/table'
 import AddContentDialog from '@/views/content/AddContentDialog'
+import { R2FileField } from '@/views/content/R2FileField'
 
 type ContentType = 'kitabs' | 'ders' | 'audio' | 'video' | 'pdfs' | 'library' | 'sahabah'
 
@@ -45,6 +46,12 @@ type ContentListPageProps = {
 }
 
 type Row = Record<string, unknown>
+
+type UploadedAsset = {
+  id: string
+  public_url: string
+  object_key: string
+}
 
 type R2Status = {
   ok: boolean
@@ -82,7 +89,12 @@ const ContentListPage = ({
   const [editTitleEn, setEditTitleEn] = useState('')
   const [editTitleAm, setEditTitleAm] = useState('')
   const [editAuthor, setEditAuthor] = useState('')
-  const [editDesc, setEditDesc] = useState('')
+  const [editAuthorAm, setEditAuthorAm] = useState('')
+  const [editDescEn, setEditDescEn] = useState('')
+  const [editDescAm, setEditDescAm] = useState('')
+  const [editCover, setEditCover] = useState<UploadedAsset | null>(null)
+  const [editPdf, setEditPdf] = useState<UploadedAsset | null>(null)
+  const [editMedia, setEditMedia] = useState<UploadedAsset | null>(null)
   const [r2Status, setR2Status] = useState<R2Status | null>(null)
   const [syncBusy, setSyncBusy] = useState(false)
   const [syncMsg, setSyncMsg] = useState<string | null>(null)
@@ -152,7 +164,40 @@ const ContentListPage = ({
     setEditTitleEn(String(row.title_en || row.name_en || row.title || ''))
     setEditTitleAm(String(row.title_am || row.name_am || ''))
     setEditAuthor(String(row.author_en || ''))
-    setEditDesc(String(row.description_en || row.description_am || ''))
+    setEditAuthorAm(String(row.author_am || ''))
+    setEditDescEn(String(row.description_en || ''))
+    setEditDescAm(String(row.description_am || ''))
+    const coverId = row.cover_asset_id || row.thumbnail_asset_id
+    const coverUrlVal = row.cover_url || row.thumbnail_url
+    setEditCover(
+      typeof coverId === 'string' && coverId
+        ? {
+            id: coverId,
+            public_url: String(coverUrlVal || ''),
+            object_key: String(row.cover_key || row.object_key || 'cover')
+          }
+        : null
+    )
+    const pdfId = row.pdf_asset_id || (type === 'pdfs' ? row.media_asset_id : null)
+    setEditPdf(
+      typeof pdfId === 'string' && pdfId
+        ? {
+            id: pdfId,
+            public_url: String(row.pdf_url || row.media_url || ''),
+            object_key: String(row.pdf_key || row.object_key || 'file.pdf')
+          }
+        : null
+    )
+    const mediaId = row.media_asset_id || row.video_asset_id || row.audio_asset_id
+    setEditMedia(
+      typeof mediaId === 'string' && mediaId
+        ? {
+            id: mediaId,
+            public_url: String(row.media_url || row.audio_url || row.file_url || ''),
+            object_key: String(row.object_key || 'media')
+          }
+        : null
+    )
   }
 
   const saveEdit = async () => {
@@ -160,16 +205,42 @@ const ContentListPage = ({
     setBusyId(String(editRow.id))
     setError(null)
     try {
+      const body: Record<string, unknown> = {
+        id: editRow.id,
+        title_en: editTitleEn || null,
+        title_am: editTitleAm || null,
+        description_en: editDescEn || null,
+        description_am: editDescAm || null
+      }
+      if (type === 'kitabs') {
+        body.author_en = editAuthor || null
+        body.author_am = editAuthorAm || null
+        if (editCover?.id) body.cover_asset_id = editCover.id
+        if (editPdf?.id) body.pdf_asset_id = editPdf.id
+      }
+      if (type === 'audio') {
+        if (editCover?.id) body.cover_asset_id = editCover.id
+        if (editMedia?.id) body.media_asset_id = editMedia.id
+      }
+      if (type === 'video') {
+        if (editCover?.id) {
+          body.cover_asset_id = editCover.id
+          body.thumbnail_asset_id = editCover.id
+        }
+        if (editMedia?.id) body.video_asset_id = editMedia.id
+      }
+      if (type === 'pdfs') {
+        if (editCover?.id) body.cover_asset_id = editCover.id
+        if (editPdf?.id) body.pdf_asset_id = editPdf.id
+      }
+      if (type === 'sahabah' && editCover?.id) {
+        body.cover_asset_id = editCover.id
+      }
+
       const res = await fetch(`/api/admin/content/${type}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: editRow.id,
-          title_en: editTitleEn || null,
-          title_am: editTitleAm || null,
-          author_en: type === 'kitabs' ? editAuthor || null : undefined,
-          description_en: editDesc || null
-        })
+        body: JSON.stringify(body)
       })
       const data = await res.json()
       if (!res.ok || !data.ok) throw new Error(data.error || 'Edit failed')
@@ -563,30 +634,83 @@ const ContentListPage = ({
       </Dialog>
 
       <Dialog open={Boolean(editRow)} onOpenChange={o => !o && setEditRow(null)}>
-        <DialogContent className='max-h-[85vh] overflow-y-auto sm:max-w-lg'>
+        <DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-lg'>
           <DialogHeader>
-            <DialogTitle>Edit</DialogTitle>
-            <DialogDescription>Edit titles and description. Changes show on the website and in the app.</DialogDescription>
+            <DialogTitle>Edit content</DialogTitle>
+            <DialogDescription>
+              Update English & Amharic text, cover, and files. Changes appear on the website and mobile
+              app after save.
+            </DialogDescription>
           </DialogHeader>
           <div className='space-y-3'>
             <Field>
-              <FieldLabel>Title (EN)</FieldLabel>
+              <FieldLabel>Title (English)</FieldLabel>
               <Input value={editTitleEn} onChange={e => setEditTitleEn(e.target.value)} />
             </Field>
             <Field>
-              <FieldLabel>Title (AM)</FieldLabel>
+              <FieldLabel>Title (Amharic)</FieldLabel>
               <Input value={editTitleAm} onChange={e => setEditTitleAm(e.target.value)} />
             </Field>
             {type === 'kitabs' ? (
-              <Field>
-                <FieldLabel>Sheikh / author</FieldLabel>
-                <Input value={editAuthor} onChange={e => setEditAuthor(e.target.value)} />
-              </Field>
+              <>
+                <Field>
+                  <FieldLabel>Sheikh / author (EN)</FieldLabel>
+                  <Input value={editAuthor} onChange={e => setEditAuthor(e.target.value)} />
+                </Field>
+                <Field>
+                  <FieldLabel>Sheikh / author (AM)</FieldLabel>
+                  <Input value={editAuthorAm} onChange={e => setEditAuthorAm(e.target.value)} />
+                </Field>
+              </>
             ) : null}
             <Field>
-              <FieldLabel>Description</FieldLabel>
-              <Textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} rows={3} />
+              <FieldLabel>Description (English)</FieldLabel>
+              <Textarea value={editDescEn} onChange={e => setEditDescEn(e.target.value)} rows={3} />
             </Field>
+            <Field>
+              <FieldLabel>Description (Amharic)</FieldLabel>
+              <Textarea value={editDescAm} onChange={e => setEditDescAm(e.target.value)} rows={3} />
+            </Field>
+            {type === 'kitabs' || type === 'audio' || type === 'video' || type === 'pdfs' || type === 'sahabah' ? (
+              <R2FileField
+                label='Cover image (replace)'
+                accept='image/*'
+                folder={`staff-uploads/${type}/covers`}
+                value={editCover}
+                onChange={setEditCover}
+                hint='Upload a new cover to replace the old one. Leave as-is to keep current cover.'
+              />
+            ) : null}
+            {type === 'kitabs' || type === 'pdfs' ? (
+              <R2FileField
+                label='PDF file (replace)'
+                accept='application/pdf,.pdf'
+                folder={`staff-uploads/${type}/pdf`}
+                value={editPdf}
+                onChange={setEditPdf}
+                hint='Upload a new PDF to replace the old one.'
+              />
+            ) : null}
+            {type === 'audio' ? (
+              <R2FileField
+                label='Audio file (replace)'
+                accept='audio/*,.mp3,.m4a,.ogg,.wav'
+                folder='staff-uploads/audio'
+                value={editMedia}
+                onChange={setEditMedia}
+                hint='Upload new audio to replace the current file.'
+              />
+            ) : null}
+            {type === 'video' ? (
+              <R2FileField
+                label='Video file (replace)'
+                accept='video/*,.mp4,.webm'
+                folder='staff-uploads/video'
+                value={editMedia}
+                onChange={setEditMedia}
+                hint='Upload new video to replace the current file.'
+              />
+            ) : null}
           </div>
           <DialogFooter className='gap-2'>
             <Button type='button' variant='outline' onClick={() => setEditRow(null)}>
@@ -598,7 +722,7 @@ const ContentListPage = ({
               disabled={busyId === String(editRow?.id)}
               onClick={() => void saveEdit()}
             >
-              Save
+              Save changes
             </Button>
           </DialogFooter>
         </DialogContent>

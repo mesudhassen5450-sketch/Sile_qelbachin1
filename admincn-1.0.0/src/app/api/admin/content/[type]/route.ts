@@ -470,8 +470,14 @@ export async function PATCH(
       title_en: body.title_en,
       title_am: body.title_am,
       author_en: body.author_en,
+      author_am: body.author_am,
       description_en: body.description_en,
-      description_am: body.description_am
+      description_am: body.description_am,
+      cover_asset_id: body.cover_asset_id,
+      pdf_asset_id: body.pdf_asset_id,
+      media_asset_id: body.media_asset_id,
+      video_asset_id: body.video_asset_id,
+      thumbnail_asset_id: body.thumbnail_asset_id
     })
     return NextResponse.json({ ok: true, message: 'Updated. Website/mobile read public API.' })
   } catch (err) {

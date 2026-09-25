@@ -173,8 +173,14 @@ export async function updateContentMeta(input: {
   title_en?: string | null
   title_am?: string | null
   author_en?: string | null
+  author_am?: string | null
   description_en?: string | null
   description_am?: string | null
+  cover_asset_id?: string | null
+  pdf_asset_id?: string | null
+  media_asset_id?: string | null
+  video_asset_id?: string | null
+  thumbnail_asset_id?: string | null
 }): Promise<{ ok: true }> {
   const store = loadLocalStore()
   const now = nowIso()
@@ -189,10 +195,14 @@ export async function updateContentMeta(input: {
         title_en: input.title_en !== undefined ? input.title_en : k.title_en,
         title_am: input.title_am !== undefined ? input.title_am : k.title_am,
         author_en: input.author_en !== undefined ? input.author_en : k.author_en,
+        author_am: input.author_am !== undefined ? input.author_am : k.author_am,
         description_en:
           input.description_en !== undefined ? input.description_en : k.description_en,
         description_am:
           input.description_am !== undefined ? input.description_am : k.description_am,
+        cover_asset_id:
+          input.cover_asset_id !== undefined ? input.cover_asset_id : k.cover_asset_id,
+        pdf_asset_id: input.pdf_asset_id !== undefined ? input.pdf_asset_id : k.pdf_asset_id,
         updated_at: now
       }
     })
@@ -200,6 +210,10 @@ export async function updateContentMeta(input: {
     store.audio_items = store.audio_items.map(a => {
       if (a.id !== input.id) return a
       found = true
+      const nextMeta = { ...(a.metadata || {}) }
+      if (input.cover_asset_id !== undefined) {
+        nextMeta.cover_asset_id = input.cover_asset_id
+      }
       return {
         ...a,
         title_en: input.title_en !== undefined ? input.title_en : a.title_en,
@@ -208,6 +222,9 @@ export async function updateContentMeta(input: {
           input.description_en !== undefined ? input.description_en : a.description_en,
         description_am:
           input.description_am !== undefined ? input.description_am : a.description_am,
+        media_asset_id:
+          input.media_asset_id !== undefined ? input.media_asset_id : a.media_asset_id,
+        metadata: nextMeta,
         updated_at: now
       }
     })
@@ -223,6 +240,14 @@ export async function updateContentMeta(input: {
           input.description_en !== undefined ? input.description_en : v.description_en,
         description_am:
           input.description_am !== undefined ? input.description_am : v.description_am,
+        video_asset_id:
+          input.video_asset_id !== undefined ? input.video_asset_id : v.video_asset_id,
+        thumbnail_asset_id:
+          input.thumbnail_asset_id !== undefined
+            ? input.thumbnail_asset_id
+            : input.cover_asset_id !== undefined
+              ? input.cover_asset_id
+              : v.thumbnail_asset_id,
         updated_at: now
       }
     })
@@ -230,10 +255,21 @@ export async function updateContentMeta(input: {
     store.pdf_items = store.pdf_items.map(p => {
       if (p.id !== input.id) return p
       found = true
+      const nextMeta = { ...(p.metadata || {}) }
+      if (input.cover_asset_id !== undefined) {
+        nextMeta.cover_asset_id = input.cover_asset_id
+      }
       return {
         ...p,
         title_en: input.title_en !== undefined ? input.title_en : p.title_en,
         title_am: input.title_am !== undefined ? input.title_am : p.title_am,
+        media_asset_id:
+          input.pdf_asset_id !== undefined
+            ? input.pdf_asset_id
+            : input.media_asset_id !== undefined
+              ? input.media_asset_id
+              : p.media_asset_id,
+        metadata: nextMeta,
         updated_at: now
       }
     })
@@ -249,6 +285,8 @@ export async function updateContentMeta(input: {
           input.description_en !== undefined ? input.description_en : s.description_en,
         description_am:
           input.description_am !== undefined ? input.description_am : s.description_am,
+        cover_asset_id:
+          input.cover_asset_id !== undefined ? input.cover_asset_id : s.cover_asset_id,
         updated_at: now
       }
     })
@@ -272,11 +310,31 @@ export async function updateContentMeta(input: {
       if (input.title_en !== undefined) patch.title_en = input.title_en
       if (input.title_am !== undefined) patch.title_am = input.title_am
       if (input.author_en !== undefined && input.type === 'kitabs') patch.author_en = input.author_en
+      if (input.author_am !== undefined && input.type === 'kitabs') patch.author_am = input.author_am
       if (input.description_en !== undefined) patch.description_en = input.description_en
       if (input.description_am !== undefined) patch.description_am = input.description_am
+      if (input.type === 'kitabs') {
+        if (input.cover_asset_id !== undefined) patch.cover_asset_id = input.cover_asset_id
+        if (input.pdf_asset_id !== undefined) patch.pdf_asset_id = input.pdf_asset_id
+      }
+      if (input.type === 'audio' && input.media_asset_id !== undefined) {
+        patch.media_asset_id = input.media_asset_id
+      }
+      if (input.type === 'video') {
+        if (input.video_asset_id !== undefined) patch.video_asset_id = input.video_asset_id
+        if (input.thumbnail_asset_id !== undefined || input.cover_asset_id !== undefined) {
+          patch.thumbnail_asset_id = input.thumbnail_asset_id ?? input.cover_asset_id
+        }
+      }
+      if (input.type === 'pdfs') {
+        if (input.pdf_asset_id !== undefined || input.media_asset_id !== undefined) {
+          patch.media_asset_id = input.pdf_asset_id ?? input.media_asset_id
+        }
+      }
       await sb.from(table).update(patch).eq('id', input.id)
     }
   }
 
   return { ok: true }
 }
+
