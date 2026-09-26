@@ -96,12 +96,17 @@ export async function GET(
     let rows = sortKitabsForDisplay(store.kitabs).map(k => {
       const cover = k.cover_asset_id ? assets.get(k.cover_asset_id) : undefined
       const pdf = k.pdf_asset_id ? assets.get(k.pdf_asset_id) : undefined
+      const coverFromMeta =
+        typeof k.metadata?.cover_url === 'string' ? k.metadata.cover_url : null
+      const pdfFromMeta = typeof k.metadata?.pdf_url === 'string' ? k.metadata.pdf_url : null
       const dersCount = store.ders.filter(d => d.kitab_id === k.id).length
       return {
         ...k,
         ders_count_live: dersCount,
-        cover_url: cover?.public_url || null,
-        pdf_url: pdf?.public_url || null,
+        cover_url: cover?.public_url || coverFromMeta || null,
+        cover_key: cover?.object_key || null,
+        pdf_url: pdf?.public_url || pdfFromMeta || null,
+        pdf_key: pdf?.object_key || null,
         title: k.title_en || k.title_am || k.slug
       }
     })
@@ -304,7 +309,7 @@ export async function POST(
         ok: true,
         kitab: result.kitab,
         ders: result.ders,
-        message: 'Kitab published. Media is on Cloudflare R2; website/mobile read public API.'
+        message: 'Kitab published. Media is stored online; website/mobile read the public API.'
       })
     }
 
@@ -535,7 +540,7 @@ export async function DELETE(
     return NextResponse.json({
       ...result,
       message:
-        'Deleted from Admin CMS and public API (official website/mobile). Linked Cloudflare R2 files removed when credentials work.'
+        'Deleted from Admin CMS and public API (official website/mobile). Linked media files removed when storage credentials work.'
     })
   } catch (err) {
     return NextResponse.json(

@@ -106,7 +106,7 @@ export async function deleteContentItem(input: {
       }
     }
   } else if (deleteR2) {
-    skipped.push('R2 credentials missing — CMS row deleted but files left on Cloudflare.')
+    skipped.push('Storage credentials missing — CMS row deleted but media files were left in storage.')
   }
 
   const assetIdSet = new Set(assetIds)

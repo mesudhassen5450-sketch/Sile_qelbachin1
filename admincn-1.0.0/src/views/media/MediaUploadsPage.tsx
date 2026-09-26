@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 type PublishAs = 'none' | 'audio' | 'video' | 'pdfs'
 
 /**
- * Staff upload → Cloudflare R2 → optional publish to public API (website + mobile).
+ * Staff upload → online storage → optional publish to public API (website + mobile).
  * Never Cloudinary.
  */
 const MediaUploadsPage = () => {

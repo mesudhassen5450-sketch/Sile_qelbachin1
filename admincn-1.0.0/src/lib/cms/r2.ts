@@ -78,7 +78,7 @@ export function hasR2ApiCredentials(env = getR2Env()): boolean {
   return Boolean(env.accessKeyId && env.secretAccessKey)
 }
 
-/** Cloudflare R2 Access Key ID is 32 chars; Secret Access Key is typically 64. */
+/** R2 Access Key ID is 32 chars; Secret Access Key is typically 64. */
 export function diagnoseR2Credentials(env = getR2Env()): {
   ok: boolean
   issues: string[]
@@ -87,7 +87,7 @@ export function diagnoseR2Credentials(env = getR2Env()): {
   if (!env.accessKeyId) issues.push('R2_ACCESS_KEY_ID is missing.')
   else if (env.accessKeyId.length !== 32) {
     issues.push(
-      `R2_ACCESS_KEY_ID on this server is ${env.accessKeyId.length} characters (must be exactly 32). On Render → Sile_qelbachin1-1 → Environment: paste the Access Key ID from Cloudflare R2 → Manage R2 API Tokens (not the secret, not “key”).`
+      `R2_ACCESS_KEY_ID on this server is ${env.accessKeyId.length} characters (must be exactly 32). On Render → Sile_qelbachin1-1 → Environment: paste the Access Key ID from your R2 API tokens (not the secret, not “key”).`
     )
   }
   if (!env.secretAccessKey) issues.push('R2_SECRET_ACCESS_KEY is missing on this server (Render env).')
@@ -236,7 +236,7 @@ export async function headObjectExists(objectKey: string): Promise<boolean> {
 }
 
 /**
- * Upload bytes to Cloudflare R2 (S3 PutObject). Server-only — never expose R2 secrets to the browser.
+ * Upload bytes to online R2 storage (S3 PutObject). Server-only — never expose R2 secrets to the browser.
  */
 function formatR2SdkError(err: unknown): Error {
   const msg = err instanceof Error ? err.message : String(err)
@@ -245,8 +245,8 @@ function formatR2SdkError(err: unknown): Error {
     const diag = diagnoseR2Credentials()
     const hint = diag.issues.length
       ? diag.issues.join(' ')
-      : 'Regenerate the R2 API token in Cloudflare → R2 → Manage R2 API Tokens, then set R2_ACCESS_KEY_ID + R2_SECRET_ACCESS_KEY in .env.local and restart Admin.'
-    return new Error(`Cloudflare R2 auth failed (SignatureDoesNotMatch). ${hint}`)
+      : 'Regenerate the R2 API token in your storage dashboard, then set R2_ACCESS_KEY_ID + R2_SECRET_ACCESS_KEY in .env.local and restart Admin.'
+    return new Error(`Online storage auth failed (SignatureDoesNotMatch). ${hint}`)
   }
   return err instanceof Error ? err : new Error(msg)
 }
@@ -290,7 +290,7 @@ export async function putObjectToR2(input: {
   }
 }
 
-/** Delete one object from Cloudflare R2. Missing keys are treated as success. */
+/** Delete one object from online storage. Missing keys are treated as success. */
 export async function deleteObjectFromR2(objectKey: string): Promise<{ deleted: boolean; objectKey: string }> {
   const env = getR2Env()
   if (!hasR2ApiCredentials(env)) {

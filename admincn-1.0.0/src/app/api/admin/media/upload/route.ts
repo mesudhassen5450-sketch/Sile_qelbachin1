@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 /**
- * Staff upload → Cloudflare R2 (never Cloudinary).
+ * Staff upload → online storage (never Cloudinary).
  * multipart/form-data: file, optional title fields handled by /api/admin/content publish.
  */
 export async function POST(request: Request) {
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
       {
         ok: false,
         error:
-          'Cloudflare R2 is not configured for uploads. Set R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_ENDPOINT on Render.'
+          'Online storage is not configured for uploads. Set R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_ENDPOINT on Render.'
       },
       { status: 503 }
     )
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
       object_key: result.object_key,
       backend: result.backend,
       message:
-        'File stored on Cloudflare R2. Create/publish a content item to show it on website and mobile.'
+        'File stored online. Create/publish a content item to show it on website and mobile.'
     })
   } catch (err) {
     return NextResponse.json(

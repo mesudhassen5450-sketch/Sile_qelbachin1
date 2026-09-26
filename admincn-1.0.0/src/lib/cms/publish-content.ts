@@ -37,7 +37,7 @@ export async function upsertPublishableContent(input: PublishContentInput) {
   const store = loadLocalStore()
   const asset = store.media_assets.find(a => a.id === input.media_asset_id)
   if (!asset) {
-    throw new Error('media_asset_id not found. Upload to Cloudflare R2 first.')
+    throw new Error('media_asset_id not found. Upload the media file first.')
   }
 
   const now = nowIso()

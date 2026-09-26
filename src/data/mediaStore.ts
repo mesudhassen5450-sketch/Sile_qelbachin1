@@ -34,7 +34,7 @@ const items: MediaItem[] = (rawData as any[]).map((item) => {
   let cleanUrl = item.fileUrl || '';
 
   if (cleanUrl && !cleanUrl.startsWith('http') && !cleanUrl.startsWith('//')) {
-    // Relative catalog path → Cloudflare R2 via mediaUrl helper
+    // Relative catalog path → R2 via mediaUrl helper
     cleanUrl = mediaFileUrl(cleanUrl);
   } else {
     cleanUrl = resolveMediaUrl(cleanUrl);

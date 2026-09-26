@@ -126,7 +126,7 @@ export function R2FileField({
               <div className='min-w-0'>
                 <p className='truncate text-sm font-medium'>{fileName}</p>
                 <p className='text-emerald-600 dark:text-emerald-400 text-xs font-medium'>
-                  Uploaded to Cloudflare successfully
+                  Uploaded successfully
                 </p>
                 {value.public_url ? (
                   <a

@@ -53,6 +53,21 @@ type UploadedAsset = {
   object_key: string
 }
 
+/** Parse Admin API JSON; 502/HTML deploy pages must not crash the UI. */
+async function readApiJson(res: Response): Promise<Record<string, unknown>> {
+  const text = await res.text()
+  try {
+    return JSON.parse(text) as Record<string, unknown>
+  } catch {
+    if (res.status === 502 || res.status === 503 || res.status === 504) {
+      throw new Error(
+        'Admin server is restarting (temporary). Wait 1–2 minutes, then click Refresh.'
+      )
+    }
+    throw new Error(`Server error (${res.status || 'unknown'}). Refresh and try again.`)
+  }
+}
+
 type R2Status = {
   ok: boolean
   bucket?: string
@@ -114,10 +129,12 @@ const ContentListPage = ({
       const res = await fetch(`/api/admin/content/${type}?${params.toString()}`, {
         cache: 'no-store'
       })
-      const data = await res.json()
-      if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to load')
-      setRows(data.rows || [])
-      setCount(data.count || 0)
+      const data = await readApiJson(res)
+      if (!res.ok || !data.ok) {
+        throw new Error(typeof data.error === 'string' ? data.error : 'Failed to load')
+      }
+      setRows((data.rows as Row[]) || [])
+      setCount(typeof data.count === 'number' ? data.count : 0)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -212,9 +229,9 @@ const ContentListPage = ({
         cache: 'no-store',
         signal: controller.signal
       })
-      const data = await res.json().catch(() => ({}))
+      const data = await readApiJson(res)
       if (!res.ok || !data.ok) {
-        throw new Error(data.error || 'Save failed')
+        throw new Error(typeof data.error === 'string' ? data.error : 'Save failed')
       }
       return data as { ok: true; message?: string; row?: Record<string, unknown> }
     } catch (err) {
@@ -232,7 +249,7 @@ const ContentListPage = ({
     setEditRow(null)
   }
 
-  /** Link cover/PDF as soon as Cloudflare upload finishes (do not wait for Save). */
+  /** Link cover/PDF as soon as upload finishes (do not wait for Save). */
   const linkAssetNow = async (
     field: 'cover' | 'pdf' | 'media',
     asset: UploadedAsset | null
@@ -266,7 +283,7 @@ const ContentListPage = ({
       setError(
         err instanceof Error
           ? err.message
-          : 'File uploaded to Cloudflare, but linking to this item failed. Click Save changes.'
+          : 'File uploaded, but linking to this item failed. Click Save changes.'
       )
     }
   }
@@ -561,7 +578,7 @@ const ContentListPage = ({
           <CardContent className='space-y-2 py-4 text-sm'>
             <p className='text-destructive font-medium'>File uploads are unavailable</p>
             <p className='text-destructive/90'>
-              Online storage (Cloudflare R2) is not connected on this Admin server. Image / PDF /
+              Online file storage is not connected on this Admin server. Image / PDF /
               audio uploads will fail until credentials are fixed on Render.
             </p>
             {r2Status.issues && r2Status.issues.length > 0 ? (
@@ -578,7 +595,7 @@ const ContentListPage = ({
 
       {saveOk ? (
         <Card className='border-emerald-500/50 bg-emerald-950/30'>
-          <CardContent className='py-3 text-sm font-medium text-emerald-300' role='status'>
+          <CardContent className='px-4 py-3 text-sm font-medium text-emerald-300 sm:px-6' role='status'>
             {saveOk}
           </CardContent>
         </Card>
@@ -591,8 +608,8 @@ const ContentListPage = ({
       ) : null}
 
       {error ? (
-        <Card>
-          <CardContent className='text-destructive py-4 text-sm'>{error}</CardContent>
+        <Card className='border-destructive/40'>
+          <CardContent className='text-destructive px-4 py-4 text-sm sm:px-6'>{error}</CardContent>
         </Card>
       ) : null}
 
@@ -710,8 +727,8 @@ const ContentListPage = ({
       ) : null}
 
       <Dialog open={Boolean(viewRow)} onOpenChange={o => !o && setViewRow(null)}>
-        <DialogContent className='max-h-[85vh] overflow-y-auto sm:max-w-lg'>
-          <DialogHeader>
+        <DialogContent className='max-h-[min(85dvh,640px)] w-[calc(100%-1rem)] gap-4 overflow-y-auto p-4 sm:max-w-lg sm:p-6'>
+          <DialogHeader className='pr-8'>
             <DialogTitle>View</DialogTitle>
             <DialogDescription>Details for this item.</DialogDescription>
           </DialogHeader>
@@ -766,15 +783,15 @@ const ContentListPage = ({
           if (!o) closeEditDialog()
         }}
       >
-        <DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-lg'>
-          <DialogHeader>
+        <DialogContent className='max-h-[min(92dvh,820px)] w-[calc(100%-1rem)] gap-4 overflow-y-auto p-4 sm:max-w-lg sm:gap-6 sm:p-6'>
+          <DialogHeader className='pr-8'>
             <DialogTitle>Edit content</DialogTitle>
             <DialogDescription>
-              Upload files first (Cloudflare), then click Save changes. After a successful save you
-              will see a green success message on this page. You can Cancel / close anytime.
+              Upload files first, then click Save changes. After a successful save you will see a
+              green success message. You can Cancel / close anytime.
             </DialogDescription>
           </DialogHeader>
-          <div className='space-y-3'>
+          <div className='space-y-3 pb-1'>
             <Field>
               <FieldLabel>Title (English)</FieldLabel>
               <Input value={editTitleEn} onChange={e => setEditTitleEn(e.target.value)} />
@@ -813,7 +830,7 @@ const ContentListPage = ({
                   setEditCover(asset)
                   if (asset) void linkAssetNow('cover', asset)
                 }}
-                hint='Upload a new cover — it is linked to this kitab immediately on Cloudflare + database.'
+                hint='Upload a new cover — it is linked to this kitab immediately.'
               />
             ) : null}
             {type === 'kitabs' || type === 'pdfs' ? (

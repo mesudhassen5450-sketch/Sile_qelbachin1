@@ -25,7 +25,7 @@ export type StaffUploadResult = {
 }
 
 /**
- * Staff upload path: file bytes → Cloudflare R2 PutObject → media_assets row.
+ * Staff upload path: file bytes → online storage PutObject → media_assets row.
  * Not Cloudinary. Website/mobile read public_url after content is published.
  */
 export async function uploadStaffMedia(input: {
@@ -38,7 +38,7 @@ export async function uploadStaffMedia(input: {
 }): Promise<StaffUploadResult> {
   if (!hasR2ApiCredentials()) {
     throw new Error(
-      'Cloudflare R2 credentials missing. Set R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY on Admin (Render).'
+      'Online storage credentials missing. Set R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY on Admin (Render).'
     )
   }
 

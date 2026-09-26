@@ -79,8 +79,8 @@ export const siteConfig = {
         readingTime: 8
       },
       {
-        title: "Use Cloudflare Workers to concat audio files",
-        description: "How to use Cloudflare Workers to merge audio files using FFmpeg in the browser.",
+        title: "Use edge workers to concat audio files",
+        description: "How to use edge workers to merge audio files using FFmpeg in the browser.",
         date: "April 19, 2025",
         href: "/post/cloudflare-audio-concat",
         imageUrl: "/assets/images/posts/post2.jpg",

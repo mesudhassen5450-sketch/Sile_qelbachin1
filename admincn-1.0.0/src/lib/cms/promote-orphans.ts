@@ -37,7 +37,7 @@ export type PromoteOrphansResult = {
 
 /**
  * Turn orphan R2 audio/video/pdf objects into manageable CMS rows
- * so existing Cloudflare files appear under Content → Audio / Video / PDFs.
+ * so existing storage files appear under Content → Audio / Video / PDFs.
  */
 export async function promoteOrphanMedia(options?: {
   adminEmail?: string | null

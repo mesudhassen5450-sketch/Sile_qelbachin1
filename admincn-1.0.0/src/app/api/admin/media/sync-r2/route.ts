@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 /**
- * One-click: list Cloudflare R2 → media_assets → match kitabs / ders / audio / video / pdfs.
+ * One-click: list online storage → media_assets → match kitabs / ders / audio / video / pdfs.
  * Official website/mobile then read published rows from the public API.
  */
 export async function POST(request: Request) {
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       message:
-        'Synced Cloudflare R2 into Admin. Kitabs / Audio / Video / PDFs are ready to manage and published to the public API.',
+        'Synced online storage into Admin. Kitabs / Audio / Video / PDFs are ready to manage and published to the public API.',
       scan: {
         total_r2_objects: scan.run.total_objects,
         imported: scan.run.imported,

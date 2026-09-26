@@ -57,7 +57,7 @@ function normalizeRelativeMediaPath(path: string): string {
   return fixKnownFolderAliases(safeDecode(cleaned));
 }
 
-/** Build a public Cloudflare R2 URL for a media-catalog relative path. */
+/** Build a public R2 URL for a media-catalog relative path. */
 export function buildR2MediaUrl(relativePath: string): string {
   const normalized = normalizeRelativeMediaPath(relativePath);
   if (!normalized) return '';
@@ -95,7 +95,7 @@ function splitPathAndSuffix(url: string): { pathname: string; suffix: string } {
 }
 
 /**
- * Resolve any media URL to Cloudflare R2 (production playback source).
+ * Resolve any media URL to online R2 storage (production playback source).
  * Rewrites legacy GitHub raw / media.githubusercontent / jsDelivr URLs.
  * Keeps local public paths (/covers/, /logo, etc.) on this site.
  */
