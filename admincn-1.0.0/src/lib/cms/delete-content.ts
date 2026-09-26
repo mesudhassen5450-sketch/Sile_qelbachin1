@@ -167,23 +167,31 @@ export async function deleteContentItem(input: {
   return { ok: true, deleted_r2_keys: deletedKeys, skipped_r2: skipped }
 }
 
-export async function updateContentMeta(input: {
-  type: DeletableContentType
-  id: string
-  title_en?: string | null
-  title_am?: string | null
-  author_en?: string | null
-  author_am?: string | null
-  description_en?: string | null
-  description_am?: string | null
-  cover_asset_id?: string | null
-  pdf_asset_id?: string | null
-  media_asset_id?: string | null
-  video_asset_id?: string | null
-  thumbnail_asset_id?: string | null
-  cover_url?: string | null
-  pdf_url?: string | null
-}): Promise<{ ok: true; row?: Record<string, unknown> | null }> {
+export async function updateContentMeta(
+  input: {
+    type: DeletableContentType
+    id: string
+    title_en?: string | null
+    title_am?: string | null
+    author_en?: string | null
+    author_am?: string | null
+    description_en?: string | null
+    description_am?: string | null
+    cover_asset_id?: string | null
+    pdf_asset_id?: string | null
+    media_asset_id?: string | null
+    video_asset_id?: string | null
+    thumbnail_asset_id?: string | null
+    cover_url?: string | null
+    pdf_url?: string | null
+  },
+  /** Internal: prevent infinite re-entry when importing a Supabase-only row. */
+  _depth = 0
+): Promise<{ ok: true; row?: Record<string, unknown> | null }> {
+  if (_depth > 2) {
+    throw new Error('Save failed: could not sync this item from the database. Refresh and try again.')
+  }
+
   const store = loadLocalStore()
   const now = nowIso()
   let found = false
@@ -336,8 +344,10 @@ export async function updateContentMeta(input: {
             remote as (typeof store.pdf_items)[0]
           ]
         }
-        // Re-apply patch on the newly imported local row
-        return updateContentMeta(input)
+        // Persist before re-entry — otherwise the next loadLocalStore() misses the
+        // import and retries forever (Save stuck on "Saving…" for minutes).
+        saveLocalStore(store)
+        return updateContentMeta(input, _depth + 1)
       }
     }
   }

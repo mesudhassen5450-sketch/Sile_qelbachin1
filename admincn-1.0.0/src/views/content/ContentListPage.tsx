@@ -202,17 +202,34 @@ const ContentListPage = ({
   }
 
   const patchContent = async (body: Record<string, unknown>) => {
-    const res = await fetch(`/api/admin/content/${type}?t=${Date.now()}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      cache: 'no-store'
-    })
-    const data = await res.json()
-    if (!res.ok || !data.ok) {
-      throw new Error(data.error || 'Save failed')
+    const controller = new AbortController()
+    const timer = window.setTimeout(() => controller.abort(), 25000)
+    try {
+      const res = await fetch(`/api/admin/content/${type}?t=${Date.now()}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        cache: 'no-store',
+        signal: controller.signal
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || 'Save failed')
+      }
+      return data as { ok: true; message?: string; row?: Record<string, unknown> }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        throw new Error('Save timed out. Refresh the page and try again.')
+      }
+      throw err
+    } finally {
+      window.clearTimeout(timer)
     }
-    return data as { ok: true; message?: string; row?: Record<string, unknown> }
+  }
+
+  const closeEditDialog = () => {
+    setBusyId(null)
+    setEditRow(null)
   }
 
   /** Link cover/PDF as soon as Cloudflare upload finishes (do not wait for Save). */
@@ -243,7 +260,8 @@ const ContentListPage = ({
             ? 'PDF saved to database.'
             : 'Media file saved to database.'
       )
-      await load()
+      // Refresh list in background — do not block the edit dialog
+      void load()
     } catch (err) {
       setError(
         err instanceof Error
@@ -337,11 +355,11 @@ const ContentListPage = ({
       )
       setSyncMsg(null)
       setEditRow(null)
-      await load()
+      setBusyId(null)
+      void load()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       setSaveOk(null)
-    } finally {
       setBusyId(null)
     }
   }
@@ -745,8 +763,7 @@ const ContentListPage = ({
       <Dialog
         open={Boolean(editRow)}
         onOpenChange={o => {
-          if (!o && busyId) return
-          if (!o) setEditRow(null)
+          if (!o) closeEditDialog()
         }}
       >
         <DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-lg'>
@@ -754,7 +771,7 @@ const ContentListPage = ({
             <DialogTitle>Edit content</DialogTitle>
             <DialogDescription>
               Upload files first (Cloudflare), then click Save changes. After a successful save you
-              will see a green success message on this page.
+              will see a green success message on this page. You can Cancel / close anytime.
             </DialogDescription>
           </DialogHeader>
           <div className='space-y-3'>
@@ -840,7 +857,7 @@ const ContentListPage = ({
             ) : null}
           </div>
           <DialogFooter className='gap-2'>
-            <Button type='button' variant='outline' onClick={() => setEditRow(null)} disabled={Boolean(busyId)}>
+            <Button type='button' variant='outline' onClick={closeEditDialog}>
               Cancel
             </Button>
             <Button
