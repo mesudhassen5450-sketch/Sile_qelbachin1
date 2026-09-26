@@ -125,7 +125,9 @@ export function R2FileField({
               <CheckCircle2Icon className='text-primary mt-0.5 size-5 shrink-0' />
               <div className='min-w-0'>
                 <p className='truncate text-sm font-medium'>{fileName}</p>
-                <p className='text-muted-foreground text-xs'>Uploaded successfully</p>
+                <p className='text-emerald-600 dark:text-emerald-400 text-xs font-medium'>
+                  Uploaded to Cloudflare successfully
+                </p>
                 {value.public_url ? (
                   <a
                     className='text-primary text-xs underline'

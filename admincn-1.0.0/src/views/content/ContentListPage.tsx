@@ -98,6 +98,7 @@ const ContentListPage = ({
   const [r2Status, setR2Status] = useState<R2Status | null>(null)
   const [syncBusy, setSyncBusy] = useState(false)
   const [syncMsg, setSyncMsg] = useState<string | null>(null)
+  const [saveOk, setSaveOk] = useState<string | null>(null)
   const kind = allowCreate === false ? null : createKind(type)
   const canAdd = Boolean(kind)
   const canManage = type !== 'library'
@@ -200,78 +201,146 @@ const ContentListPage = ({
     )
   }
 
-  const saveEdit = async () => {
-    if (!editRow || type === 'library') return
-    setBusyId(String(editRow.id))
+  const patchContent = async (body: Record<string, unknown>) => {
+    const res = await fetch(`/api/admin/content/${type}?t=${Date.now()}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      cache: 'no-store'
+    })
+    const data = await res.json()
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || 'Save failed')
+    }
+    return data as { ok: true; message?: string; row?: Record<string, unknown> }
+  }
+
+  /** Link cover/PDF as soon as Cloudflare upload finishes (do not wait for Save). */
+  const linkAssetNow = async (
+    field: 'cover' | 'pdf' | 'media',
+    asset: UploadedAsset | null
+  ) => {
+    if (!editRow?.id || !asset?.id) return
     setError(null)
     try {
-      const body: Record<string, unknown> = {
-        id: editRow.id,
-        title_en: editTitleEn || null,
-        title_am: editTitleAm || null,
-        description_en: editDescEn || null,
-        description_am: editDescAm || null
+      const body: Record<string, unknown> = { id: editRow.id }
+      if (field === 'cover') {
+        body.cover_asset_id = asset.id
+        body.cover_url = asset.public_url
+        if (type === 'video') body.thumbnail_asset_id = asset.id
+      } else if (field === 'pdf') {
+        body.pdf_asset_id = asset.id
+        body.pdf_url = asset.public_url
+      } else {
+        body.media_asset_id = asset.id
+        if (type === 'video') body.video_asset_id = asset.id
       }
-      if (type === 'kitabs') {
-        body.author_en = editAuthor || null
-        body.author_am = editAuthorAm || null
-        if (editCover?.id) {
-          body.cover_asset_id = editCover.id
-          body.cover_url = editCover.public_url || null
-        }
-        if (editPdf?.id) {
-          body.pdf_asset_id = editPdf.id
-          body.pdf_url = editPdf.public_url || null
-        }
-      }
-      if (type === 'audio') {
-        if (editCover?.id) {
-          body.cover_asset_id = editCover.id
-          body.cover_url = editCover.public_url || null
-        }
-        if (editMedia?.id) body.media_asset_id = editMedia.id
-      }
-      if (type === 'video') {
-        if (editCover?.id) {
-          body.cover_asset_id = editCover.id
-          body.thumbnail_asset_id = editCover.id
-          body.cover_url = editCover.public_url || null
-        }
-        if (editMedia?.id) body.video_asset_id = editMedia.id
-      }
-      if (type === 'pdfs') {
-        if (editCover?.id) {
-          body.cover_asset_id = editCover.id
-          body.cover_url = editCover.public_url || null
-        }
-        if (editPdf?.id) {
-          body.pdf_asset_id = editPdf.id
-          body.pdf_url = editPdf.public_url || null
-        }
-      }
-      if (type === 'sahabah' && editCover?.id) {
-        body.cover_asset_id = editCover.id
-        body.cover_url = editCover.public_url || null
-      }
-
-      const res = await fetch(`/api/admin/content/${type}?t=${Date.now()}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        cache: 'no-store'
-      })
-      const data = await res.json()
-      if (!res.ok || !data.ok) throw new Error(data.error || 'Edit failed')
-      setEditRow(null)
-      const savedTitle = data.row?.title_en || data.row?.title_am || editTitleEn || editTitleAm
-      setSyncMsg(
-        `Saved: ${savedTitle || 'item'}. Cover: ${
-          editCover?.public_url ? 'yes' : type === 'kitabs' ? 'none (upload a cover image)' : '—'
-        }. Refresh the website page to see it.`
+      await patchContent(body)
+      setSaveOk(
+        field === 'cover'
+          ? 'Cover saved to database. It will show on Admin and the website.'
+          : field === 'pdf'
+            ? 'PDF saved to database.'
+            : 'Media file saved to database.'
       )
       await load()
     } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'File uploaded to Cloudflare, but linking to this item failed. Click Save changes.'
+      )
+    }
+  }
+
+  const saveEdit = async () => {
+    // Snapshot — dialog close must not wipe values mid-request
+    const row = editRow
+    const cover = editCover
+    const pdf = editPdf
+    const media = editMedia
+    const titleEn = editTitleEn
+    const titleAm = editTitleAm
+    const authorEn = editAuthor
+    const authorAm = editAuthorAm
+    const descEn = editDescEn
+    const descAm = editDescAm
+
+    if (!row || type === 'library') return
+    setBusyId(String(row.id))
+    setError(null)
+    setSaveOk(null)
+    try {
+      const body: Record<string, unknown> = {
+        id: row.id,
+        title_en: titleEn || null,
+        title_am: titleAm || null,
+        description_en: descEn || null,
+        description_am: descAm || null
+      }
+      if (type === 'kitabs') {
+        body.author_en = authorEn || null
+        body.author_am = authorAm || null
+        if (cover?.id) {
+          body.cover_asset_id = cover.id
+          body.cover_url = cover.public_url || null
+        }
+        if (pdf?.id) {
+          body.pdf_asset_id = pdf.id
+          body.pdf_url = pdf.public_url || null
+        }
+      }
+      if (type === 'audio') {
+        if (cover?.id) {
+          body.cover_asset_id = cover.id
+          body.cover_url = cover.public_url || null
+        }
+        if (media?.id) body.media_asset_id = media.id
+      }
+      if (type === 'video') {
+        if (cover?.id) {
+          body.cover_asset_id = cover.id
+          body.thumbnail_asset_id = cover.id
+          body.cover_url = cover.public_url || null
+        }
+        if (media?.id) body.video_asset_id = media.id
+      }
+      if (type === 'pdfs') {
+        if (cover?.id) {
+          body.cover_asset_id = cover.id
+          body.cover_url = cover.public_url || null
+        }
+        if (pdf?.id) {
+          body.pdf_asset_id = pdf.id
+          body.pdf_url = pdf.public_url || null
+        }
+      }
+      if (type === 'sahabah' && cover?.id) {
+        body.cover_asset_id = cover.id
+        body.cover_url = cover.public_url || null
+      }
+
+      const data = await patchContent(body)
+      const savedTitle =
+        (typeof data.row?.title_en === 'string' && data.row.title_en) ||
+        (typeof data.row?.title_am === 'string' && data.row.title_am) ||
+        titleEn ||
+        titleAm ||
+        'item'
+      const coverLinked = Boolean(
+        cover?.id || (data.row && (data.row as { cover_asset_id?: string }).cover_asset_id)
+      )
+      setSaveOk(
+        `✓ Changes saved successfully — “${savedTitle}”${
+          type === 'kitabs' ? (coverLinked ? ' (cover linked)' : ' (no cover)') : ''
+        }. Website / app will show the update.`
+      )
+      setSyncMsg(null)
+      setEditRow(null)
+      await load()
+    } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
+      setSaveOk(null)
     } finally {
       setBusyId(null)
     }
@@ -489,6 +558,14 @@ const ContentListPage = ({
         </Card>
       ) : null}
 
+      {saveOk ? (
+        <Card className='border-emerald-500/50 bg-emerald-950/30'>
+          <CardContent className='py-3 text-sm font-medium text-emerald-300' role='status'>
+            {saveOk}
+          </CardContent>
+        </Card>
+      ) : null}
+
       {syncMsg ? (
         <Card className='border-primary/40 bg-primary/5'>
           <CardContent className='text-foreground py-3 text-sm'>{syncMsg}</CardContent>
@@ -665,13 +742,19 @@ const ContentListPage = ({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={Boolean(editRow)} onOpenChange={o => !o && setEditRow(null)}>
+      <Dialog
+        open={Boolean(editRow)}
+        onOpenChange={o => {
+          if (!o && busyId) return
+          if (!o) setEditRow(null)
+        }}
+      >
         <DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-lg'>
           <DialogHeader>
             <DialogTitle>Edit content</DialogTitle>
             <DialogDescription>
-              Update English & Amharic text, cover, and files. Changes appear on the website and mobile
-              app after save.
+              Upload files first (Cloudflare), then click Save changes. After a successful save you
+              will see a green success message on this page.
             </DialogDescription>
           </DialogHeader>
           <div className='space-y-3'>
@@ -709,8 +792,11 @@ const ContentListPage = ({
                 accept='image/*'
                 folder={`staff-uploads/${type}/covers`}
                 value={editCover}
-                onChange={setEditCover}
-                hint='Upload a new cover to replace the old one. Leave as-is to keep current cover.'
+                onChange={asset => {
+                  setEditCover(asset)
+                  if (asset) void linkAssetNow('cover', asset)
+                }}
+                hint='Upload a new cover — it is linked to this kitab immediately on Cloudflare + database.'
               />
             ) : null}
             {type === 'kitabs' || type === 'pdfs' ? (
@@ -719,8 +805,11 @@ const ContentListPage = ({
                 accept='application/pdf,.pdf'
                 folder={`staff-uploads/${type}/pdf`}
                 value={editPdf}
-                onChange={setEditPdf}
-                hint='Upload a new PDF to replace the old one.'
+                onChange={asset => {
+                  setEditPdf(asset)
+                  if (asset) void linkAssetNow('pdf', asset)
+                }}
+                hint='Upload a new PDF — it is linked immediately.'
               />
             ) : null}
             {type === 'audio' ? (
@@ -729,8 +818,11 @@ const ContentListPage = ({
                 accept='audio/*,.mp3,.m4a,.ogg,.wav'
                 folder='staff-uploads/audio'
                 value={editMedia}
-                onChange={setEditMedia}
-                hint='Upload new audio to replace the current file.'
+                onChange={asset => {
+                  setEditMedia(asset)
+                  if (asset) void linkAssetNow('media', asset)
+                }}
+                hint='Upload new audio — it is linked immediately.'
               />
             ) : null}
             {type === 'video' ? (
@@ -739,13 +831,16 @@ const ContentListPage = ({
                 accept='video/*,.mp4,.webm'
                 folder='staff-uploads/video'
                 value={editMedia}
-                onChange={setEditMedia}
-                hint='Upload new video to replace the current file.'
+                onChange={asset => {
+                  setEditMedia(asset)
+                  if (asset) void linkAssetNow('media', asset)
+                }}
+                hint='Upload new video — it is linked immediately.'
               />
             ) : null}
           </div>
           <DialogFooter className='gap-2'>
-            <Button type='button' variant='outline' onClick={() => setEditRow(null)}>
+            <Button type='button' variant='outline' onClick={() => setEditRow(null)} disabled={Boolean(busyId)}>
               Cancel
             </Button>
             <Button
@@ -754,7 +849,7 @@ const ContentListPage = ({
               disabled={busyId === String(editRow?.id)}
               onClick={() => void saveEdit()}
             >
-              Save changes
+              {busyId === String(editRow?.id) ? 'Saving…' : 'Save changes'}
             </Button>
           </DialogFooter>
         </DialogContent>
