@@ -1,81 +1,60 @@
 # Mobile ↔ Admin ↔ Cloudflare R2 — Final Integration Guide
 
 **Product:** ስለ ቀልባችን / Sile Qelbachin  
-**For:** Flutter / mobile developers + deploy operators  
-**Updated:** 2026-09-25
+**Canonical file:** this document (repo root)  
+**Updated:** 2026-09-26
+
+Also see (older / internal): `admincn-1.0.0/docs/admin/CMS-WEBSITE-MOBILE-WORKFLOW.md`
 
 ---
 
-## 1. Pipeline (how content reaches the phone)
+## 1. Pipeline
 
 ```text
-Staff (Admin UI)
-   │  Add / Edit / Publish  (EN + AM titles, cover, PDF, audio…)
-   ▼
-Admin CMS  (Render)
-   │  PutObject → Cloudflare R2
-   │  Save metadata → Supabase / store
-   ▼
-Cloudflare R2  (file bytes + public HTTPS URL)
-   │
-   ▼
-GET /api/public/v1/*   ← published only, CORS *
-   │
-   ├── Website (Netlify)
-   └── Flutter / mobile app
+Staff (Admin UI)  https://admin.sileqelbachin1.com
+        │  Add / Edit / Publish  (EN + AM, cover, PDF, audio…)
+        ▼
+Admin CMS (Render · rootDir admincn-1.0.0)
+        │  PutObject → Cloudflare R2
+        │  Metadata → Supabase
+        ▼
+Cloudflare R2  (public HTTPS file URLs)
+        │
+        ▼
+GET /api/public/v1/*   (published only, CORS *)
+        ├── Website (Netlify)
+        └── Flutter / mobile
 ```
-
-**Rules**
 
 | Do | Don’t |
 |----|--------|
 | Mobile reads **public API** JSON | Mobile must **not** call R2 S3 API |
-| Play `audioUrl` / `pdfUrl` / `coverImage` (HTTPS) | Never put `R2_SECRET` / service role in the APK |
+| Use `coverImage` / `pdfUrl` / `audioUrl` HTTPS links | Never put `R2_SECRET` / service role in the APK |
 | Refresh after Admin publish | Staff login is Admin-only |
 
 ---
 
-## 2. Cloudflare DNS — fix Admin subdomain (what you did wrong)
+## 2. Live URLs
 
-**Important:** `sile-qelbachin1.onrender.com` is the **public website**. Admin is **`sile-qelbachin1-1.onrender.com`**.
+| Surface | URL |
+|---------|-----|
+| **Admin login** | https://admin.sileqelbachin1.com/pages/auth/login |
+| **Admin API (mobile)** | https://admin.sileqelbachin1.com/api/public/v1 |
+| Render fallback Admin | https://sile-qelbachin1-1.onrender.com |
+| Public website | Netlify / `sileqelbachin1.com` |
+| Local Admin | http://localhost:3001/pages/auth/login |
 
-In Cloudflare DNS fix the `admin` record:
-
-| Wrong | Correct |
-|-------|---------|
-| `admin` CNAME → `sile-qelbachin1.onrender.com` (public site) | `admin` CNAME → **`sile-qelbachin1-1.onrender.com`** (Admin CMS) |
-
-**Exact Cloudflare record (DNS only / grey cloud):**
-
-| Field | Value |
-|-------|--------|
-| Type | **CNAME** |
-| Name | **admin** |
-| Target | **sile-qelbachin1-1.onrender.com** |
-| Proxy | **DNS only** (grey cloud) |
-| TTL | Auto |
-
-Then in Render → service **`Sile_qelbachin1-1`** → Custom Domain → add `admin.sileqelbachin1.com` and wait until verification is green.
-
-**Until DNS is fixed, open Admin here:**
-
-- Admin UI: **https://sile-qelbachin1-1.onrender.com/pages/auth/login**
-- API: `https://sile-qelbachin1-1.onrender.com/api/public/v1/kitabs`
+DNS: Cloudflare `admin` CNAME → `sile-qelbachin1-1.onrender.com` (DNS only).
 
 ---
 
-## 3. Mobile app — only these env values (safe in Flutter)
+## 3. Mobile (Flutter) — safe env only
 
 ```text
 CMS_API_BASE=https://admin.sileqelbachin1.com/api/public/v1
-# Until admin DNS points to Sile_qelbachin1-1, use:
-# CMS_API_BASE=https://sile-qelbachin1-1.onrender.com/api/public/v1
-
 R2_PUBLIC_BASE=https://pub-03bea4f667534df5ab6c67f073c73d1e.r2.dev
 R2_OBJECT_PREFIX=sileqelbachin-meadia
 ```
-
-Dart sketch:
 
 ```dart
 const cmsBase = String.fromEnvironment(
@@ -91,79 +70,31 @@ Future<List<dynamic>> fetchCms(String resource) async {
 }
 ```
 
-### Endpoints
+### Public API endpoints
 
-| GET | Use for |
-|-----|---------|
-| `/kitabs` | Kitab list + ders + `audioUrl` / `pdfUrl` / `coverImage` |
+| GET | Use |
+|-----|-----|
+| `/kitabs` | Kitabs + ders + `audioUrl` / `pdfUrl` / `coverImage` |
 | `/audio` | Audio archive |
 | `/muhadara` | Muhadara |
 | `/video` | Videos |
-| `/pdfs` | Standalone PDFs |
+| `/pdfs` | PDFs |
 | `/reminders` | Home reminders |
 | `/sahabah` | Sahabah |
 
-Example kitab fields:
-
-```json
-{
-  "slug": "intebih-ante-murakeb",
-  "title": { "am": "…", "en": "…", "ar": "…" },
-  "coverImage": "https://pub-….r2.dev/sileqelbachin-meadia/…",
-  "pdfUrl": "https://pub-….r2.dev/…",
-  "dersList": [
-    { "title": { "am": "…", "en": "…" }, "audioUrl": "https://pub-….r2.dev/…" }
-  ]
-}
-```
-
-Play `audioUrl` / open `pdfUrl` / show `coverImage` directly — those are already public R2 links.
+Play / open the HTTPS URLs inside the JSON directly (already public R2 links).
 
 ---
 
-## 4. Admin can add + edit old content (EN + AM)
+## 4. Render — R2 access (fix “Unauthorized” / uploads)
 
-In Admin → **Content → Kitabs** (same pattern for Audio / Video / PDFs):
+Paste into **Render → Sile_qelbachin1-1 → Environment**, then **Manual Deploy**.
 
-| Action | How |
-|--------|-----|
-| **Add new kitab** | **Add** → titles EN/AM, description EN/AM, cover, PDF, ders audio → Publish |
-| **Rename (e.g. Intebih)** | Row → **Edit** → Title EN + Title AM → Save |
-| **Change description** | Edit → Description EN + Description AM |
-| **Change cover** | Edit → upload new **Cover image** |
-| **Change PDF** | Edit → upload new **PDF file** |
-| **Change audio (standalone)** | Content → Audio → Edit → replace audio + cover |
-| **Delete** | Trash → removes from Admin + public API (+ R2 file when credentials work) |
-
-After Save/Publish, mobile refresh of `/kitabs` (etc.) shows the update.
-
----
-
-## 5. Admin / Render — full environment (server only)
-
-Copy into **Render → Environment** (never into Flutter):
-
-### Public / app URL
+### Fixed public values (safe to copy)
 
 ```text
 NEXT_PUBLIC_APP_URL=https://admin.sileqelbachin1.com
 PORT=10000
-```
-
-### Supabase
-
-```text
-NEXT_PUBLIC_SUPABASE_URL=https://lsyyezhsqhzcskjbqmco.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_8-CoK12m_oltVdpPjYhMlQ_a5tMDA2m
-SUPABASE_URL=https://lsyyezhsqhzcskjbqmco.supabase.co
-SUPABASE_PUBLISHABLE_KEY=sb_publishable_8-CoK12m_oltVdpPjYhMlQ_a5tMDA2m
-SUPABASE_SERVICE_ROLE_KEY=<same service-role JWT as in Render — do not paste into mobile>
-SUPABASE_SECRET_KEY=<same as service role if you use both>
-```
-
-### Cloudflare R2 (Admin uploads / sync)
-
-```text
 CLOUDFLARE_ACCOUNT_ID=26e435690c62468180455b796d21b3ab
 R2_ACCOUNT_ID=26e435690c62468180455b796d21b3ab
 R2_BUCKET_NAME=sileqelbachinmediea
@@ -171,25 +102,46 @@ R2_ENDPOINT=https://26e435690c62468180455b796d21b3ab.r2.cloudflarestorage.com
 R2_PUBLIC_BASE_URL=https://pub-03bea4f667534df5ab6c67f073c73d1e.r2.dev
 NEXT_PUBLIC_R2_PUBLIC_BASE=https://pub-03bea4f667534df5ab6c67f073c73d1e.r2.dev
 NEXT_PUBLIC_R2_OBJECT_PREFIX=sileqelbachin-meadia
-R2_ACCESS_KEY_ID=<from Cloudflare R2 API token — 32 chars — Render only>
-R2_SECRET_ACCESS_KEY=<from Cloudflare R2 API token — ~64 chars — Render only>
-# Optional dashboard token (not required by Admin R2 S3 client):
-# CLOUDFLARE_API_TOKEN=<CFAT from Cloudflare — Render only, never Flutter>
+SUPER_ADMIN_EMAIL=mesudhassen5450@gmail.com
 ```
 
-Copy `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` from your local Admin `.env.local` or Render dashboard — **do not commit them**.
-### Super Admin bootstrap (one-time)
+### Secrets (Render only — never Flutter, never commit)
+
+From Cloudflare → R2 → **Manage R2 API Tokens** → create token (Object Read & Write):
 
 ```text
-SUPER_ADMIN_EMAIL=mesudhassen5450@gmail.com
-SUPER_ADMIN_BOOTSTRAP_PASSWORD=<temp password — change after first login>
+R2_ACCESS_KEY_ID=<32-char Access Key ID>
+R2_SECRET_ACCESS_KEY=<~64-char Secret Access Key>
 ```
 
-**Render Root Directory:** `admincn-1.0.0`
+On your laptop (after updating `admincn-1.0.0/.env.local`):
+
+```bash
+cd admincn-1.0.0
+npm run r2:print-render-env
+```
+
+Or open the local helper file (gitignored):
+
+`admincn-1.0.0/.env.render.r2.local`
+
+Copy those two keys into Render.
+
+Also keep Supabase on Render:
+
+```text
+NEXT_PUBLIC_SUPABASE_URL=https://lsyyezhsqhzcskjbqmco.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<publishable>
+SUPABASE_URL=https://lsyyezhsqhzcskjbqmco.supabase.co
+SUPABASE_PUBLISHABLE_KEY=<same publishable>
+SUPABASE_SERVICE_ROLE_KEY=<service_role JWT>
+```
+
+**Do not set on Render:** `R2_MEDIA_MIRROR_PATH`
 
 ---
 
-## 6. Website (Netlify) — only 4 public vars
+## 5. Netlify (website) — 4 public vars
 
 ```text
 NEXT_PUBLIC_SITE_URL=https://sileqelbachin1.com
@@ -198,29 +150,37 @@ NEXT_PUBLIC_R2_PUBLIC_BASE=https://pub-03bea4f667534df5ab6c67f073c73d1e.r2.dev
 NEXT_PUBLIC_R2_OBJECT_PREFIX=sileqelbachin-meadia
 ```
 
-Until Admin DNS works, set:
+---
 
-```text
-NEXT_PUBLIC_CMS_API_BASE=https://sile-qelbachin1.onrender.com/api/public/v1
-```
+## 6. Admin content for mobile
+
+Admin → **Content → Kitabs** (same for Audio / Video / PDFs / Sahabah):
+
+| Action | How |
+|--------|-----|
+| Add | **Add** → EN/AM titles, cover, PDF/audio → Publish |
+| Edit title/desc | Row → **Edit** → Save |
+| Replace cover/PDF | Edit → upload → Save |
+| Delete | Trash |
+
+Mobile refresh of `/api/public/v1/kitabs` shows updates.
 
 ---
 
-## 7. Acceptance checklist
+## 7. Checklist
 
-1. Cloudflare `admin` CNAME → `sile-qelbachin1-1.onrender.com` (DNS only)  
-2. Render verifies `admin.sileqelbachin1.com`  
-3. Open Admin → edit Intebih title AM/EN → Save → `/api/public/v1/kitabs` shows new title  
-4. Flutter pull-to-refresh shows the same title  
-5. New kitab Add + Publish → appears on phone  
-6. Replace cover/PDF → new `coverImage` / `pdfUrl` on API  
+1. Render has correct `R2_ACCESS_KEY_ID` (32) + `R2_SECRET_ACCESS_KEY` (~64) → no red “Unauthorized”  
+2. Admin Sahabah/Kitab cover upload works  
+3. `GET https://admin.sileqelbachin1.com/api/public/v1/kitabs` returns `ok: true`  
+4. Flutter uses `CMS_API_BASE` only  
+5. Super Admin: `mesudhassen5450@gmail.com`
 
 ---
 
-## 8. Security note
+## 8. Security
 
-- **Flutter:** only `CMS_API_BASE` + public R2 base/prefix  
-- **R2 Access Key / Secret / CFAT / Supabase service role:** Admin/Render only  
-- If this repo is public, rotate R2 tokens after sharing secrets in chat  
+- **Flutter:** `CMS_API_BASE` + public R2 base/prefix only  
+- **R2 Access Key / Secret / Supabase service role:** Admin + Render only  
+- If secrets were shown in chat/screenshots, rotate the R2 token after Render is updated  
 
-**Bottom line:** Fix the Cloudflare CNAME → Admin works → staff edit EN/AM + files → mobile only GETs `/api/public/v1/*` and plays the R2 URLs inside the JSON.
+**Bottom line:** Mobile only GETs `/api/public/v1/*` and plays the R2 HTTPS URLs in the JSON. R2 S3 keys stay on Render.
