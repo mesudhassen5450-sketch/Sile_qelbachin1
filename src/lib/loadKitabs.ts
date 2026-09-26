@@ -109,7 +109,7 @@ export async function loadKitabsForWebsite(): Promise<{
   const merged: Array<Kitab & { _created?: string; _legacy?: string | null }> = []
 
   // 1) Every CMS published kitab wins completely (new text/cover/pdf/ders — no static merge)
-  for (const row of cmsBySlug.values()) {
+  for (const row of Array.from(cmsBySlug.values())) {
     merged.push(row)
   }
 
