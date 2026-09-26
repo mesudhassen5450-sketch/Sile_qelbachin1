@@ -1,7 +1,9 @@
 /**
  * Load published kitabs for the official website.
- * Prefer Admin public CMS API. Fall back to static JSON.
- * Order: new Admin kitabs first, then Intebih → Adewae → …
+ *
+ * Rule: Admin CMS is the source of truth.
+ * - If a slug exists in the public CMS API, use that row as-is (no static fallback for that slug).
+ * - Static JSON is only used for slugs that Admin has not published yet, or if CMS is unreachable.
  */
 import { kitabsData, type Kitab } from '@/data/channelData'
 import { fetchPublishedKitabs, isCmsApiEnabled } from '@/lib/cmsClient'
@@ -48,16 +50,6 @@ function loc(v?: { am?: string | null; ar?: string | null; en?: string | null } 
   }
 }
 
-function asLoc(v: Kitab['title'] | string | undefined | null) {
-  if (!v) return { am: '', ar: '', en: '' }
-  if (typeof v === 'string') return { am: v, ar: '', en: v }
-  return {
-    am: v.am || '',
-    ar: v.ar || '',
-    en: v.en || ''
-  }
-}
-
 function mapCmsKitab(row: CmsKitab): Kitab & { _created?: string; _legacy?: string | null } {
   const dersList = (row.dersList || []).map(d => ({
     id: d.id,
@@ -74,6 +66,7 @@ function mapCmsKitab(row: CmsKitab): Kitab & { _created?: string; _legacy?: stri
     title: loc(row.title),
     author: loc(row.author),
     category: loc(row.category),
+    // Keep empty string vs undefined: empty means Admin cleared / no cover — do NOT restore static
     coverImage: row.coverImage || undefined,
     coverBg: row.coverBg || undefined,
     pdfUrl: row.pdfUrl || undefined,
@@ -81,28 +74,22 @@ function mapCmsKitab(row: CmsKitab): Kitab & { _created?: string; _legacy?: stri
     description: loc(row.description),
     dersList,
     _created: row.created_at || row.updated_at || '',
-    _legacy: row.legacy_source || null
+    _legacy: row.legacy_source || 'cms'
   }
-}
-
-function isStaff(row: { slug: string; _legacy?: string | null }): boolean {
-  const known = CANONICAL_ORDER.includes(row.slug)
-  const src = row._legacy || ''
-  if (src === 'admin_create' || src === 'admin_ui') return true
-  return !known
 }
 
 function sortForSite(rows: Array<Kitab & { _created?: string; _legacy?: string | null }>): Kitab[] {
   const rank = new Map(CANONICAL_ORDER.map((s, i) => [s, i]))
-  const staff: typeof rows = []
-  const classic: typeof rows = []
-  for (const row of rows) {
-    if (isStaff(row)) staff.push(row)
-    else classic.push(row)
-  }
-  staff.sort((a, b) => Date.parse(b._created || '') - Date.parse(a._created || ''))
-  classic.sort((a, b) => (rank.get(a.slug) ?? 999) - (rank.get(b.slug) ?? 999))
-  return [...staff, ...classic].map(({ _created, _legacy, ...k }) => k)
+  return [...rows]
+    .sort((a, b) => {
+      const ra = rank.get(a.slug)
+      const rb = rank.get(b.slug)
+      if (ra !== undefined && rb !== undefined) return ra - rb
+      if (ra !== undefined) return -1
+      if (rb !== undefined) return 1
+      return Date.parse(b._created || '') - Date.parse(a._created || '')
+    })
+    .map(({ _created, _legacy, ...k }) => k)
 }
 
 export async function loadKitabsForWebsite(): Promise<{
@@ -118,51 +105,25 @@ export async function loadKitabsForWebsite(): Promise<{
     return { kitabs: kitabsData, source: 'static' }
   }
 
-  const mapped = remote.map(mapCmsKitab)
-  const bySlug = new Map<string, Kitab & { _created?: string; _legacy?: string | null }>()
+  const cmsBySlug = new Map(remote.map(r => [r.slug, mapCmsKitab(r)]))
+  const merged: Array<Kitab & { _created?: string; _legacy?: string | null }> = []
 
+  // 1) Every CMS published kitab wins completely (new text/cover/pdf/ders — no static merge)
+  for (const row of cmsBySlug.values()) {
+    merged.push(row)
+  }
+
+  // 2) Static only for slugs Admin has never published
   for (const k of kitabsData) {
-    bySlug.set(k.slug, { ...k, _created: '', _legacy: 'static' })
-  }
-  for (const k of mapped) {
-    const prev = bySlug.get(k.slug)
-    if (!prev) {
-      bySlug.set(k.slug, k)
-      continue
+    if (!cmsBySlug.has(k.slug)) {
+      merged.push({ ...k, _created: '', _legacy: 'static' })
     }
-    // Prefer CMS text/media, but keep static cover/PDF/audio if CMS left them empty
-    const prevTitle = asLoc(prev.title)
-    const nextTitle = asLoc(k.title)
-    const prevAuthor = asLoc(prev.author)
-    const nextAuthor = asLoc(k.author)
-    const prevDesc = asLoc(prev.description)
-    const nextDesc = asLoc(k.description)
-    bySlug.set(k.slug, {
-      ...prev,
-      ...k,
-      title: {
-        am: nextTitle.am || prevTitle.am,
-        ar: nextTitle.ar || prevTitle.ar,
-        en: nextTitle.en || prevTitle.en
-      },
-      author: {
-        am: nextAuthor.am || prevAuthor.am,
-        ar: nextAuthor.ar || prevAuthor.ar,
-        en: nextAuthor.en || prevAuthor.en
-      },
-      description: {
-        am: nextDesc.am || prevDesc.am,
-        ar: nextDesc.ar || prevDesc.ar,
-        en: nextDesc.en || prevDesc.en
-      },
-      coverImage: k.coverImage || prev.coverImage,
-      pdfUrl: k.pdfUrl || prev.pdfUrl,
-      dersList: k.dersList?.length ? k.dersList : prev.dersList,
-      dersCount: k.dersList?.length ? k.dersCount : prev.dersCount
-    })
   }
 
-  return { kitabs: sortForSite(Array.from(bySlug.values())), source: 'cms+static' }
+  return {
+    kitabs: sortForSite(merged),
+    source: cmsBySlug.size ? 'cms' : 'static'
+  }
 }
 
 export async function loadKitabBySlug(slug: string): Promise<Kitab | null> {

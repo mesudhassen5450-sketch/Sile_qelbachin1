@@ -368,7 +368,29 @@ export async function updateContentMeta(input: {
           if (input.cover_asset_id !== undefined) patch.cover_asset_id = input.cover_asset_id
           if (input.pdf_asset_id !== undefined) patch.pdf_asset_id = input.pdf_asset_id
           const localKitab = store.kitabs.find(k => k.id === input.id)
-          if (localKitab?.metadata) patch.metadata = localKitab.metadata
+          const meta: Record<string, unknown> = { ...(localKitab?.metadata || {}) }
+          // Resolve public URLs from media_assets so website can show cover even if join lags
+          if (input.cover_asset_id) {
+            const { data: coverRow } = await sb
+              .from('media_assets')
+              .select('public_url')
+              .eq('id', input.cover_asset_id)
+              .maybeSingle()
+            if (coverRow?.public_url) meta.cover_url = coverRow.public_url
+          }
+          if (input.pdf_asset_id) {
+            const { data: pdfRow } = await sb
+              .from('media_assets')
+              .select('public_url')
+              .eq('id', input.pdf_asset_id)
+              .maybeSingle()
+            if (pdfRow?.public_url) meta.pdf_url = pdfRow.public_url
+          }
+          patch.metadata = meta
+          if (localKitab) {
+            localKitab.metadata = meta
+            saveLocalStore(store)
+          }
         }
         if (input.type === 'audio') {
           if (input.media_asset_id !== undefined) patch.media_asset_id = input.media_asset_id

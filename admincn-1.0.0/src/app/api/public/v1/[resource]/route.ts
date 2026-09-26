@@ -12,6 +12,7 @@ function withCors(res: NextResponse) {
   res.headers.set('Access-Control-Allow-Origin', '*')
   res.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
   res.headers.set('Access-Control-Allow-Headers', 'Content-Type')
+  res.headers.set('Cache-Control', 'no-store, max-age=0, must-revalidate')
   return res
 }
 

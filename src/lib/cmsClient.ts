@@ -1,15 +1,14 @@
 /**
- * Optional published CMS client.
- * When NEXT_PUBLIC_CMS_API_BASE is set (Admin public API), consumers can load
- * database-published content. Legacy static JSON remains the default until verified.
+ * Published CMS client for the public website.
+ * Admin (Render) is the source of truth — website always prefers live API data.
  *
- * Example:
- *   NEXT_PUBLIC_CMS_API_BASE=http://localhost:3001/api/public/v1
+ * Override with NEXT_PUBLIC_CMS_API_BASE in Netlify / .env.local if needed.
  */
-const CMS_BASE = (process.env.NEXT_PUBLIC_CMS_API_BASE || '').replace(/\/+$/, '');
+const DEFAULT_CMS_BASE = 'https://admin.sileqelbachin1.com/api/public/v1'
+const CMS_BASE = (process.env.NEXT_PUBLIC_CMS_API_BASE || DEFAULT_CMS_BASE).replace(/\/+$/, '')
 
 export function isCmsApiEnabled(): boolean {
-  return Boolean(CMS_BASE);
+  return Boolean(CMS_BASE)
 }
 
 async function getJson<T>(resource: string): Promise<T | null> {
@@ -17,7 +16,8 @@ async function getJson<T>(resource: string): Promise<T | null> {
   try {
     const res = await fetch(`${CMS_BASE}/${resource}`, {
       cache: 'no-store',
-      next: { revalidate: 0 }
+      next: { revalidate: 0 },
+      headers: { Accept: 'application/json' }
     })
     if (!res.ok) return null
     const body = await res.json()
@@ -29,17 +29,17 @@ async function getJson<T>(resource: string): Promise<T | null> {
 }
 
 export async function fetchPublishedKitabs<T = unknown>(): Promise<T[] | null> {
-  return getJson<T[]>('kitabs');
+  return getJson<T[]>('kitabs')
 }
 
 export async function fetchPublishedAudio<T = unknown>(): Promise<T[] | null> {
-  return getJson<T[]>('audio');
+  return getJson<T[]>('audio')
 }
 
 export async function fetchPublishedVideos<T = unknown>(): Promise<T[] | null> {
-  return getJson<T[]>('video');
+  return getJson<T[]>('video')
 }
 
 export async function fetchPublishedPdfs<T = unknown>(): Promise<T[] | null> {
-  return getJson<T[]>('pdfs');
+  return getJson<T[]>('pdfs')
 }

@@ -17,7 +17,7 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const kitab = (await loadKitabBySlug(slug)) || kitabsData.find(k => k.slug === slug)
+  const kitab = await loadKitabBySlug(slug)
 
   const titleString = kitab
     ? typeof kitab.title === 'string'
