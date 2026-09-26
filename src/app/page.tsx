@@ -623,6 +623,9 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* 10. PARTNER — ኢኽላስ (directly above footer) */}
+      <PartnerIkhlasSection />
+
     </div>
   );
 }
