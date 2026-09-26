@@ -358,3 +358,94 @@ export async function createSahabahItem(input: {
 
   return row
 }
+
+/** Append one child ders (audio) to an existing kitab. */
+export async function createDersForKitab(input: {
+  kitab_id: string
+  title_am?: string | null
+  title_ar?: string | null
+  title_en?: string | null
+  speaker_en?: string | null
+  audio_asset_id: string
+  status?: ContentStatus
+}) {
+  if (!input.audio_asset_id) {
+    throw new Error('audio_asset_id required.')
+  }
+
+  const store = loadLocalStore()
+  const now = nowIso()
+  const status: ContentStatus = input.status || 'published'
+  const sb = isSupabaseConfigured() ? getServiceSupabase() : null
+
+  let kitab = store.kitabs.find(k => k.id === input.kitab_id) || null
+  if (!kitab && sb) {
+    const { data: remote, error } = await sb
+      .from('kitabs')
+      .select('*')
+      .eq('id', input.kitab_id)
+      .maybeSingle()
+    if (error) throw new Error(`Load kitab failed: ${error.message}`)
+    if (remote) {
+      kitab = remote as KitabRecord
+      store.kitabs = [...store.kitabs.filter(k => k.id !== kitab!.id), kitab]
+    }
+  }
+  if (!kitab) throw new Error('Kitab not found.')
+
+  let maxOrder = store.ders
+    .filter(d => d.kitab_id === kitab!.id)
+    .reduce((m, d) => Math.max(m, d.sort_order || 0), 0)
+  if (sb) {
+    const { data: remoteDers } = await sb
+      .from('ders')
+      .select('sort_order')
+      .eq('kitab_id', kitab.id)
+    if (Array.isArray(remoteDers)) {
+      for (const d of remoteDers) {
+        maxOrder = Math.max(maxOrder, Number(d.sort_order) || 0)
+      }
+    }
+  }
+
+  const nextNum = maxOrder + 1
+  markAssetLinked(store, input.audio_asset_id)
+
+  const row: DersRecord = {
+    id: newId(),
+    legacy_id: `admin-ders-${Date.now()}`,
+    kitab_id: kitab.id,
+    ders_number: nextNum,
+    sort_order: nextNum,
+    title_am: input.title_am || null,
+    title_ar: input.title_ar || null,
+    title_en: input.title_en || input.title_am || `Ders ${nextNum}`,
+    speaker_am: null,
+    speaker_ar: null,
+    speaker_en: input.speaker_en || kitab.author_en || null,
+    duration_label: null,
+    audio_asset_id: input.audio_asset_id,
+    status,
+    metadata: { source: 'admin_ui' },
+    created_at: now,
+    updated_at: now,
+    published_at: status === 'published' ? now : null
+  }
+
+  store.ders = [...store.ders.filter(d => d.id !== row.id), row]
+  const dersCount =
+    (sb
+      ? maxOrder
+      : store.ders.filter(d => d.kitab_id === kitab!.id && d.id !== row.id).length) + 1
+  store.kitabs = store.kitabs.map(k =>
+    k.id === kitab!.id ? { ...k, ders_count: dersCount, updated_at: now } : k
+  )
+  saveLocalStore(store)
+
+  if (sb) {
+    await sb.from('ders').upsert(row, { onConflict: 'id' })
+    await sb.from('kitabs').update({ ders_count: dersCount, updated_at: now }).eq('id', kitab.id)
+  }
+
+  return row
+}

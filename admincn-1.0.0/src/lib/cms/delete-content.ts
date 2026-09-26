@@ -69,7 +69,22 @@ export async function deleteContentItem(input: {
   const store = loadLocalStore()
   const id = input.id
   const deleteR2 = input.deleteR2Files !== false
+  const sbEarly = isSupabaseConfigured() ? getServiceSupabase() : null
+
+  // Hydrate ders/kitab from Supabase when local mirror is empty (Render).
+  if (input.type === 'ders' && !store.ders.some(d => d.id === id) && sbEarly) {
+    const { data: remote } = await sbEarly.from('ders').select('*').eq('id', id).maybeSingle()
+    if (remote) {
+      store.ders = [...store.ders.filter(d => d.id !== id), remote as (typeof store.ders)[0]]
+      saveLocalStore(store)
+    }
+  }
+
   const assetIds = collectAssetIds(store, input.type, id)
+  let parentKitabId: string | null = null
+  if (input.type === 'ders') {
+    parentKitabId = store.ders.find(d => d.id === id)?.kitab_id || null
+  }
 
   if (input.type === 'kitabs' && !store.kitabs.some(k => k.id === id)) {
     throw new Error('Kitab not found.')
@@ -125,6 +140,13 @@ export async function deleteContentItem(input: {
     store.sahabah_items = (store.sahabah_items || []).filter(s => s.id !== id)
   } else if (input.type === 'ders') {
     store.ders = store.ders.filter(d => d.id !== id)
+    if (parentKitabId) {
+      const count = store.ders.filter(d => d.kitab_id === parentKitabId).length
+      const now = nowIso()
+      store.kitabs = store.kitabs.map(k =>
+        k.id === parentKitabId ? { ...k, ders_count: count, updated_at: now } : k
+      )
+    }
   }
 
   appendAudit(store, {
@@ -152,6 +174,13 @@ export async function deleteContentItem(input: {
         await sb.from('pdf_items').delete().eq('id', id)
       } else if (input.type === 'ders') {
         await sb.from('ders').delete().eq('id', id)
+        if (parentKitabId) {
+          const count = store.ders.filter(d => d.kitab_id === parentKitabId).length
+          await sb
+            .from('kitabs')
+            .update({ ders_count: count, updated_at: nowIso() })
+            .eq('id', parentKitabId)
+        }
       }
       for (const asset of assets) {
         await sb
@@ -184,6 +213,8 @@ export async function updateContentMeta(
     thumbnail_asset_id?: string | null
     cover_url?: string | null
     pdf_url?: string | null
+    sort_order?: number | null
+    speaker_en?: string | null
   },
   /** Internal: prevent infinite re-entry when importing a Supabase-only row. */
   _depth = 0
@@ -309,10 +340,30 @@ export async function updateContentMeta(
         updated_at: now
       }
     })
+  } else if (input.type === 'ders') {
+    store.ders = store.ders.map(d => {
+      if (d.id !== input.id) return d
+      found = true
+      const nextSort =
+        input.sort_order !== undefined && input.sort_order !== null
+          ? Number(input.sort_order)
+          : d.sort_order
+      return {
+        ...d,
+        title_en: input.title_en !== undefined ? input.title_en : d.title_en,
+        title_am: input.title_am !== undefined ? input.title_am : d.title_am,
+        speaker_en: input.speaker_en !== undefined ? input.speaker_en : d.speaker_en,
+        audio_asset_id:
+          input.media_asset_id !== undefined ? input.media_asset_id : d.audio_asset_id,
+        sort_order: nextSort,
+        ders_number: nextSort,
+        updated_at: now
+      }
+    })
   }
 
   // If the row lives only in Supabase (common on Render), pull it into local then patch.
-  if (!found && isSupabaseConfigured() && input.type !== 'sahabah' && input.type !== 'ders') {
+  if (!found && isSupabaseConfigured() && input.type !== 'sahabah') {
     const sb = getServiceSupabase()
     if (sb) {
       const table =
@@ -322,7 +373,9 @@ export async function updateContentMeta(
             ? 'audio_items'
             : input.type === 'video'
               ? 'video_items'
-              : 'pdf_items'
+              : input.type === 'ders'
+                ? 'ders'
+                : 'pdf_items'
       const { data: remote, error } = await sb.from(table).select('*').eq('id', input.id).maybeSingle()
       if (error) throw new Error(`Load failed: ${error.message}`)
       if (remote) {
@@ -343,6 +396,11 @@ export async function updateContentMeta(
             ...store.pdf_items.filter(p => p.id !== input.id),
             remote as (typeof store.pdf_items)[0]
           ]
+        } else if (input.type === 'ders') {
+          store.ders = [
+            ...store.ders.filter(d => d.id !== input.id),
+            remote as (typeof store.ders)[0]
+          ]
         }
         // Persist before re-entry — otherwise the next loadLocalStore() misses the
         // import and retries forever (Save stuck on "Saving…" for minutes).
@@ -360,6 +418,41 @@ export async function updateContentMeta(
     if (sb) {
       if (input.type === 'sahabah') {
         // Sahabah may be local-only until a table exists; local save already done.
+      } else if (input.type === 'ders') {
+        const patch: Record<string, unknown> = { updated_at: now }
+        if (input.title_en !== undefined) patch.title_en = input.title_en
+        if (input.title_am !== undefined) patch.title_am = input.title_am
+        if (input.speaker_en !== undefined) patch.speaker_en = input.speaker_en
+        if (input.media_asset_id !== undefined) patch.audio_asset_id = input.media_asset_id
+        if (input.sort_order !== undefined && input.sort_order !== null) {
+          patch.sort_order = Number(input.sort_order)
+          patch.ders_number = Number(input.sort_order)
+        }
+        const { data, error } = await sb
+          .from('ders')
+          .update(patch)
+          .eq('id', input.id)
+          .select('*')
+          .maybeSingle()
+        if (error) throw new Error(`Save failed (database): ${error.message}`)
+        if (!data) {
+          const localRow = store.ders.find(d => d.id === input.id)
+          if (localRow) {
+            const { data: upData, error: upErr } = await sb
+              .from('ders')
+              .upsert(localRow as Record<string, unknown>)
+              .select('*')
+              .maybeSingle()
+            if (upErr) throw new Error(`Save failed (database upsert): ${upErr.message}`)
+            return { ok: true, row: (upData as Record<string, unknown>) || null }
+          }
+          throw new Error('Ders not found in database. Refresh Admin and try again.')
+        }
+        store.ders = store.ders.map(d =>
+          d.id === input.id ? { ...d, ...(data as object), updated_at: now } : d
+        )
+        saveLocalStore(store)
+        return { ok: true, row: data as Record<string, unknown> }
       } else {
         const table =
           input.type === 'kitabs'

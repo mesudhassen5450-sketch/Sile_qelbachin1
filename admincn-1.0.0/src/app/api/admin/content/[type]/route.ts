@@ -123,33 +123,37 @@ export async function GET(
 
   if (type === 'ders') {
     const kitabSlug = url.searchParams.get('kitab')
-    let kitabs = store.kitabs
-    if (kitabSlug) kitabs = kitabs.filter(k => k.slug === kitabSlug)
-    const kitabIds = new Set(kitabs.map(k => k.id))
+    const kitabIdParam = url.searchParams.get('kitab_id')
     let rows = store.ders
-      .filter(d => kitabIds.has(d.kitab_id))
-      .map(d => {
-        const kitab = store.kitabs.find(k => k.id === d.kitab_id)
-        const audio = d.audio_asset_id ? assets.get(d.audio_asset_id) : undefined
-        return {
-          ...d,
-          kitab_slug: kitab?.slug || null,
-          kitab_title: kitab?.title_en || kitab?.title_am || null,
-          audio_url: audio?.public_url || null,
-          audio_key: audio?.object_key || null,
-          title: d.title_en || d.title_am || d.legacy_id
-        }
-      })
-    if (status) rows = rows.filter(r => r.status === status)
+    if (kitabIdParam) {
+      rows = rows.filter(d => d.kitab_id === kitabIdParam)
+    } else if (kitabSlug) {
+      const kitab = store.kitabs.find(k => k.slug === kitabSlug)
+      rows = kitab ? rows.filter(d => d.kitab_id === kitab.id) : []
+    }
+    const mapped = rows.map(d => {
+      const kitab = store.kitabs.find(k => k.id === d.kitab_id)
+      const audio = d.audio_asset_id ? assets.get(d.audio_asset_id) : undefined
+      return {
+        ...d,
+        kitab_slug: kitab?.slug || null,
+        kitab_title: kitab?.title_en || kitab?.title_am || null,
+        audio_url: audio?.public_url || null,
+        audio_key: audio?.object_key || null,
+        title: d.title_en || d.title_am || d.legacy_id
+      }
+    })
+    let out = mapped
+    if (status) out = out.filter(r => r.status === status)
     if (q) {
-      rows = rows.filter(r =>
+      out = out.filter(r =>
         [r.title_am, r.title_en, r.legacy_id, r.kitab_slug, r.audio_key]
           .filter(Boolean)
           .some(v => String(v).toLowerCase().includes(q))
       )
     }
-    rows.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
-    return NextResponse.json({ ok: true, count: rows.length, rows })
+    out.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+    return NextResponse.json({ ok: true, count: out.length, rows: out })
   }
 
   if (type === 'audio') {
@@ -403,6 +407,34 @@ export async function POST(
       return NextResponse.json({ ok: true, row, published: true })
     }
 
+    if (type === 'ders') {
+      const gate = await requireApiPermission(['ders.create', 'ders.publish', 'ders.edit'])
+      if ('response' in gate) return gate.response
+      const { createDersForKitab } = await import('@/lib/cms/create-content')
+      const kitabId = String(body.kitab_id || '')
+      const audioAssetId = String(body.audio_asset_id || body.media_asset_id || '')
+      if (!kitabId) {
+        return NextResponse.json({ ok: false, error: 'kitab_id required.' }, { status: 400 })
+      }
+      if (!audioAssetId) {
+        return NextResponse.json({ ok: false, error: 'audio_asset_id required.' }, { status: 400 })
+      }
+      const row = await createDersForKitab({
+        kitab_id: kitabId,
+        title_am: body.title_am,
+        title_ar: body.title_ar,
+        title_en: body.title_en,
+        speaker_en: body.speaker_en,
+        audio_asset_id: audioAssetId,
+        status: body.status || 'published'
+      })
+      return NextResponse.json({
+        ok: true,
+        row,
+        message: 'Child ders audio added. Website / app will show it under this kitab.'
+      })
+    }
+
     return NextResponse.json({ ok: false, error: `POST not supported for ${type}` }, { status: 400 })
   } catch (err) {
     return NextResponse.json(
@@ -475,11 +507,13 @@ export async function PATCH(
       description_am: body.description_am,
       cover_asset_id: body.cover_asset_id,
       pdf_asset_id: body.pdf_asset_id,
-      media_asset_id: body.media_asset_id,
+      media_asset_id: body.media_asset_id || body.audio_asset_id,
       video_asset_id: body.video_asset_id,
       thumbnail_asset_id: body.thumbnail_asset_id,
       cover_url: body.cover_url,
-      pdf_url: body.pdf_url
+      pdf_url: body.pdf_url,
+      sort_order: body.sort_order,
+      speaker_en: body.speaker_en
     })
     return NextResponse.json({
       ok: true,

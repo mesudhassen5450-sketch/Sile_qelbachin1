@@ -32,6 +32,7 @@ import {
   TableRow
 } from '@/components/ui/table'
 import AddContentDialog from '@/views/content/AddContentDialog'
+import { KitabChildAudioEditor } from '@/views/content/KitabChildAudioEditor'
 import { R2FileField } from '@/views/content/R2FileField'
 
 type ContentType = 'kitabs' | 'ders' | 'audio' | 'video' | 'pdfs' | 'library' | 'sahabah'
@@ -844,6 +845,15 @@ const ContentListPage = ({
                   if (asset) void linkAssetNow('pdf', asset)
                 }}
                 hint='Upload a new PDF — it is linked immediately.'
+              />
+            ) : null}
+            {type === 'kitabs' && editRow?.id ? (
+              <KitabChildAudioEditor
+                kitabId={String(editRow.id)}
+                onChanged={() => {
+                  setSaveOk('Child ders audio updated. Website / app will show the change.')
+                  void load()
+                }}
               />
             ) : null}
             {type === 'audio' ? (
