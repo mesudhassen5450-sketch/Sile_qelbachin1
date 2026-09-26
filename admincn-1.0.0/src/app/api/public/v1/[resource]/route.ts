@@ -50,6 +50,15 @@ export async function GET(
     ).map(k => {
         const cover = k.cover_asset_id ? assets.get(k.cover_asset_id) : undefined
         const pdf = k.pdf_asset_id ? assets.get(k.pdf_asset_id) : undefined
+        // Fallback: some older rows store public URL in metadata when asset id drifted
+        const coverFallback =
+          cover?.public_url ||
+          (typeof k.metadata?.cover_url === 'string' ? k.metadata.cover_url : null) ||
+          null
+        const pdfFallback =
+          pdf?.public_url ||
+          (typeof k.metadata?.pdf_url === 'string' ? k.metadata.pdf_url : null) ||
+          null
         const dersList = store.ders
           .filter(d => d.kitab_id === k.id && d.status === 'published')
           .sort((a, b) => a.sort_order - b.sort_order)
@@ -74,9 +83,9 @@ export async function GET(
             ar: k.description_ar,
             en: k.description_en
           },
-          coverImage: cover?.public_url || null,
+          coverImage: coverFallback,
           coverBg: k.cover_bg,
-          pdfUrl: pdf?.public_url || null,
+          pdfUrl: pdfFallback,
           dersCount: dersList.length,
           dersList,
           legacy_source: k.legacy_source,

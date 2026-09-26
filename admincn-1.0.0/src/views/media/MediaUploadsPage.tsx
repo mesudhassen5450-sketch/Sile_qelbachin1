@@ -18,7 +18,7 @@ type PublishAs = 'none' | 'audio' | 'video' | 'pdfs'
  * Never Cloudinary.
  */
 const MediaUploadsPage = () => {
-  const { can } = useAuth()
+  const { can, loading: authLoading } = useAuth()
   const [file, setFile] = useState<File | null>(null)
   const [titleEn, setTitleEn] = useState('')
   const [titleAm, setTitleAm] = useState('')
@@ -32,6 +32,14 @@ const MediaUploadsPage = () => {
     message?: string
     published?: boolean
   } | null>(null)
+
+  if (authLoading) {
+    return (
+      <Card>
+        <CardContent className='text-muted-foreground py-6 text-sm'>Loading…</CardContent>
+      </Card>
+    )
+  }
 
   if (!can('media.upload') && !can('media.scan')) {
     return (

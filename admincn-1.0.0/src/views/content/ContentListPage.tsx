@@ -245,6 +245,7 @@ const ContentListPage = ({
       const data = await res.json()
       if (!res.ok || !data.ok) throw new Error(data.error || 'Edit failed')
       setEditRow(null)
+      setSyncMsg(data.message || 'Saved. Website and mobile will show the update.')
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))

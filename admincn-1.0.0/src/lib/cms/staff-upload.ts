@@ -109,15 +109,24 @@ export async function uploadStaffMedia(input: {
   saveLocalStore(store)
 
   let backend: StaffUploadResult['backend'] = 'local'
+  let canonical = asset
   if (isSupabaseConfigured()) {
-    await upsertMediaAssetsRemote([asset])
+    const remoteRows = await upsertMediaAssetsRemote([asset])
+    canonical = remoteRows[0] || asset
+    // Keep local store id aligned with Supabase (public API reads Supabase)
+    if (canonical.id && canonical.id !== asset.id) {
+      store.media_assets = store.media_assets.map(a =>
+        a.id === asset.id ? { ...canonical } : a
+      )
+      saveLocalStore(store)
+    }
     backend = 'local+supabase'
   }
 
   return {
-    asset,
-    public_url: asset.public_url || put.publicUrl,
-    object_key: asset.object_key,
+    asset: canonical,
+    public_url: canonical.public_url || put.publicUrl,
+    object_key: canonical.object_key,
     backend
   }
 }

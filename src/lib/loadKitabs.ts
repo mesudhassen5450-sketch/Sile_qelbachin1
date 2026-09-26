@@ -48,6 +48,16 @@ function loc(v?: { am?: string | null; ar?: string | null; en?: string | null } 
   }
 }
 
+function asLoc(v: Kitab['title'] | string | undefined | null) {
+  if (!v) return { am: '', ar: '', en: '' }
+  if (typeof v === 'string') return { am: v, ar: '', en: v }
+  return {
+    am: v.am || '',
+    ar: v.ar || '',
+    en: v.en || ''
+  }
+}
+
 function mapCmsKitab(row: CmsKitab): Kitab & { _created?: string; _legacy?: string | null } {
   const dersList = (row.dersList || []).map(d => ({
     id: d.id,
@@ -115,7 +125,41 @@ export async function loadKitabsForWebsite(): Promise<{
     bySlug.set(k.slug, { ...k, _created: '', _legacy: 'static' })
   }
   for (const k of mapped) {
-    bySlug.set(k.slug, k)
+    const prev = bySlug.get(k.slug)
+    if (!prev) {
+      bySlug.set(k.slug, k)
+      continue
+    }
+    // Prefer CMS text/media, but keep static cover/PDF/audio if CMS left them empty
+    const prevTitle = asLoc(prev.title)
+    const nextTitle = asLoc(k.title)
+    const prevAuthor = asLoc(prev.author)
+    const nextAuthor = asLoc(k.author)
+    const prevDesc = asLoc(prev.description)
+    const nextDesc = asLoc(k.description)
+    bySlug.set(k.slug, {
+      ...prev,
+      ...k,
+      title: {
+        am: nextTitle.am || prevTitle.am,
+        ar: nextTitle.ar || prevTitle.ar,
+        en: nextTitle.en || prevTitle.en
+      },
+      author: {
+        am: nextAuthor.am || prevAuthor.am,
+        ar: nextAuthor.ar || prevAuthor.ar,
+        en: nextAuthor.en || prevAuthor.en
+      },
+      description: {
+        am: nextDesc.am || prevDesc.am,
+        ar: nextDesc.ar || prevDesc.ar,
+        en: nextDesc.en || prevDesc.en
+      },
+      coverImage: k.coverImage || prev.coverImage,
+      pdfUrl: k.pdfUrl || prev.pdfUrl,
+      dersList: k.dersList?.length ? k.dersList : prev.dersList,
+      dersCount: k.dersList?.length ? k.dersCount : prev.dersCount
+    })
   }
 
   return { kitabs: sortForSite(Array.from(bySlug.values())), source: 'cms+static' }

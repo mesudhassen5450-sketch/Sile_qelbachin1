@@ -61,7 +61,15 @@ function roleHas(role: StaffRole, permission: Permission): boolean {
 }
 
 const RolesPage = () => {
-  const { can } = useAuth()
+  const { can, loading: authLoading } = useAuth()
+
+  if (authLoading) {
+    return (
+      <Card>
+        <CardContent className='text-muted-foreground py-6 text-sm'>Loading…</CardContent>
+      </Card>
+    )
+  }
 
   if (!can('admins.manage') && !can('admins.view')) {
     return (

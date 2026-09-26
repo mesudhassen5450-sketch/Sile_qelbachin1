@@ -190,6 +190,11 @@ export async function updateContentMeta(input: {
     store.kitabs = store.kitabs.map(k => {
       if (k.id !== input.id) return k
       found = true
+      const coverId =
+        input.cover_asset_id !== undefined ? input.cover_asset_id : k.cover_asset_id
+      const pdfId = input.pdf_asset_id !== undefined ? input.pdf_asset_id : k.pdf_asset_id
+      const coverAsset = coverId ? store.media_assets.find(a => a.id === coverId) : undefined
+      const pdfAsset = pdfId ? store.media_assets.find(a => a.id === pdfId) : undefined
       return {
         ...k,
         title_en: input.title_en !== undefined ? input.title_en : k.title_en,
@@ -200,9 +205,13 @@ export async function updateContentMeta(input: {
           input.description_en !== undefined ? input.description_en : k.description_en,
         description_am:
           input.description_am !== undefined ? input.description_am : k.description_am,
-        cover_asset_id:
-          input.cover_asset_id !== undefined ? input.cover_asset_id : k.cover_asset_id,
-        pdf_asset_id: input.pdf_asset_id !== undefined ? input.pdf_asset_id : k.pdf_asset_id,
+        cover_asset_id: coverId,
+        pdf_asset_id: pdfId,
+        metadata: {
+          ...(k.metadata || {}),
+          ...(coverAsset?.public_url ? { cover_url: coverAsset.public_url } : {}),
+          ...(pdfAsset?.public_url ? { pdf_url: pdfAsset.public_url } : {})
+        },
         updated_at: now
       }
     })
@@ -292,10 +301,8 @@ export async function updateContentMeta(input: {
     })
   }
 
-  if (!found) throw new Error('Item not found.')
-  saveLocalStore(store)
-
-  if (isSupabaseConfigured() && input.type !== 'sahabah') {
+  // If the row lives only in Supabase (common on Render), pull it into local then patch.
+  if (!found && isSupabaseConfigured() && input.type !== 'sahabah' && input.type !== 'ders') {
     const sb = getServiceSupabase()
     if (sb) {
       const table =
@@ -306,32 +313,127 @@ export async function updateContentMeta(input: {
             : input.type === 'video'
               ? 'video_items'
               : 'pdf_items'
-      const patch: Record<string, unknown> = { updated_at: now }
-      if (input.title_en !== undefined) patch.title_en = input.title_en
-      if (input.title_am !== undefined) patch.title_am = input.title_am
-      if (input.author_en !== undefined && input.type === 'kitabs') patch.author_en = input.author_en
-      if (input.author_am !== undefined && input.type === 'kitabs') patch.author_am = input.author_am
-      if (input.description_en !== undefined) patch.description_en = input.description_en
-      if (input.description_am !== undefined) patch.description_am = input.description_am
-      if (input.type === 'kitabs') {
-        if (input.cover_asset_id !== undefined) patch.cover_asset_id = input.cover_asset_id
-        if (input.pdf_asset_id !== undefined) patch.pdf_asset_id = input.pdf_asset_id
+      const { data: remote, error } = await sb.from(table).select('*').eq('id', input.id).maybeSingle()
+      if (error) throw new Error(`Load failed: ${error.message}`)
+      if (remote) {
+        if (input.type === 'kitabs') {
+          store.kitabs = [...store.kitabs.filter(k => k.id !== input.id), remote as (typeof store.kitabs)[0]]
+        } else if (input.type === 'audio') {
+          store.audio_items = [
+            ...store.audio_items.filter(a => a.id !== input.id),
+            remote as (typeof store.audio_items)[0]
+          ]
+        } else if (input.type === 'video') {
+          store.video_items = [
+            ...store.video_items.filter(v => v.id !== input.id),
+            remote as (typeof store.video_items)[0]
+          ]
+        } else if (input.type === 'pdfs') {
+          store.pdf_items = [
+            ...store.pdf_items.filter(p => p.id !== input.id),
+            remote as (typeof store.pdf_items)[0]
+          ]
+        }
+        // Re-apply patch on the newly imported local row
+        return updateContentMeta(input)
       }
-      if (input.type === 'audio' && input.media_asset_id !== undefined) {
-        patch.media_asset_id = input.media_asset_id
-      }
-      if (input.type === 'video') {
-        if (input.video_asset_id !== undefined) patch.video_asset_id = input.video_asset_id
-        if (input.thumbnail_asset_id !== undefined || input.cover_asset_id !== undefined) {
-          patch.thumbnail_asset_id = input.thumbnail_asset_id ?? input.cover_asset_id
+    }
+  }
+
+  if (!found) throw new Error('Item not found.')
+  saveLocalStore(store)
+
+  if (isSupabaseConfigured()) {
+    const sb = getServiceSupabase()
+    if (sb) {
+      if (input.type === 'sahabah') {
+        // Sahabah may be local-only until a table exists; local save already done.
+      } else {
+        const table =
+          input.type === 'kitabs'
+            ? 'kitabs'
+            : input.type === 'audio'
+              ? 'audio_items'
+              : input.type === 'video'
+                ? 'video_items'
+                : 'pdf_items'
+        const patch: Record<string, unknown> = { updated_at: now }
+        if (input.title_en !== undefined) patch.title_en = input.title_en
+        if (input.title_am !== undefined) patch.title_am = input.title_am
+        if (input.author_en !== undefined && input.type === 'kitabs') patch.author_en = input.author_en
+        if (input.author_am !== undefined && input.type === 'kitabs') patch.author_am = input.author_am
+        if (input.description_en !== undefined) patch.description_en = input.description_en
+        if (input.description_am !== undefined) patch.description_am = input.description_am
+        if (input.type === 'kitabs') {
+          if (input.cover_asset_id !== undefined) patch.cover_asset_id = input.cover_asset_id
+          if (input.pdf_asset_id !== undefined) patch.pdf_asset_id = input.pdf_asset_id
+          const localKitab = store.kitabs.find(k => k.id === input.id)
+          if (localKitab?.metadata) patch.metadata = localKitab.metadata
+        }
+        if (input.type === 'audio') {
+          if (input.media_asset_id !== undefined) patch.media_asset_id = input.media_asset_id
+          if (input.cover_asset_id !== undefined) {
+            const { data: existing } = await sb
+              .from('audio_items')
+              .select('metadata')
+              .eq('id', input.id)
+              .maybeSingle()
+            const meta = {
+              ...((existing?.metadata as Record<string, unknown>) || {}),
+              cover_asset_id: input.cover_asset_id
+            }
+            patch.metadata = meta
+          }
+        }
+        if (input.type === 'video') {
+          if (input.video_asset_id !== undefined) patch.video_asset_id = input.video_asset_id
+          if (input.thumbnail_asset_id !== undefined || input.cover_asset_id !== undefined) {
+            patch.thumbnail_asset_id = input.thumbnail_asset_id ?? input.cover_asset_id
+          }
+        }
+        if (input.type === 'pdfs') {
+          if (input.pdf_asset_id !== undefined || input.media_asset_id !== undefined) {
+            patch.media_asset_id = input.pdf_asset_id ?? input.media_asset_id
+          }
+          if (input.cover_asset_id !== undefined) {
+            const { data: existing } = await sb
+              .from('pdf_items')
+              .select('metadata')
+              .eq('id', input.id)
+              .maybeSingle()
+            const meta = {
+              ...((existing?.metadata as Record<string, unknown>) || {}),
+              cover_asset_id: input.cover_asset_id
+            }
+            patch.metadata = meta
+          }
+        }
+
+        const { data, error } = await sb
+          .from(table)
+          .update(patch)
+          .eq('id', input.id)
+          .select('id')
+          .maybeSingle()
+        if (error) throw new Error(`Save failed (database): ${error.message}`)
+        if (!data) {
+          // Row exists only in Supabase under a different path — try upsert from local row
+          const localRow =
+            input.type === 'kitabs'
+              ? store.kitabs.find(k => k.id === input.id)
+              : input.type === 'audio'
+                ? store.audio_items.find(a => a.id === input.id)
+                : input.type === 'video'
+                  ? store.video_items.find(v => v.id === input.id)
+                  : store.pdf_items.find(p => p.id === input.id)
+          if (localRow) {
+            const { error: upErr } = await sb.from(table).upsert(localRow as Record<string, unknown>)
+            if (upErr) throw new Error(`Save failed (database upsert): ${upErr.message}`)
+          } else {
+            throw new Error('Item not found in database. Refresh Admin and try again.')
+          }
         }
       }
-      if (input.type === 'pdfs') {
-        if (input.pdf_asset_id !== undefined || input.media_asset_id !== undefined) {
-          patch.media_asset_id = input.pdf_asset_id ?? input.media_asset_id
-        }
-      }
-      await sb.from(table).update(patch).eq('id', input.id)
     }
   }
 

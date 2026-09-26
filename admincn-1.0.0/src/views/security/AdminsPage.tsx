@@ -61,7 +61,7 @@ function statusVariant(status: StaffStatus): 'default' | 'secondary' | 'destruct
 }
 
 const AdminsPage = () => {
-  const { can, profile } = useAuth()
+  const { can, loading: authLoading, profile } = useAuth()
   const [rows, setRows] = useState<StaffRow[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -83,6 +83,10 @@ const AdminsPage = () => {
   const [copied, setCopied] = useState(false)
 
   const load = useCallback(async () => {
+    if (authLoading) {
+      setLoading(true)
+      return
+    }
     if (!can('admins.view')) {
       setError(
         'Access denied. Only Super Admin can manage staff. Sign out and sign in again after bootstrap.'
@@ -105,7 +109,7 @@ const AdminsPage = () => {
     } finally {
       setLoading(false)
     }
-  }, [can])
+  }, [authLoading, can])
 
   useEffect(() => {
     void load()
@@ -258,7 +262,15 @@ const AdminsPage = () => {
     await load()
   }
 
-  if (error && rows.length === 0 && !loading) {
+  if (authLoading || loading) {
+    return (
+      <Card>
+        <CardContent className='text-muted-foreground py-6 text-sm'>Loading…</CardContent>
+      </Card>
+    )
+  }
+
+  if (error && rows.length === 0) {
     return (
       <Card>
         <CardContent className='text-destructive py-6 text-sm'>{error}</CardContent>

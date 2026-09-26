@@ -72,11 +72,11 @@ export async function loadSupabaseSnapshot(): Promise<CmsStoreSnapshot | null> {
   }
 }
 
-export async function upsertMediaAssetsRemote(assets: MediaAsset[]): Promise<void> {
+export async function upsertMediaAssetsRemote(assets: MediaAsset[]): Promise<MediaAsset[]> {
   const sb = getServiceSupabase()
-  if (!sb || assets.length === 0) return
+  if (!sb || assets.length === 0) return assets
 
-  // Chunk to avoid payload limits
+  const resolved: MediaAsset[] = []
   const chunkSize = 200
   for (let i = 0; i < assets.length; i += chunkSize) {
     const chunk = assets.slice(i, i + chunkSize)
@@ -84,7 +84,21 @@ export async function upsertMediaAssetsRemote(assets: MediaAsset[]): Promise<voi
       onConflict: 'storage_provider,bucket,object_key'
     })
     if (error) throw new Error(`media_assets upsert failed: ${error.message}`)
+
+    // Re-read by object key so cover_asset_id matches the row id in Supabase
+    for (const asset of chunk) {
+      const { data, error: readErr } = await sb
+        .from('media_assets')
+        .select('*')
+        .eq('storage_provider', asset.storage_provider)
+        .eq('bucket', asset.bucket)
+        .eq('object_key', asset.object_key)
+        .maybeSingle()
+      if (readErr) throw new Error(`media_assets read failed: ${readErr.message}`)
+      resolved.push((data as MediaAsset) || asset)
+    }
   }
+  return resolved
 }
 
 export async function insertScanRunRemote(run: ScanRun): Promise<void> {
