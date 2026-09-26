@@ -215,37 +215,60 @@ const ContentListPage = ({
       if (type === 'kitabs') {
         body.author_en = editAuthor || null
         body.author_am = editAuthorAm || null
-        if (editCover?.id) body.cover_asset_id = editCover.id
-        if (editPdf?.id) body.pdf_asset_id = editPdf.id
+        if (editCover?.id) {
+          body.cover_asset_id = editCover.id
+          body.cover_url = editCover.public_url || null
+        }
+        if (editPdf?.id) {
+          body.pdf_asset_id = editPdf.id
+          body.pdf_url = editPdf.public_url || null
+        }
       }
       if (type === 'audio') {
-        if (editCover?.id) body.cover_asset_id = editCover.id
+        if (editCover?.id) {
+          body.cover_asset_id = editCover.id
+          body.cover_url = editCover.public_url || null
+        }
         if (editMedia?.id) body.media_asset_id = editMedia.id
       }
       if (type === 'video') {
         if (editCover?.id) {
           body.cover_asset_id = editCover.id
           body.thumbnail_asset_id = editCover.id
+          body.cover_url = editCover.public_url || null
         }
         if (editMedia?.id) body.video_asset_id = editMedia.id
       }
       if (type === 'pdfs') {
-        if (editCover?.id) body.cover_asset_id = editCover.id
-        if (editPdf?.id) body.pdf_asset_id = editPdf.id
+        if (editCover?.id) {
+          body.cover_asset_id = editCover.id
+          body.cover_url = editCover.public_url || null
+        }
+        if (editPdf?.id) {
+          body.pdf_asset_id = editPdf.id
+          body.pdf_url = editPdf.public_url || null
+        }
       }
       if (type === 'sahabah' && editCover?.id) {
         body.cover_asset_id = editCover.id
+        body.cover_url = editCover.public_url || null
       }
 
-      const res = await fetch(`/api/admin/content/${type}`, {
+      const res = await fetch(`/api/admin/content/${type}?t=${Date.now()}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        cache: 'no-store'
       })
       const data = await res.json()
       if (!res.ok || !data.ok) throw new Error(data.error || 'Edit failed')
       setEditRow(null)
-      setSyncMsg(data.message || 'Saved. Website and mobile will show the update.')
+      const savedTitle = data.row?.title_en || data.row?.title_am || editTitleEn || editTitleAm
+      setSyncMsg(
+        `Saved: ${savedTitle || 'item'}. Cover: ${
+          editCover?.public_url ? 'yes' : type === 'kitabs' ? 'none (upload a cover image)' : '—'
+        }. Refresh the website page to see it.`
+      )
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))

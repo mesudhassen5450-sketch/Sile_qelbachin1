@@ -15,9 +15,9 @@ async function getStore(): Promise<CmsStoreSnapshot> {
     try {
       const remote = await loadSupabaseSnapshot()
       if (remote) {
-        // Prefer remote CMS tables, but keep local-only sahabah + any newer local media
+        // Media: union by object key (local uploads may be seconds ahead of remote)
         const mediaByKey = new Map(
-          [...remote.media_assets, ...local.media_assets].map(a => [
+          [...local.media_assets, ...remote.media_assets].map(a => [
             `${a.storage_provider}:${a.bucket}:${a.object_key}`,
             a
           ])
@@ -25,13 +25,16 @@ async function getStore(): Promise<CmsStoreSnapshot> {
         return {
           ...remote,
           media_assets: Array.from(mediaByKey.values()),
-          sahabah_items: local.sahabah_items?.length ? local.sahabah_items : remote.sahabah_items || [],
-          // Prefer local kitabs/audio if they have newer admin_ui creates not yet in remote count
-          kitabs: mergeById(remote.kitabs, local.kitabs),
-          ders: mergeById(remote.ders, local.ders),
-          audio_items: mergeById(remote.audio_items, local.audio_items),
-          video_items: mergeById(remote.video_items, local.video_items),
-          pdf_items: mergeById(remote.pdf_items, local.pdf_items)
+          sahabah_items: local.sahabah_items?.length
+            ? local.sahabah_items
+            : remote.sahabah_items || [],
+          reminders: remote.reminders?.length ? remote.reminders : local.reminders || [],
+          // Supabase is source of truth for published content (local must not hide Admin saves)
+          kitabs: mergePreferRemote(remote.kitabs, local.kitabs),
+          ders: mergePreferRemote(remote.ders, local.ders),
+          audio_items: mergePreferRemote(remote.audio_items, local.audio_items),
+          video_items: mergePreferRemote(remote.video_items, local.video_items),
+          pdf_items: mergePreferRemote(remote.pdf_items, local.pdf_items)
         }
       }
     } catch {
@@ -41,27 +44,19 @@ async function getStore(): Promise<CmsStoreSnapshot> {
   return local
 }
 
+/** Remote (Supabase) always wins for the same id. Local-only rows (not yet in DB) are kept. */
+function mergePreferRemote<T extends { id: string }>(remote: T[], local: T[]): T[] {
+  const map = new Map<string, T>()
+  for (const row of local) map.set(row.id, row)
+  for (const row of remote) map.set(row.id, row)
+  return Array.from(map.values())
+}
+
 function mergeById<T extends { id: string; updated_at?: string; created_at?: string }>(
   remote: T[],
   local: T[]
 ): T[] {
-  const map = new Map<string, T>()
-  for (const row of remote) map.set(row.id, row)
-  for (const row of local) {
-    const prev = map.get(row.id)
-    if (!prev) {
-      map.set(row.id, row)
-      continue
-    }
-    const prevT = Date.parse(prev.updated_at || prev.created_at || '') || 0
-    const nextT = Date.parse(row.updated_at || row.created_at || '') || 0
-    if (nextT >= prevT) map.set(row.id, row)
-  }
-  return Array.from(map.values()).sort((a, b) => {
-    const ta = Date.parse(a.updated_at || a.created_at || '') || 0
-    const tb = Date.parse(b.updated_at || b.created_at || '') || 0
-    return tb - ta
-  })
+  return mergePreferRemote(remote, local)
 }
 
 function sortRecent<T extends { updated_at?: string | null; created_at?: string | null }>(rows: T[]): T[] {
@@ -464,7 +459,7 @@ export async function PATCH(
     }
 
     const { updateContentMeta } = await import('@/lib/cms/delete-content')
-    await updateContentMeta({
+    const result = await updateContentMeta({
       type: normalized as import('@/lib/cms/delete-content').DeletableContentType,
       id,
       title_en: body.title_en,
@@ -477,9 +472,15 @@ export async function PATCH(
       pdf_asset_id: body.pdf_asset_id,
       media_asset_id: body.media_asset_id,
       video_asset_id: body.video_asset_id,
-      thumbnail_asset_id: body.thumbnail_asset_id
+      thumbnail_asset_id: body.thumbnail_asset_id,
+      cover_url: body.cover_url,
+      pdf_url: body.pdf_url
     })
-    return NextResponse.json({ ok: true, message: 'Updated. Website/mobile read public API.' })
+    return NextResponse.json({
+      ok: true,
+      message: 'Saved to database. Website / mobile will show this update.',
+      row: result.row || null
+    })
   } catch (err) {
     return NextResponse.json(
       { ok: false, error: err instanceof Error ? err.message : 'Update failed.' },

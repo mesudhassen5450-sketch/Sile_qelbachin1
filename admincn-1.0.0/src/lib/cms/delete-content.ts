@@ -181,7 +181,9 @@ export async function updateContentMeta(input: {
   media_asset_id?: string | null
   video_asset_id?: string | null
   thumbnail_asset_id?: string | null
-}): Promise<{ ok: true }> {
+  cover_url?: string | null
+  pdf_url?: string | null
+}): Promise<{ ok: true; row?: Record<string, unknown> | null }> {
   const store = loadLocalStore()
   const now = nowIso()
   let found = false
@@ -369,6 +371,8 @@ export async function updateContentMeta(input: {
           if (input.pdf_asset_id !== undefined) patch.pdf_asset_id = input.pdf_asset_id
           const localKitab = store.kitabs.find(k => k.id === input.id)
           const meta: Record<string, unknown> = { ...(localKitab?.metadata || {}) }
+          if (input.cover_url) meta.cover_url = input.cover_url
+          if (input.pdf_url) meta.pdf_url = input.pdf_url
           // Resolve public URLs from media_assets so website can show cover even if join lags
           if (input.cover_asset_id) {
             const { data: coverRow } = await sb
@@ -435,7 +439,7 @@ export async function updateContentMeta(input: {
           .from(table)
           .update(patch)
           .eq('id', input.id)
-          .select('id')
+          .select('*')
           .maybeSingle()
         if (error) throw new Error(`Save failed (database): ${error.message}`)
         if (!data) {
@@ -449,16 +453,29 @@ export async function updateContentMeta(input: {
                   ? store.video_items.find(v => v.id === input.id)
                   : store.pdf_items.find(p => p.id === input.id)
           if (localRow) {
-            const { error: upErr } = await sb.from(table).upsert(localRow as Record<string, unknown>)
+            const { data: upData, error: upErr } = await sb
+              .from(table)
+              .upsert(localRow as Record<string, unknown>)
+              .select('*')
+              .maybeSingle()
             if (upErr) throw new Error(`Save failed (database upsert): ${upErr.message}`)
+            return { ok: true, row: (upData as Record<string, unknown>) || null }
           } else {
             throw new Error('Item not found in database. Refresh Admin and try again.')
           }
         }
+        // Keep local mirror in sync with what Supabase actually stored
+        if (input.type === 'kitabs' && data) {
+          store.kitabs = store.kitabs.map(k =>
+            k.id === input.id ? { ...k, ...(data as object), updated_at: now } : k
+          )
+          saveLocalStore(store)
+        }
+        return { ok: true, row: data as Record<string, unknown> }
       }
     }
   }
 
-  return { ok: true }
+  return { ok: true, row: null }
 }
 

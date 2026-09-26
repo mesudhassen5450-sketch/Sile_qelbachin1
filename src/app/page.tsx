@@ -36,15 +36,78 @@ import HomeReminders from '@/components/HomeReminders';
 import HeroCardMedia from '@/components/HeroCardMedia';
 import PartnerIkhlasSection from '@/components/PartnerIkhlasSection';
 import { SITELINK_PAGES, getSitePageCopy } from '@/lib/seo';
+import { useEffect, useState } from 'react';
+
+const CMS_KITABS_URL = (
+  process.env.NEXT_PUBLIC_CMS_API_BASE || 'https://admin.sileqelbachin1.com/api/public/v1'
+).replace(/\/+$/, '') + '/kitabs';
 
 export default function HomePage() {
   const { t, getLocalized, language } = useLanguage();
 
-  const featuredKitabs = kitabsData.slice(0, 3);
-  const latestDersList = [...kitabsData[0].dersList].reverse().slice(0, 5);
+  const [featuredKitabs, setFeaturedKitabs] = useState(() => kitabsData.slice(0, 3));
+  const latestDersList = [...(featuredKitabs[0]?.dersList || kitabsData[0].dersList)].reverse().slice(0, 5);
   const featuredReminder = remindersData[0];
   const featuredSahabah = sahabahData[0];
   const featuredKnowledge = knowledgeData[0];
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${CMS_KITABS_URL}?t=${Date.now()}`, { cache: 'no-store' });
+        const body = await res.json();
+        if (!res.ok || !body?.ok || !Array.isArray(body.data) || !body.data.length) return;
+        const order = [
+          'intebih-ante-murakeb',
+          'adewae-kitab',
+          'fatihu-awliya',
+          'alwasail-almufida',
+          'teshilu-alimu-sheria',
+          'yekelb-medreq',
+          'betewbet-mengede-lay',
+        ];
+        const mapped = body.data.map((row: {
+          slug: string;
+          title?: { am?: string; en?: string; ar?: string };
+          author?: { am?: string; en?: string; ar?: string };
+          description?: { am?: string; en?: string; ar?: string };
+          coverImage?: string | null;
+          pdfUrl?: string | null;
+          dersCount?: number;
+          dersList?: typeof kitabsData[0]['dersList'];
+        }) => {
+          const loc = (v?: { am?: string; en?: string; ar?: string }) => ({
+            am: v?.am || '',
+            ar: v?.ar || '',
+            en: v?.en || '',
+          });
+          return {
+            slug: row.slug,
+            title: loc(row.title),
+            author: loc(row.author),
+            category: { am: '', ar: '', en: '' },
+            coverImage: row.coverImage || undefined,
+            pdfUrl: row.pdfUrl || undefined,
+            dersCount: row.dersCount ?? (row.dersList?.length || 0),
+            description: loc(row.description),
+            dersList: row.dersList || [],
+          };
+        });
+        mapped.sort((a: { slug: string }, b: { slug: string }) => {
+          const ia = order.indexOf(a.slug);
+          const ib = order.indexOf(b.slug);
+          return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+        });
+        if (!cancelled) setFeaturedKitabs(mapped.slice(0, 3));
+      } catch {
+        // keep static until API is reachable
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const appFeatures = [
     { label: t('appFeatureQibla'), icon: Compass },
