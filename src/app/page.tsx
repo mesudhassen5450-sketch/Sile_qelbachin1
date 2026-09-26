@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import HomeReminders from '@/components/HomeReminders';
 import HeroCardMedia from '@/components/HeroCardMedia';
+import PartnerIkhlasSection from '@/components/PartnerIkhlasSection';
 import { SITELINK_PAGES, getSitePageCopy } from '@/lib/seo';
 
 export default function HomePage() {
