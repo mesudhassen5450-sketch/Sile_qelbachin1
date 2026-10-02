@@ -4,6 +4,9 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   CloudDownloadIcon,
   EyeIcon,
+  HomeIcon,
+  MicIcon,
+  MicOffIcon,
   PencilIcon,
   PlusIcon,
   Trash2Icon
@@ -23,6 +26,7 @@ import {
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { useAdminLocale } from '@/context/AdminLocaleContext'
 import AddContentDialog from '@/views/content/AddContentDialog'
 import { KitabChildAudioEditor } from '@/views/content/KitabChildAudioEditor'
 import { R2FileField } from '@/views/content/R2FileField'
@@ -105,6 +109,7 @@ const ContentListPage = ({
   videoSection,
   pdfSection,
 }: ContentListPageProps) => {
+  const { lang, t } = useAdminLocale()
   const [rows, setRows] = useState<Row[]>([])
   const [count, setCount] = useState(0)
   const [q, setQ] = useState('')
@@ -122,6 +127,7 @@ const ContentListPage = ({
   const [editDescAm, setEditDescAm] = useState('')
   const [editPriority, setEditPriority] = useState('1')
   const [editFeatured, setEditFeatured] = useState(false)
+  const [editIsMuhadara, setEditIsMuhadara] = useState(false)
   const [editScheduledAt, setEditScheduledAt] = useState('')
   const [editCover, setEditCover] = useState<UploadedAsset | null>(null)
   const [editPdf, setEditPdf] = useState<UploadedAsset | null>(null)
@@ -135,6 +141,13 @@ const ContentListPage = ({
   const canManage = type !== 'library'
   const canSyncR2 =
     type === 'kitabs' || type === 'audio' || type === 'video' || type === 'pdfs' || type === 'library'
+
+  const displayTitle = (row: Row) => {
+    const en = String(row.title_en || row.name_en || '')
+    const am = String(row.title_am || row.name_am || '')
+    if (lang === 'am') return am || en || String(row.title || row.slug || row.id)
+    return en || am || String(row.title || row.slug || row.id)
+  }
 
   const defaultCategory =
     type === 'audio' && audioSection
@@ -260,6 +273,7 @@ const ContentListPage = ({
     setEditDescAm(String(row.description_am || ''))
     setEditPriority(String(row.priority ?? endPriorityDefault(rows.length)))
     setEditFeatured(Boolean(row.featured))
+    setEditIsMuhadara(Boolean(row.is_muhadara))
     setEditScheduledAt(
       row.scheduled_at
         ? new Date(String(row.scheduled_at)).toISOString().slice(0, 16)
@@ -382,6 +396,7 @@ const ContentListPage = ({
     const descAm = editDescAm
     const priority = editPriority
     const featured = editFeatured
+    const isMuhadara = editIsMuhadara
     const scheduledAt = editScheduledAt
 
     if (!row || type === 'library') return
@@ -401,8 +416,12 @@ const ContentListPage = ({
       }
       if (defaultCategory) {
         body.category = defaultCategory
-        if (type === 'audio' && audioSection === 'dawah') body.is_muhadara = true
-        if (type === 'audio' && audioSection === 'quran') body.is_muhadara = false
+      }
+      if (type === 'audio') {
+        // Explicit toggle — do not force muhadara=true for Da'wah section
+        if (audioSection === 'quran') body.is_muhadara = false
+        else if (audioSection === 'dawah' || audioSection === 'one_minute') body.is_muhadara = isMuhadara
+        else body.is_muhadara = isMuhadara
       }
       if (type === 'kitabs') {
         body.author_en = authorEn || null
@@ -610,8 +629,75 @@ const ContentListPage = ({
     )
   }
 
+  const quickPatch = async (id: string, patch: Record<string, unknown>, okMsg: string) => {
+    if (type === 'library') return
+    setBusyId(id)
+    setError(null)
+    setSaveOk(null)
+    try {
+      await patchContent({ id, ...patch })
+      setSaveOk(okMsg)
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   const ActionButtons = ({ row }: { row: Row }) => (
     <div className='flex flex-wrap items-center gap-1'>
+      {type === 'audio' || type === 'kitabs' || type === 'video' ? (
+        <Button
+          type='button'
+          size='sm'
+          variant={row.featured ? 'default' : 'outline'}
+          className={`h-8 gap-1 px-2 text-[11px] ${row.featured ? 'bg-amber-600 hover:bg-amber-700' : ''}`}
+          disabled={busyId === String(row.id)}
+          title={t({ en: 'Show on home page', am: 'በመነሻ ገጽ አሳይ' })}
+          onClick={() =>
+            void quickPatch(
+              String(row.id),
+              { featured: !row.featured },
+              row.featured
+                ? t({ en: 'Removed from home', am: 'ከመነሻ ተወግዷል' })
+                : t({ en: 'Marked for home page', am: 'ለመነሻ ገጽ ተመርጧል' })
+            )
+          }
+        >
+          <HomeIcon className='size-3.5' />
+          {row.featured
+            ? t({ en: 'On home', am: 'መነሻ' })
+            : t({ en: 'Home', am: 'መነሻ' })}
+        </Button>
+      ) : null}
+      {type === 'audio' && audioSection === 'dawah' ? (
+        <Button
+          type='button'
+          size='sm'
+          variant={row.is_muhadara ? 'default' : 'outline'}
+          className={`h-8 gap-1 px-2 text-[11px] ${row.is_muhadara ? 'bg-red-700 hover:bg-red-800' : ''}`}
+          disabled={busyId === String(row.id)}
+          title={t({
+            en: row.is_muhadara ? 'Mark as not muhadara' : 'Mark as muhadara',
+            am: row.is_muhadara ? 'ከሙሐደራ አውጣ' : 'እንደ ሙሐደራ ምልክት አድርግ',
+          })}
+          onClick={() =>
+            void quickPatch(
+              String(row.id),
+              { is_muhadara: !row.is_muhadara },
+              row.is_muhadara
+                ? t({ en: 'Marked: not muhadara', am: 'ሙሐደራ አይደለም' })
+                : t({ en: 'Marked as muhadara', am: 'እንደ ሙሐደራ ተመዘገበ' })
+            )
+          }
+        >
+          {row.is_muhadara ? <MicIcon className='size-3.5' /> : <MicOffIcon className='size-3.5' />}
+          {row.is_muhadara
+            ? t({ en: 'Muhadara', am: 'ሙሐደራ' })
+            : t({ en: 'Not muhadara', am: 'ሙሐደራ አይደለም' })}
+        </Button>
+      ) : null}
       <Button
         type='button'
         size='sm'
@@ -795,11 +881,14 @@ const ContentListPage = ({
         <CardContent className='p-3 sm:p-4'>
           <div className='grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
             {rows.map(row => (
-              <Card key={String(row.id)} className='overflow-hidden border-border/80 shadow-sm'>
+              <Card
+                key={String(row.id)}
+                className='group overflow-hidden border-border/80 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-red-600/40 hover:bg-red-600/[0.06] hover:shadow-md'
+              >
                 <MediaPreview row={row} />
                 <CardHeader className='space-y-1 p-3 pb-1'>
                   <CardTitle className='line-clamp-2 text-sm leading-snug'>
-                    {String(row.title || row.name_en || row.slug || row.object_key || row.id)}
+                    {displayTitle(row)}
                   </CardTitle>
                   <CardDescription className='line-clamp-1 text-xs'>{metaFor(row)}</CardDescription>
                 </CardHeader>
@@ -812,7 +901,19 @@ const ContentListPage = ({
                       P{String(row.priority ?? endPriorityDefault(count))}
                     </Badge>
                     {row.featured ? (
-                      <Badge className='bg-amber-600/90 text-[10px] text-white'>Featured</Badge>
+                      <Badge className='bg-amber-600/90 text-[10px] text-white'>
+                        {t({ en: 'Home', am: 'መነሻ' })}
+                      </Badge>
+                    ) : null}
+                    {type === 'audio' && row.is_muhadara ? (
+                      <Badge className='bg-red-700/90 text-[10px] text-white'>
+                        {t({ en: 'Muhadara', am: 'ሙሐደራ' })}
+                      </Badge>
+                    ) : null}
+                    {type === 'audio' && audioSection === 'dawah' && !row.is_muhadara ? (
+                      <Badge variant='outline' className='text-[10px]'>
+                        {t({ en: 'Not muhadara', am: 'ሙሐደራ አይደለም' })}
+                      </Badge>
                     ) : null}
                   </div>
                   {row.updated_at || row.created_at ? (
@@ -869,8 +970,7 @@ const ContentListPage = ({
           {viewRow ? (
             <div className='space-y-2 text-sm'>
               <p>
-                <span className='text-muted-foreground'>Title:</span>{' '}
-                {String(viewRow.title || viewRow.name_en || viewRow.slug)}
+                <span className='text-muted-foreground'>Title:</span> {displayTitle(viewRow)}
               </p>
               <p>
                 <span className='text-muted-foreground'>Status:</span> {String(viewRow.status || '—')}
@@ -991,15 +1091,32 @@ const ContentListPage = ({
                 onChange={e => setEditFeatured(e.target.checked)}
                 className='size-4 rounded border'
               />
-              Featured on home
+              {t({ en: 'Featured on home page', am: 'በመነሻ ገጽ ተመራጭ' })}
               {type === 'kitabs'
-                ? ' — home shows top 3 featured kitabs'
+                ? t({ en: ' — home shows top 3 featured kitabs', am: ' — መነሻ ላይ ከፍተኛ 3 ኪታብ' })
                 : type === 'audio'
-                  ? ' — home popular audio (top 3 featured, 1 min+ Da’wah talks)'
+                  ? t({
+                      en: ' — home popular audio (top 3 featured)',
+                      am: ' — መነሻ ታዋቂ ድምጽ (ከፍተኛ 3)',
+                    })
                   : type === 'video'
-                    ? ' — highlighted video lists'
+                    ? t({ en: ' — highlighted video lists', am: ' — የተመረጡ ቪዲዮዎች' })
                     : ''}
             </label>
+            {type === 'audio' && audioSection !== 'quran' ? (
+              <label className='flex items-center gap-2 text-sm'>
+                <input
+                  type='checkbox'
+                  checked={editIsMuhadara}
+                  onChange={e => setEditIsMuhadara(e.target.checked)}
+                  className='size-4 rounded border'
+                />
+                {t({
+                  en: 'Mark as muhadara (uncheck = not muhadara)',
+                  am: 'እንደ ሙሐደራ ምልክት አድርግ (ካልተመረጠ = ሙሐደራ አይደለም)',
+                })}
+              </label>
+            ) : null}
             {type === 'kitabs' || type === 'audio' || type === 'video' || type === 'pdfs' || type === 'sahabah' ? (
               <R2FileField
                 label='Cover image (replace)'

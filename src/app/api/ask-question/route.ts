@@ -33,11 +33,19 @@ type Row = {
 
 const OPEN_STATUSES = new Set(['new', 'assigned', 'in_review', 'user_replied'])
 
+function adminCmsBase(): string {
+  return (
+    process.env.NEXT_PUBLIC_CMS_API_BASE ||
+    process.env.CMS_API_BASE ||
+    'https://admin.sileqelbachin1.com/api/public/v1'
+  ).replace(/\/+$/, '')
+}
+
 function storePaths(): string[] {
   const cwd = process.cwd()
   return [
     join(cwd, '.data', 'question-submissions.json'),
-    // Admin CMS sibling folder (local monorepo)
+    // Admin CMS sibling folder (local monorepo only)
     join(cwd, 'admincn-1.0.0', '.data', 'question-submissions.json'),
   ]
 }
@@ -75,15 +83,12 @@ function findPendingForEmail(email: string): Row | undefined {
     .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0]
 }
 
-function saveEverywhere(row: Row) {
-  // Write once to website store, then mirror same id to Admin store.
-  // Do NOT also POST to Admin public API — that created duplicate inbox rows.
-  const paths = storePaths()
-  for (const path of paths) {
+function saveLocalMirror(row: Row) {
+  // Best-effort local mirror for monorepo / local admin — production Admin is authoritative via API.
+  for (const path of storePaths()) {
     try {
       const rows = loadFrom(path)
       if (rows.some(r => r.id === row.id)) continue
-      // Dedupe near-identical recent submissions
       const dup = rows.find(
         r =>
           r.auth_email === row.auth_email &&
@@ -101,7 +106,7 @@ function saveEverywhere(row: Row) {
 
 /**
  * Check whether the signed-in email already has an unanswered question.
- * GET /api/ask-question?email=user@example.com
+ * Prefers Admin CMS (production). Falls back to local files for offline/dev.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url)
@@ -111,6 +116,23 @@ export async function GET(request: Request) {
   if (!email.includes('@')) {
     return NextResponse.json({ ok: false, error: 'email required' }, { status: 400 })
   }
+
+  try {
+    const res = await fetch(`${adminCmsBase()}/questions?email=${encodeURIComponent(email)}&t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(10000),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      if (data && typeof data.pending === 'boolean') {
+        return NextResponse.json(data)
+      }
+    }
+  } catch {
+    /* fall through to local */
+  }
+
   const pending = findPendingForEmail(email)
   if (!pending) {
     return NextResponse.json({ ok: true, pending: false })
@@ -126,8 +148,8 @@ export async function GET(request: Request) {
 }
 
 /**
- * Public Ask-an-Ustaz intake — stores authenticated email + question for Admin inbox.
- * Blocks a second question while the first is still unanswered (open statuses).
+ * Public Ask-an-Ustaz intake — forwards to Admin CMS so the inbox on Render receives it.
+ * Also mirrors locally when possible (dev monorepo).
  */
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}))
@@ -146,6 +168,86 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'Question is too short.' }, { status: 400 })
   }
 
+  const payload = {
+    name,
+    contact: authEmail,
+    category,
+    question,
+    user_id: userId,
+    auth_email: authEmail,
+  }
+
+  // Production path: Admin on Render is the inbox source of truth
+  try {
+    const res = await fetch(`${adminCmsBase()}/questions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15000),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (res.status === 409 || data.pending) {
+      return NextResponse.json(
+        {
+          ok: false,
+          pending: true,
+          id: data.id,
+          question_preview: data.question_preview,
+          error:
+            data.error ||
+            'You already have a question waiting for an answer. Please check your email for the Ustaz reply before asking another.',
+          check_email: true,
+        },
+        { status: 409 }
+      )
+    }
+    if (res.ok && data.ok) {
+      // Local mirror (best effort)
+      const now = new Date().toISOString()
+      saveLocalMirror({
+        id: String(data.id || randomUUID()),
+        user_id: userId,
+        auth_email: authEmail,
+        name,
+        category,
+        question,
+        status: 'new',
+        assigned_to: null,
+        greeting: null,
+        answer: null,
+        description: null,
+        cover_url: null,
+        audio_url: null,
+        video_url: null,
+        published_public: false,
+        answered_at: null,
+        answered_by: null,
+        email_sent: false,
+        email_error: null,
+        admin_seen_at: null,
+        created_at: now,
+        updated_at: now,
+      })
+      return NextResponse.json({
+        ok: true,
+        id: data.id,
+        message:
+          data.message ||
+          'Question received. An Ustaz will answer and the reply will be sent to your email. Please stay alert.',
+      })
+    }
+    // If Admin returned a hard error, surface it
+    if (!res.ok) {
+      return NextResponse.json(
+        { ok: false, error: data.error || `Admin inbox error (${res.status}).` },
+        { status: 502 }
+      )
+    }
+  } catch {
+    /* Admin unreachable — try local fallback for offline/dev */
+  }
+
+  // Local/dev fallback when Admin API is unreachable
   const pending = findPendingForEmail(authEmail)
   if (pending) {
     return NextResponse.json(
@@ -188,7 +290,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    saveEverywhere(row)
+    saveLocalMirror(row)
   } catch (err) {
     return NextResponse.json(
       { ok: false, error: err instanceof Error ? err.message : 'Could not save.' },
@@ -200,6 +302,6 @@ export async function POST(request: Request) {
     ok: true,
     id: row.id,
     message:
-      'Question received. An Ustaz will answer and the reply will be sent to your email. Please stay alert.',
+      'Question received (saved locally). Deploy Admin CMS to sync inbox in production.',
   })
 }

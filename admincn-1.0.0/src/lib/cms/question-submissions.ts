@@ -172,6 +172,16 @@ export function listQuestionSubmissions(): QuestionSubmission[] {
   return deduped
 }
 
+export function findOpenQuestionByEmail(email: string): QuestionSubmission | undefined {
+  const e = String(email || '')
+    .trim()
+    .toLowerCase()
+  if (!e.includes('@')) return undefined
+  return listQuestionSubmissions()
+    .filter(r => r.auth_email?.toLowerCase() === e && OPEN_QUESTION_STATUSES.includes(r.status))
+    .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0]
+}
+
 export function createQuestionSubmission(input: {
   user_id?: string | null
   auth_email: string
@@ -183,6 +193,17 @@ export function createQuestionSubmission(input: {
   const question = String(input.question || '').trim()
   if (!email || !email.includes('@')) throw new Error('Authenticated email is required.')
   if (question.length < 5) throw new Error('Question is too short.')
+
+  const pending = findOpenQuestionByEmail(email)
+  if (pending) {
+    const err = new Error(
+      'You already have a question waiting for an answer. Please check your email before asking another.'
+    ) as Error & { code?: string; pendingId?: string; preview?: string }
+    err.code = 'PENDING'
+    err.pendingId = pending.id
+    err.preview = pending.question.slice(0, 160)
+    throw err
+  }
 
   const rows = loadAll()
   const nowMs = Date.now()

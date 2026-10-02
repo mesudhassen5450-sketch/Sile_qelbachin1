@@ -433,6 +433,27 @@ export async function GET(
   }
 
   if (resource === 'marriage' || resource === 'articles' || resource === 'questions') {
+    // Ask-form pending check: GET /questions?email=user@x.com (not the public Youth Q&A list)
+    if (resource === 'questions') {
+      const email = new URL(_request.url).searchParams.get('email')
+      if (email) {
+        const { findOpenQuestionByEmail } = await import('@/lib/cms/question-submissions')
+        const pending = findOpenQuestionByEmail(email)
+        if (!pending) {
+          return withCors(NextResponse.json({ ok: true, pending: false }))
+        }
+        return withCors(
+          NextResponse.json({
+            ok: true,
+            pending: true,
+            id: pending.id,
+            created_at: pending.created_at,
+            category: pending.category,
+            question_preview: pending.question.slice(0, 160),
+          })
+        )
+      }
+    }
     const { listPublishedYouthContent } = await import('@/lib/cms/youth-content')
     const kind = resource as 'marriage' | 'articles' | 'questions'
     const rows = listPublishedYouthContent(kind)
@@ -541,6 +562,22 @@ export async function POST(
         })
       )
     } catch (err) {
+      const e = err as Error & { code?: string; pendingId?: string; preview?: string }
+      if (e.code === 'PENDING') {
+        return withCors(
+          NextResponse.json(
+            {
+              ok: false,
+              pending: true,
+              id: e.pendingId,
+              question_preview: e.preview,
+              error: e.message,
+              check_email: true,
+            },
+            { status: 409 }
+          )
+        )
+      }
       return withCors(
         NextResponse.json(
           { ok: false, error: err instanceof Error ? err.message : 'Could not save question.' },

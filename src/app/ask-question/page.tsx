@@ -3,19 +3,26 @@
 import Link from 'next/link'
 import { FormEvent, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import CategoryPageHero from '@/components/CategoryPageHero'
 import { useAuth } from '@/context/AuthContext'
 import { useLanguage } from '@/context/LanguageContext'
 import { siteMetadata } from '@/data/channelData'
 
+const QURAN = {
+  arabic: 'فَاسْأَلُوا أَهْلَ الذِّكْرِ إِن كُنتُمْ لَا تَعْلَمُونَ',
+  am: '«የማታውቁ ከሆነ የእውቀቱን ባለቤቶች ጠይቁ።» (ሱረቱ አን-ነህል፡ 43)',
+  en: '"So ask the people of the message if you do not know." (Surah An-Nahl: 43)',
+  ar: '«فاسألوا أهل الذكر إن كنتم لا تعلمون» (سورة النحل: 43)',
+}
+
 const CATEGORIES = [
-  { en: 'General Islamic Question', am: 'አጠቃላይ የእስልምና ጥያቄ', ar: 'سؤال إسلامي عام' },
-  { en: 'Worship (Ibadah)', am: 'ዒባዳ (የአምልኮ ጉዳዮች)', ar: 'العبادة' },
-  { en: 'Family & Marriage', am: 'ቤተሰብ እና ጋብቻ', ar: 'الأسرة والزواج' },
-  { en: 'Personal Advice', am: 'የግል ምክር', ar: 'نصيحة شخصية' },
-  { en: 'Qur’an & Tafsir', am: 'ቁርኣን እና ተፍሲር', ar: 'القرآن والتفسير' },
-  { en: 'Hadith', am: 'ሐዲሥ', ar: 'الحديث' },
-  { en: 'Aqeedah (Faith)', am: 'ዐቂዳ (እምነት)', ar: 'العقيدة' },
+  { value: 'general', en: 'General Islamic Question', am: 'አጠቃላይ የእስልምና ጥያቄ', ar: 'سؤال إسلامي عام' },
+  { value: 'ibadah', en: 'Worship (Ibadah)', am: 'ዒባዳ (የአምልኮ ጉዳዮች)', ar: 'العبادة' },
+  { value: 'family', en: 'Family & Marriage', am: 'ቤተሰብ እና ጋብቻ', ar: 'الأسرة والزواج' },
+  { value: 'counseling', en: 'Personal Advice', am: 'የግል ምክር', ar: 'نصيحة شخصية' },
+  { value: 'quran', en: 'Qur’an & Tafsir', am: 'ቁርኣን እና ተፍሲር', ar: 'القرآن والتفسير' },
+  { value: 'hadith', en: 'Hadith', am: 'ሐዲሥ', ar: 'الحديث' },
+  { value: 'aqeedah', en: 'Aqeedah (Faith)', am: 'ዐቂዳ (እምነት)', ar: 'العقيدة' },
+  { value: 'other', en: 'Other…', am: 'ሌላ...', ar: 'أخرى…' },
 ]
 
 function cmsQuestionsUrl(): string {
@@ -23,7 +30,6 @@ function cmsQuestionsUrl(): string {
 }
 
 function gmailInboxUrl(email: string): string {
-  // Opens Gmail (or Google account mail) — user verifies the Ustaz answer arrived
   if (email.toLowerCase().endsWith('@gmail.com')) {
     return 'https://mail.google.com/mail/u/0/#inbox'
   }
@@ -31,7 +37,7 @@ function gmailInboxUrl(email: string): string {
 }
 
 export default function AskQuestionPage() {
-  const { getLocalized } = useLanguage()
+  const { getLocalized, language } = useLanguage()
   const { user, loading: authLoading, configured, displayName } = useAuth()
   const router = useRouter()
   const [submitted, setSubmitted] = useState(false)
@@ -39,10 +45,9 @@ export default function AskQuestionPage() {
   const [error, setError] = useState<string | null>(null)
   const [pendingCheck, setPendingCheck] = useState<'loading' | 'clear' | 'blocked'>('loading')
   const [pendingPreview, setPendingPreview] = useState<string | null>(null)
-  const [form, setForm] = useState({
-    category: CATEGORIES[0].en,
-    question: '',
-  })
+  const [categoryValue, setCategoryValue] = useState(CATEGORIES[0].value)
+  const [otherCategory, setOtherCategory] = useState('')
+  const [question, setQuestion] = useState('')
 
   useEffect(() => {
     if (authLoading) return
@@ -79,6 +84,15 @@ export default function AskQuestionPage() {
     }
   }, [user?.email])
 
+  const resolveCategoryLabel = () => {
+    if (categoryValue === 'other') {
+      const custom = otherCategory.trim()
+      return custom || getLocalized({ en: 'Other', am: 'ሌላ', ar: 'أخرى' })
+    }
+    const found = CATEGORIES.find(c => c.value === categoryValue)
+    return found ? getLocalized(found) : categoryValue
+  }
+
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -86,9 +100,25 @@ export default function AskQuestionPage() {
       router.replace('/login?next=/ask-question')
       return
     }
-    const q = form.question.trim()
+    if (categoryValue === 'other' && otherCategory.trim().length < 2) {
+      setError(
+        getLocalized({
+          en: 'Please briefly describe your category.',
+          am: 'እባክዎ የምድቡን ርዕስ በጥቂቱ ይግለጹ።',
+          ar: 'يرجى وصف التصنيف باختصار.',
+        })
+      )
+      return
+    }
+    const q = question.trim()
     if (q.length < 10) {
-      setError('Please write a clearer question (at least a few sentences).')
+      setError(
+        getLocalized({
+          en: 'Please write a clearer question (at least a few sentences).',
+          am: 'እባክዎ ጥያቄዎን በግልጽ ይጻፉ።',
+          ar: 'يرجى كتابة سؤال أوضح.',
+        })
+      )
       return
     }
 
@@ -98,7 +128,7 @@ export default function AskQuestionPage() {
         name: displayName || user.email,
         anonymous: false,
         contact: user.email,
-        category: form.category,
+        category: resolveCategoryLabel(),
         question: q,
         user_id: user.id,
         auth_email: user.email,
@@ -125,7 +155,13 @@ export default function AskQuestionPage() {
       setSubmitted(true)
       setPendingCheck('blocked')
     } catch {
-      setError('Could not send your question. Please try again in a moment.')
+      setError(
+        getLocalized({
+          en: 'Could not send your question. Please try again in a moment.',
+          am: 'ጥያቄዎን መላክ አልተቻለም። እባክዎ ትንሽ ቆይተው እንደገና ይሞክሩ።',
+          ar: 'تعذر إرسال سؤالك. حاول مرة أخرى.',
+        })
+      )
     } finally {
       setSubmitting(false)
     }
@@ -161,23 +197,40 @@ export default function AskQuestionPage() {
     )
   }
 
+  const ayahTranslation =
+    language === 'en' ? QURAN.en : language === 'ar' ? QURAN.ar : QURAN.am
+
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      <CategoryPageHero
-        emoji="🔒"
-        badge={{ en: 'Confidential', am: 'ምስጢራዊ', ar: 'سري' }}
-        title={{
-          en: 'Ask an Ustaz',
-          am: 'ኡስታዝን ጠይቅ',
-          ar: 'اسأل الأستاذ',
-        }}
-        description={{
-          en: 'Your private questions about Islamic life. Your question stays fully confidential.',
-          am: 'ስለ እስልምና ሕይወትዎ የሚኖሩዎት የግል ጥያቄዎች። ጥያቄዎ ሙሉ በሙሉ ምስጢራዊነቱ የተጠበቀ ነው።',
-          ar: 'أسئلتك الشخصية عن حياتك الإسلامية. سؤالك يبقى سرياً بالكامل.',
-        }}
-        showAskCta={false}
-      />
+      <section className="portfolio-card p-6 sm:p-8 space-y-5 text-center sm:text-start">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-[#A91F24] dark:text-red-400">
+          {getLocalized({ en: 'Confidential', am: 'ምስጢራዊ', ar: 'سري' })}
+        </p>
+        <div className="space-y-2 rounded-2xl border border-[#e5e7eb] dark:border-neutral-800 bg-[#f8f9fb]/80 dark:bg-neutral-900/50 px-4 py-4">
+          <p className="text-xl sm:text-2xl leading-relaxed text-[#111827] dark:text-neutral-100 arabic-text text-center" dir="rtl">
+            {QURAN.arabic}
+          </p>
+          <p className="text-sm sm:text-base font-medium text-[#6b7280] dark:text-neutral-400 text-center leading-relaxed">
+            {ayahTranslation}
+          </p>
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-[#111827] dark:text-white tracking-tight">
+            {getLocalized({
+              en: 'Submit your question',
+              am: 'ጥያቄዎን ያቅርቡ',
+              ar: 'قدّم سؤالك',
+            })}
+          </h1>
+          <p className="text-sm sm:text-base text-[#6b7280] dark:text-neutral-400 max-w-2xl leading-relaxed">
+            {getLocalized({
+              en: 'Your private questions about Islamic life. Your question stays fully confidential.',
+              am: 'ስለ እስልምና ሕይወትዎ የሚኖሩዎት የግል ጥያቄዎች። ጥያቄዎ ሙሉ በሙሉ ምስጢራዊነቱ የተጠበቀ ነው።',
+              ar: 'أسئلتك الشخصية عن حياتك الإسلامية. سؤالك يبقى سرياً بالكامل.',
+            })}
+          </p>
+        </div>
+      </section>
 
       {pendingCheck === 'blocked' && !submitted ? (
         <div
@@ -296,34 +349,57 @@ export default function AskQuestionPage() {
               ar: `مسجّل بحساب ${user.email}`,
             })}
           </p>
-          <p className="text-xs text-amber-700 dark:text-amber-300/90 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-xl px-3 py-2">
+          <p className="text-xs text-amber-800 dark:text-amber-300/90 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-xl px-3 py-2.5 leading-relaxed">
             {getLocalized({
-              en: 'Please send only one question at a time. After you submit, wait until a reply reaches your email.',
-              am: 'እባክዎ በአንድ ጊዜ አንድ ጥያቄ ብቻ ይላኩ። ጥያቄዎ ከተላከ በኋላ በኢሜይልዎ ምላሽ እስኪደርስዎት ድረስ ይጠብቁ።',
-              ar: 'يرجى إرسال سؤال واحد فقط في كل مرة. بعد الإرسال انتظر حتى يصلك الرد على بريدك.',
+              en: 'Please send only one question at a time. After you submit, wait patiently until a reply reaches your email.',
+              am: 'እባክዎን በአንድ ጊዜ አንድ ጥያቄ ብቻ ይላኩ። ጥያቄዎ ከተላከ በኋላ በኢሜይልዎ ምላሽ እስኪደርስዎት ድረስ በትዕግሥት ይጠብቁ።',
+              ar: 'يرجى إرسال سؤال واحد فقط في كل مرة. بعد الإرسال انتظر بصبر حتى يصلك الرد على بريدك.',
             })}
           </p>
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-neutral-500">
               {getLocalized({
-                en: 'Question category (optional)',
-                am: 'የጥያቄው ምድብ (አማራጭ)',
-                ar: 'تصنيف السؤال (اختياري)',
+                en: 'Question category (select)',
+                am: 'የጥያቄው ምድብ (ይምረጡ)',
+                ar: 'تصنيف السؤال (اختر)',
               })}
             </label>
             <select
-              value={form.category}
-              onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+              value={categoryValue}
+              onChange={e => setCategoryValue(e.target.value)}
               className="w-full rounded-xl border border-[#E7E2D8] dark:border-neutral-700 bg-white dark:bg-neutral-900 px-4 py-2.5 text-sm"
             >
               {CATEGORIES.map(c => (
-                <option key={c.en} value={c.en}>
+                <option key={c.value} value={c.value}>
                   {getLocalized(c)}
                 </option>
               ))}
             </select>
           </div>
+
+          {categoryValue === 'other' ? (
+            <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+              <label className="text-xs font-semibold text-neutral-500">
+                {getLocalized({
+                  en: 'Briefly describe your topic / category',
+                  am: 'የጥያቄዎን ርዕስ/ምድብ በጥቂቱ ይግለጹ',
+                  ar: 'صف موضوع سؤالك باختصار',
+                })}
+              </label>
+              <input
+                type="text"
+                value={otherCategory}
+                onChange={e => setOtherCategory(e.target.value)}
+                className="w-full rounded-xl border border-[#E7E2D8] dark:border-neutral-700 bg-white dark:bg-neutral-900 px-4 py-2.5 text-sm"
+                placeholder={getLocalized({
+                  en: 'e.g. business, social relations…',
+                  am: 'ለምሳሌ፦ ንግድ፣ ማኅበራዊ ግንኙነት...',
+                  ar: 'مثلاً: التجارة، العلاقات الاجتماعية…',
+                })}
+              />
+            </div>
+          ) : null}
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-neutral-500">
@@ -332,8 +408,8 @@ export default function AskQuestionPage() {
             <textarea
               required
               rows={6}
-              value={form.question}
-              onChange={e => setForm(f => ({ ...f, question: e.target.value }))}
+              value={question}
+              onChange={e => setQuestion(e.target.value)}
               className="w-full rounded-xl border border-[#E7E2D8] dark:border-neutral-700 bg-white dark:bg-neutral-900 px-4 py-3 text-sm"
               placeholder={getLocalized({
                 en: 'Write your question clearly here…',
