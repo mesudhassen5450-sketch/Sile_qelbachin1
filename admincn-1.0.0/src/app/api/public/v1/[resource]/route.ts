@@ -491,7 +491,7 @@ export async function GET(
             audioUrl: tafsirAudio || media?.public_url || null,
             videoUrl: tafsirVideo,
           },
-          duration: a.duration || null,
+          duration: a.duration_label || null,
           series: typeof a.metadata?.series === 'string' ? a.metadata.series : null,
           episode:
             typeof a.metadata?.episode === 'number'
