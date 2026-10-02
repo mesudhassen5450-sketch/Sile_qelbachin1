@@ -206,7 +206,7 @@ export default function AskQuestionPage() {
           ) : null}
           <div className="flex flex-wrap justify-center gap-2 pt-2">
             <a
-              href={gmailInboxUrl(user.email)}
+              href={gmailInboxUrl(user.email || '')}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex px-5 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition"
@@ -262,7 +262,7 @@ export default function AskQuestionPage() {
           </p>
           <div className="flex flex-wrap justify-center gap-2 pt-2">
             <a
-              href={gmailInboxUrl(user.email)}
+              href={gmailInboxUrl(user.email || '')}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex px-5 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition"

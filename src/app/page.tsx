@@ -466,13 +466,19 @@ export default function HomePage() {
               const f = fallback[i]
               const audioUrl = (c?.audioUrl || f?.audioUrl || '').trim()
               if (!audioUrl) continue
-              const title = c?.title || f?.title
-              const speaker = c?.speaker || f?.speaker
-              if (!title || !speaker) continue
+              const titleRaw = c?.title || f?.title
+              const speakerRaw = c?.speaker || f?.speaker
+              if (!titleRaw || !speakerRaw) continue
+              const asLoc = (
+                v: string | { am?: string; ar?: string; en?: string }
+              ): { am: string; ar: string; en: string } =>
+                typeof v === 'string'
+                  ? { am: v, ar: v, en: v }
+                  : { am: v.am || '', ar: v.ar || '', en: v.en || '' }
               ders.push({
                 id: c?.id || f?.id || `intebih-part-${i + 1}`,
-                title,
-                speaker,
+                title: asLoc(titleRaw),
+                speaker: asLoc(speakerRaw),
                 audioUrl,
                 partNum: i + 1,
               })

@@ -21,7 +21,7 @@ import { formatDuration } from '@/lib/mediaDuration'
 
 export type FeedFilter = 'all' | 'video' | 'audio' | 'text'
 
-type Slide = CmsOneMinute & { durationSeconds?: number }
+type Slide = CmsOneMinute & { durationSeconds?: number | null }
 
 type Props = {
   slides: Slide[]

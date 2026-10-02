@@ -20,6 +20,8 @@ export interface MediaItem {
   monthYear?: string;
   rawFilename?: string;
   childAudios?: MediaItem[];
+  thumbnailUrl?: string;
+  coverUrl?: string;
 }
 
 const safeEncodeSegment = (segment: string): string => {

@@ -1,11 +1,12 @@
 {
   "compilerOptions": {
-    "target": "es5",
+    "target": "ES2017",
     "lib": [
       "dom",
       "dom.iterable",
-      "esnext"
+      "es2017"
     ],
+    "downlevelIteration": true,
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -26,30 +27,6 @@
     "paths": {
       "@/*": [
         "./src/*"
-      ],
-      "@supabase/supabase-js": [
-        "./vendor/@supabase/supabase-js"
-      ],
-      "@supabase/ssr": [
-        "./vendor/@supabase/ssr"
-      ],
-      "@supabase/auth-js": [
-        "./vendor/@supabase/auth-js"
-      ],
-      "@supabase/functions-js": [
-        "./vendor/@supabase/functions-js"
-      ],
-      "@supabase/postgrest-js": [
-        "./vendor/@supabase/postgrest-js"
-      ],
-      "@supabase/realtime-js": [
-        "./vendor/@supabase/realtime-js"
-      ],
-      "@supabase/storage-js": [
-        "./vendor/@supabase/storage-js"
-      ],
-      "iceberg-js": [
-        "./vendor/iceberg-js"
       ]
     }
   },

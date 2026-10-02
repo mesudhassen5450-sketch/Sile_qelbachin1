@@ -8,7 +8,7 @@ import { useLanguage } from '@/context/LanguageContext'
 import { fetchPublishedOneMinute, type CmsOneMinute } from '@/lib/cmsClient'
 import { getLocalOneMinuteSlides } from '@/data/oneMinuteCatalog'
 
-type Slide = CmsOneMinute & { durationSeconds?: number }
+type Slide = CmsOneMinute & { durationSeconds?: number | null }
 
 export default function OneMinutePage() {
   const { getLocalized } = useLanguage()
