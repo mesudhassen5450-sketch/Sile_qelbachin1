@@ -97,7 +97,6 @@ export async function sendUstazAnswerEmail(input: {
 
   const copy = am
     ? {
-        intro: 'ከስለ ቀልባችን የእስልምና ጥያቄና መልስ አገልግሎት የኡስታዝ መልስ ደርሶዎታል።',
         category: 'ምድብ',
         yourQuestion: 'ጥያቄዎ',
         answer: 'መልስ',
@@ -108,7 +107,6 @@ export async function sendUstazAnswerEmail(input: {
         videoLink: 'ቪዲዮ መልስ ይክፈቱ',
       }
     : {
-        intro: 'An Ustaz has answered your private question on Sile Qelbachin.',
         category: 'Category',
         yourQuestion: 'Your question',
         answer: 'Answer',
@@ -121,8 +119,6 @@ export async function sendUstazAnswerEmail(input: {
 
   const text = [
     greeting,
-    '',
-    copy.intro,
     '',
     input.category ? `${copy.category}: ${input.category}` : null,
     '',
@@ -168,7 +164,6 @@ export async function sendUstazAnswerEmail(input: {
     </div>
     <div style="padding:24px">
       <p style="margin:0 0 16px;font-size:15px">${escapeHtml(greeting)}</p>
-      <p style="margin:0 0 20px;font-size:14px;color:#333">${escapeHtml(copy.intro)}</p>
       ${
         input.category
           ? `<p style="margin:0 0 16px;font-size:13px;color:#555"><strong>${escapeHtml(copy.category)}:</strong> ${escapeHtml(input.category)}</p>`

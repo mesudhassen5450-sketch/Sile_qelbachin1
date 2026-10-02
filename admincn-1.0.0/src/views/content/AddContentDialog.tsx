@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { PlusIcon, TrashIcon } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -61,7 +61,8 @@ const AddContentDialog = ({
   const [descriptionEn, setDescriptionEn] = useState('')
   const [descriptionAm, setDescriptionAm] = useState('')
   const [biographyEn, setBiographyEn] = useState('')
-  const [isMuhadara, setIsMuhadara] = useState(false)
+  const [isMuhadara, setIsMuhadara] = useState(Boolean(defaultIsMuhadara))
+  const [featured, setFeatured] = useState(false)
 
   const [cover, setCover] = useState<UploadedAsset | null>(null)
   const [mainFile, setMainFile] = useState<UploadedAsset | null>(null)
@@ -75,11 +76,16 @@ const AddContentDialog = ({
     setDescriptionEn('')
     setDescriptionAm('')
     setBiographyEn('')
-    setIsMuhadara(false)
+    setIsMuhadara(Boolean(defaultIsMuhadara))
+    setFeatured(false)
     setCover(null)
     setMainFile(null)
     setDers([])
   }
+
+  useEffect(() => {
+    if (open) setIsMuhadara(Boolean(defaultIsMuhadara))
+  }, [open, defaultIsMuhadara])
 
   const addDersRow = () => {
     setDers(prev => [
@@ -102,7 +108,7 @@ const AddContentDialog = ({
           return
         }
         const dersReady = ders.filter(d => d.audio?.id)
-          if (!cover?.id && !mainFile?.id && dersReady.length === 0) {
+        if (!cover?.id && !mainFile?.id && dersReady.length === 0) {
           setError('Please upload at least one file: cover image, PDF, or ders audio.')
           return
         }
@@ -114,6 +120,7 @@ const AddContentDialog = ({
           description_am: descriptionAm || null,
           cover_asset_id: cover?.id || null,
           pdf_asset_id: mainFile?.id || null,
+          featured,
           status: 'published',
           ders: dersReady.map((d, i) => ({
             title_en: d.title_en || `Ders ${i + 1}`,
@@ -128,14 +135,19 @@ const AddContentDialog = ({
           setError('Audio file upload is required.')
           return
         }
+        if (!titleEn.trim() && !titleAm.trim()) {
+          setError('Title (EN or AM) is required.')
+          return
+        }
         body = {
-          title_en: titleEn || 'Audio',
+          title_en: titleEn.trim() || titleAm.trim() || 'Audio',
           title_am: titleAm || null,
           description_en: descriptionEn || null,
           description_am: descriptionAm || null,
           media_asset_id: mainFile.id,
           cover_asset_id: cover?.id || null,
-          is_muhadara: defaultIsMuhadara !== undefined ? defaultIsMuhadara : isMuhadara,
+          is_muhadara: isMuhadara,
+          featured,
           category: defaultCategory || (isMuhadara ? 'dawah' : 'quran'),
           status: 'published'
         }
@@ -144,13 +156,18 @@ const AddContentDialog = ({
           setError('Video file upload is required.')
           return
         }
+        if (!titleEn.trim() && !titleAm.trim()) {
+          setError('Title (EN or AM) is required.')
+          return
+        }
         body = {
-          title_en: titleEn || 'Video',
+          title_en: titleEn.trim() || titleAm.trim() || 'Video',
           title_am: titleAm || null,
           description_en: descriptionEn || null,
           description_am: descriptionAm || null,
           video_asset_id: mainFile.id,
           cover_asset_id: cover?.id || null,
+          featured,
           category: defaultCategory || 'long',
           status: 'published'
         }
@@ -164,6 +181,7 @@ const AddContentDialog = ({
           title_am: titleAm || null,
           media_asset_id: mainFile.id,
           cover_asset_id: cover?.id || null,
+          featured,
           category: defaultCategory || 'pdf',
           status: 'published'
         }
@@ -185,25 +203,46 @@ const AddContentDialog = ({
         endpoint = '/api/admin/content/sahabah'
       }
 
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      })
-      const data = await res.json()
+      const controller = new AbortController()
+      const timer = window.setTimeout(() => controller.abort(), 90000)
+      let res: Response
+      try {
+        res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: controller.signal
+        })
+      } finally {
+        window.clearTimeout(timer)
+      }
+      const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.ok) {
-        setError(data.error || 'Create failed.')
+        setError(
+          typeof data.error === 'string'
+            ? data.error
+            : res.status === 502 || res.status === 503
+              ? 'Admin is restarting. Wait a minute, then try again.'
+              : 'Create failed.'
+        )
         return
       }
       reset()
       onOpenChange(false)
       onCreated()
-    } catch {
-      setError('Create failed.')
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setError('Save timed out. Refresh the list — if the item is missing, upload again.')
+      } else {
+        setError('Create failed (network). Check your connection and try again.')
+      }
     } finally {
       setBusy(false)
     }
   }
+
+  const showFeatured = kind === 'kitabs' || kind === 'audio' || kind === 'video' || kind === 'pdfs'
+  const showMuhadara = kind === 'audio'
 
   return (
     <Dialog
@@ -217,15 +256,21 @@ const AddContentDialog = ({
         <DialogHeader>
           <DialogTitle>{titles[kind]}</DialogTitle>
           <DialogDescription>
-            Add titles and files, then publish. New items appear on the website and in the app.
+            Add titles and files, then publish. New items appear first in this list and on the website /
+            app.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={e => void onSubmit(e)} className='space-y-4'>
           <FieldGroup className='gap-3'>
             <Field>
-              <FieldLabel>Title (EN)*</FieldLabel>
-              <Input value={titleEn} onChange={e => setTitleEn(e.target.value)} required={kind !== 'kitabs'} />
+              <FieldLabel>Title (EN){kind === 'kitabs' || kind === 'audio' || kind === 'video' ? '' : '*'}</FieldLabel>
+              <Input
+                value={titleEn}
+                onChange={e => setTitleEn(e.target.value)}
+                required={kind !== 'kitabs' && kind !== 'audio' && kind !== 'video' && kind !== 'sahabah'}
+                placeholder={kind === 'audio' || kind === 'video' ? 'Optional if Title (AM) is set' : undefined}
+              />
             </Field>
             <Field>
               <FieldLabel>Title (AM)</FieldLabel>
@@ -273,10 +318,32 @@ const AddContentDialog = ({
               </Field>
             ) : null}
 
-            {kind === 'audio' ? (
+            {showFeatured ? (
+              <label className='flex items-start gap-2 text-sm'>
+                <input
+                  type='checkbox'
+                  className='mt-0.5 size-4 rounded border'
+                  checked={featured}
+                  onChange={e => setFeatured(e.target.checked)}
+                />
+                <span>
+                  Featured on home page
+                  {kind === 'audio'
+                    ? ' — home popular audio (top 3 featured)'
+                    : kind === 'kitabs'
+                      ? ' — home shows top 3 featured kitabs'
+                      : kind === 'video'
+                        ? ' — highlighted video lists'
+                        : ''}
+                </span>
+              </label>
+            ) : null}
+
+            {showMuhadara ? (
               <label className='flex items-center gap-2 text-sm'>
                 <input
                   type='checkbox'
+                  className='size-4 rounded border'
                   checked={isMuhadara}
                   onChange={e => setIsMuhadara(e.target.checked)}
                 />

@@ -375,6 +375,7 @@ export async function POST(
         cover_asset_id: body.cover_asset_id || null,
         pdf_asset_id: body.pdf_asset_id || null,
         slug: body.slug,
+        featured: Boolean(body.featured),
         status: body.status || 'published',
         ders: Array.isArray(body.ders) ? body.ders : []
       })
@@ -427,6 +428,7 @@ export async function POST(
         description_en: body.description_en,
         category: body.category,
         is_muhadara: Boolean(body.is_muhadara),
+        featured: Boolean(body.featured),
         media_asset_id: mediaAssetId,
         cover_asset_id: body.cover_asset_id || null,
         status: body.status || 'published'
@@ -450,6 +452,7 @@ export async function POST(
         description_ar: body.description_ar,
         description_en: body.description_en,
         category: body.category,
+        featured: Boolean(body.featured),
         video_asset_id: videoAssetId,
         cover_asset_id: body.cover_asset_id || body.thumbnail_asset_id || null,
         status: body.status || 'published'
@@ -472,6 +475,7 @@ export async function POST(
         media_asset_id: mediaAssetId,
         cover_asset_id: body.cover_asset_id || null,
         category: body.category || 'pdf',
+        featured: Boolean(body.featured),
         status: body.status || 'published'
       })
       return NextResponse.json({ ok: true, row, published: true })

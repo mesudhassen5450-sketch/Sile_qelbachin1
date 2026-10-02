@@ -5,17 +5,46 @@ import {
   saveLocalStore,
   upsertBySlug
 } from '@/lib/cms/local-store'
-import { insertNewAtFront } from '@/lib/cms/priority-cascade'
-import { getServiceSupabase, isSupabaseConfigured } from '@/lib/cms/supabase'
+import { insertNewAtFront, syncPriorityAssignments } from '@/lib/cms/priority-cascade'
+import { getServiceSupabase, isSupabaseConfigured, upsertMediaAssetsRemote } from '@/lib/cms/supabase'
 import type {
   AudioItemRecord,
   ContentStatus,
   DersRecord,
   KitabRecord,
+  MediaAsset,
   PdfItemRecord,
   SahabahRecord,
   VideoItemRecord
 } from '@/lib/cms/types'
+
+/** Fail loudly so Admin never reports success for an item that only lived on ephemeral disk. */
+async function requireUpsert(
+  table: string,
+  row: Record<string, unknown>,
+  onConflict: string
+): Promise<void> {
+  const sb = getServiceSupabase()
+  if (!sb) throw new Error('Database is not configured on Admin (Supabase).')
+  const { error } = await sb.from(table).upsert(row, { onConflict })
+  if (error) {
+    throw new Error(`Could not save to ${table}: ${error.message}`)
+  }
+}
+
+async function syncLinkedMedia(store: ReturnType<typeof loadLocalStore>, ids: Array<string | null | undefined>) {
+  const assets: MediaAsset[] = []
+  for (const id of ids) {
+    if (!id) continue
+    const asset = store.media_assets.find(a => a.id === id)
+    if (!asset) {
+      throw new Error('Uploaded file is missing from the media library. Upload the file again, then save.')
+    }
+    assets.push(asset)
+  }
+  if (!assets.length || !isSupabaseConfigured()) return
+  await upsertMediaAssetsRemote(assets)
+}
 
 function slugify(input: string): string {
   return input
@@ -66,6 +95,7 @@ export type CreateKitabInput = {
   pdf_asset_id?: string | null
   slug?: string
   status?: ContentStatus
+  featured?: boolean
   ders?: Array<{
     title_am?: string
     title_ar?: string
@@ -108,7 +138,7 @@ export async function createKitabWithDers(input: CreateKitabInput) {
     ders_count: input.ders?.length || 0,
     status,
     priority: 1,
-    featured: false,
+    featured: Boolean(input.featured),
     scheduled_at: null,
     legacy_source: 'admin_create',
     metadata: { source: 'admin_ui' },
@@ -150,21 +180,25 @@ export async function createKitabWithDers(input: CreateKitabInput) {
   const up = upsertBySlug(store.kitabs, kitab)
   store.kitabs = up.rows
   store.ders = [...store.ders, ...dersRows]
-  await insertNewAtFront(store, 'kitabs', kitab.id, now, { persist: false })
+  const assignments = await insertNewAtFront(store, 'kitabs', kitab.id, now, { persist: false })
   saveLocalStore(store)
 
   if (isSupabaseConfigured()) {
-    const sb = getServiceSupabase()
-    if (sb) {
-      const fresh = store.kitabs.find(k => k.id === kitab.id) || kitab
-      await sb.from('kitabs').upsert(fresh, { onConflict: 'slug' })
-      // Cascade sibling kitabs that shifted down
-      for (const k of store.kitabs) {
-        if (k.id === kitab.id) continue
-        await sb.from('kitabs').update({ priority: k.priority, updated_at: now }).eq('id', k.id)
-      }
-      if (dersRows.length)
-        await sb.from('ders').upsert(dersRows.map(dersPayloadForSupabase), { onConflict: 'id' })
+    await syncLinkedMedia(store, [
+      kitab.cover_asset_id,
+      kitab.pdf_asset_id,
+      ...dersRows.map(d => d.audio_asset_id),
+    ])
+    const fresh = store.kitabs.find(k => k.id === kitab.id) || kitab
+    await requireUpsert('kitabs', fresh as unknown as Record<string, unknown>, 'slug')
+    await syncPriorityAssignments('kitabs', assignments, now)
+    if (dersRows.length) {
+      const sb = getServiceSupabase()
+      if (!sb) throw new Error('Database is not configured on Admin (Supabase).')
+      const { error } = await sb
+        .from('ders')
+        .upsert(dersRows.map(dersPayloadForSupabase), { onConflict: 'id' })
+      if (error) throw new Error(`Could not save ders: ${error.message}`)
     }
   }
 
@@ -180,6 +214,7 @@ export async function createAudioItem(input: {
   description_en?: string
   category?: string
   is_muhadara?: boolean
+  featured?: boolean
   media_asset_id: string
   cover_asset_id?: string | null
   status?: ContentStatus
@@ -187,6 +222,9 @@ export async function createAudioItem(input: {
   const store = loadLocalStore()
   const now = nowIso()
   const status: ContentStatus = input.status || 'published'
+  if (!store.media_assets.some(a => a.id === input.media_asset_id)) {
+    throw new Error('Audio file not found. Upload the file again, then click Upload & publish.')
+  }
   markAssetLinked(store, input.media_asset_id)
   markAssetLinked(store, input.cover_asset_id)
 
@@ -213,7 +251,7 @@ export async function createAudioItem(input: {
       category === 'one_minute' ? false : Boolean(input.is_muhadara ?? category === 'dawah'),
     status,
     priority: 1,
-    featured: false,
+    featured: Boolean(input.featured),
     scheduled_at: null,
     metadata: {
       source: 'admin_ui',
@@ -227,19 +265,14 @@ export async function createAudioItem(input: {
   }
 
   store.audio_items = [row, ...store.audio_items]
-  await insertNewAtFront(store, 'audio', row.id, now, { persist: false })
+  const assignments = await insertNewAtFront(store, 'audio', row.id, now, { persist: false })
   saveLocalStore(store)
 
   if (isSupabaseConfigured()) {
-    const sb = getServiceSupabase()
-    if (sb) {
-      const fresh = store.audio_items.find(a => a.id === row.id) || row
-      await sb.from('audio_items').upsert(fresh, { onConflict: 'id' })
-      for (const a of store.audio_items) {
-        if (a.id === row.id) continue
-        await sb.from('audio_items').update({ priority: a.priority, updated_at: now }).eq('id', a.id)
-      }
-    }
+    await syncLinkedMedia(store, [input.media_asset_id, input.cover_asset_id])
+    const fresh = store.audio_items.find(a => a.id === row.id) || row
+    await requireUpsert('audio_items', fresh as unknown as Record<string, unknown>, 'id')
+    await syncPriorityAssignments('audio', assignments, now)
   }
 
   return store.audio_items.find(a => a.id === row.id) || row
@@ -253,6 +286,7 @@ export async function createVideoItem(input: {
   description_ar?: string
   description_en?: string
   category?: string
+  featured?: boolean
   video_asset_id: string
   cover_asset_id?: string | null
   status?: ContentStatus
@@ -260,9 +294,16 @@ export async function createVideoItem(input: {
   const store = loadLocalStore()
   const now = nowIso()
   const status: ContentStatus = input.status || 'published'
+  if (!store.media_assets.some(a => a.id === input.video_asset_id)) {
+    throw new Error('Video file not found. Upload the file again, then click Upload & publish.')
+  }
   markAssetLinked(store, input.video_asset_id)
   markAssetLinked(store, input.cover_asset_id)
 
+  const category =
+    String(input.category || 'archive')
+      .trim()
+      .toLowerCase() || 'archive'
   const row: VideoItemRecord = {
     id: newId(),
     legacy_id: `admin-video-${Date.now()}`,
@@ -272,7 +313,7 @@ export async function createVideoItem(input: {
     description_am: input.description_am || null,
     description_ar: input.description_ar || null,
     description_en: input.description_en || null,
-    category: input.category || 'archive',
+    category,
     video_asset_id: input.video_asset_id,
     thumbnail_asset_id: input.cover_asset_id || null,
     duration_label: null,
@@ -280,28 +321,26 @@ export async function createVideoItem(input: {
     download_count: 0,
     status,
     priority: 1,
-    featured: false,
+    featured: Boolean(input.featured),
     scheduled_at: null,
-    metadata: { source: 'admin_ui' },
+    metadata: {
+      source: 'admin_ui',
+      video_section: category === 'one_minute' ? 'one_minute' : 'long',
+    },
     created_at: now,
     updated_at: now,
     published_at: status === 'published' ? now : null
   }
 
   store.video_items = [row, ...store.video_items]
-  await insertNewAtFront(store, 'video', row.id, now, { persist: false })
+  const assignments = await insertNewAtFront(store, 'video', row.id, now, { persist: false })
   saveLocalStore(store)
 
   if (isSupabaseConfigured()) {
-    const sb = getServiceSupabase()
-    if (sb) {
-      const fresh = store.video_items.find(v => v.id === row.id) || row
-      await sb.from('video_items').upsert(fresh, { onConflict: 'id' })
-      for (const v of store.video_items) {
-        if (v.id === row.id) continue
-        await sb.from('video_items').update({ priority: v.priority, updated_at: now }).eq('id', v.id)
-      }
-    }
+    await syncLinkedMedia(store, [input.video_asset_id, input.cover_asset_id])
+    const fresh = store.video_items.find(v => v.id === row.id) || row
+    await requireUpsert('video_items', fresh as unknown as Record<string, unknown>, 'id')
+    await syncPriorityAssignments('video', assignments, now)
   }
 
   return store.video_items.find(v => v.id === row.id) || row
@@ -314,11 +353,15 @@ export async function createPdfItem(input: {
   media_asset_id: string
   cover_asset_id?: string | null
   category?: string | null
+  featured?: boolean
   status?: ContentStatus
 }) {
   const store = loadLocalStore()
   const now = nowIso()
   const status: ContentStatus = input.status || 'published'
+  if (!store.media_assets.some(a => a.id === input.media_asset_id)) {
+    throw new Error('PDF file not found. Upload the file again, then click Upload & publish.')
+  }
   markAssetLinked(store, input.media_asset_id)
   markAssetLinked(store, input.cover_asset_id)
 
@@ -336,7 +379,7 @@ export async function createPdfItem(input: {
     status,
     category: input.category || 'pdf',
     priority: 1,
-    featured: false,
+    featured: Boolean(input.featured),
     scheduled_at: null,
     metadata: { source: 'admin_ui', cover_asset_id: input.cover_asset_id || null },
     created_at: now,
@@ -345,19 +388,14 @@ export async function createPdfItem(input: {
   }
 
   store.pdf_items = [row, ...store.pdf_items]
-  await insertNewAtFront(store, 'pdfs', row.id, now, { persist: false })
+  const assignments = await insertNewAtFront(store, 'pdfs', row.id, now, { persist: false })
   saveLocalStore(store)
 
   if (isSupabaseConfigured()) {
-    const sb = getServiceSupabase()
-    if (sb) {
-      const fresh = store.pdf_items.find(p => p.id === row.id) || row
-      await sb.from('pdf_items').upsert(fresh, { onConflict: 'id' })
-      for (const p of store.pdf_items) {
-        if (p.id === row.id) continue
-        await sb.from('pdf_items').update({ priority: p.priority, updated_at: now }).eq('id', p.id)
-      }
-    }
+    await syncLinkedMedia(store, [input.media_asset_id, input.cover_asset_id])
+    const fresh = store.pdf_items.find(p => p.id === row.id) || row
+    await requireUpsert('pdf_items', fresh as unknown as Record<string, unknown>, 'id')
+    await syncPriorityAssignments('pdfs', assignments, now)
   }
 
   return store.pdf_items.find(p => p.id === row.id) || row
