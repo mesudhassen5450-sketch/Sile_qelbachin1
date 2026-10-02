@@ -15,6 +15,14 @@ interface FeaturedAudioBlockProps {
   category?: string | LocalizedString
 }
 
+function cleanDisplayText(s: string): string {
+  return s
+    .replace(/https?:\/\/\S+/gi, '')
+    .replace(/t\.me\/\S+/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
 /** Light: premium daylight card. Dark: moderate neutral card (no heavy maroon). */
 export default function FeaturedAudioBlock({
   title,
@@ -56,14 +64,13 @@ export default function FeaturedAudioBlock({
 
   const progress = displayDuration > 0 ? (displayTime / displayDuration) * 100 : 0
   const categoryLabel = typeof category === 'string' ? category : category ? getLocalized(category) : ''
-  const titleText = getLocalized(title)
-  const descText = (description || '').trim()
-  const speakerText = (speaker || '').trim()
+  const titleText = cleanDisplayText(getLocalized(title))
+  const descText = cleanDisplayText((description || '').trim())
+  const speakerText = cleanDisplayText((speaker || '').trim())
   const fingerprint = (s: string) =>
     s
       .normalize('NFKC')
       .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, '')
-      .replace(/https?:\/\/\S+|t\.me\/\S+/gi, '')
       .replace(/[^\p{L}\p{N}]+/gu, '')
       .toLowerCase()
   const nearlySame = (a: string, b: string) => {
@@ -76,7 +83,6 @@ export default function FeaturedAudioBlock({
     const longer = fa.length > fb.length ? fa : fb
     return shorter.length >= 10 && longer.includes(shorter)
   }
-  // CMS often pastes the same Telegram caption into title + description — never show description on these cards
   const showSpeaker =
     Boolean(speakerText) &&
     !nearlySame(speakerText, titleText) &&
@@ -84,29 +90,31 @@ export default function FeaturedAudioBlock({
     speakerText.toLowerCase() !== categoryLabel.toLowerCase()
 
   return (
-    <div className="group portfolio-card p-6 sm:p-7 space-y-5">
-      <div className="flex items-center justify-between gap-2">
+    <div className="group portfolio-card p-5 sm:p-7 space-y-4 sm:space-y-5 overflow-hidden min-w-0">
+      <div className="flex items-center justify-between gap-2 min-w-0">
         {categoryLabel ? (
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-semibold bg-[#efefed] dark:bg-neutral-800 text-[#A91F24] dark:text-red-400 border border-[#e3e2e0] dark:border-neutral-700 group-hover:bg-[#A91F24]/10 group-hover:border-[#A91F24]/30 transition-colors">
-            <Volume2 className="w-3.5 h-3.5 mr-1.5" />
-            {categoryLabel}
+          <span className="inline-flex items-center max-w-full truncate px-3 py-1 rounded-full text-[11px] font-semibold bg-[#efefed] dark:bg-neutral-800 text-[#A91F24] dark:text-red-400 border border-[#e3e2e0] dark:border-neutral-700 group-hover:bg-[#A91F24]/10 group-hover:border-[#A91F24]/30 transition-colors">
+            <Volume2 className="w-3.5 h-3.5 mr-1.5 shrink-0" />
+            <span className="truncate">{categoryLabel}</span>
           </span>
         ) : (
           <span />
         )}
         {duration ? (
-          <span className="text-xs font-mono text-[#6b7280] dark:text-neutral-500">{duration}</span>
+          <span className="text-xs font-mono text-[#6b7280] dark:text-neutral-500 shrink-0">{duration}</span>
         ) : null}
       </div>
 
-      <div className="space-y-2.5">
-        <h3 className="text-xl sm:text-2xl font-bold text-[#111827] dark:text-white leading-tight tracking-tight">
+      <div className="space-y-2 min-w-0">
+        <h3 className="text-base sm:text-xl font-bold text-[#111827] dark:text-white leading-snug tracking-tight break-words [overflow-wrap:anywhere] line-clamp-3">
           {titleText}
         </h3>
         {showSpeaker ? (
-          <div className="flex items-start gap-2 text-sm font-medium text-[#5f5e5b] dark:text-neutral-400">
+          <div className="flex items-start gap-2 text-sm font-medium text-[#5f5e5b] dark:text-neutral-400 min-w-0">
             <span className="shrink-0 mt-0.5">🎙</span>
-            <p className="leading-relaxed">{speakerText}</p>
+            <p className="leading-relaxed break-words [overflow-wrap:anywhere] line-clamp-2 min-w-0">
+              {speakerText}
+            </p>
           </div>
         ) : null}
       </div>

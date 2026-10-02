@@ -562,7 +562,7 @@ export default function HomePage() {
                 {popularAudio.map(track => (
                   <div
                     key={track.audioUrl}
-                    className="min-w-[82%] max-w-[82%] sm:min-w-[55%] sm:max-w-[55%] snap-start shrink-0"
+                    className="min-w-[82%] max-w-[82%] sm:min-w-[55%] sm:max-w-[55%] snap-start shrink-0 min-w-0 overflow-hidden"
                   >
                     <FeaturedAudioBlock
                       title={track.title}

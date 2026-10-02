@@ -128,6 +128,25 @@ body {
   color: #e5e5e5;
 }
 
+/* Hide Netlify “Deployed on Netlify” / drawer / badge injects */
+a[href*='netlify.com'] img,
+a[href*='netlify.app'][target='_blank'] > img,
+img[src*='netlify.com'],
+img[alt*='Netlify' i],
+img[alt*='Deploys by Netlify' i],
+#netlify-badge,
+.netlify-badge,
+[data-netlify-badge],
+iframe[src*='app.netlify.com'],
+iframe[title*='Netlify' i] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+}
+
 /* Cards — light: soft elevated white (portfolio); dark: unchanged */
 .portfolio-card {
   background-color: var(--surface);

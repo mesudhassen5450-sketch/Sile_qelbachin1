@@ -364,7 +364,7 @@ export default function QuranRecitationPanel() {
         const done = () => resolve()
         audio.addEventListener('canplaythrough', done, { once: true })
         audio.addEventListener('error', done, { once: true })
-        window.setTimeout(done, 2000)
+        window.setTimeout(done, 1200)
       })
     },
     [resolveAyahSrc]
@@ -378,9 +378,10 @@ export default function QuranRecitationPanel() {
       const list = ayahsRef.current
       const key = `ayah-${surahN}-${ayahInSurah}`
 
-      // Warm next verses while (or before) this one plays — removes network gap
+      // Warm next verses early — removes network silence between ayahs
       void ensurePreloaded(ayahInSurah + 1)
       void ensurePreloaded(ayahInSurah + 2)
+      void ensurePreloaded(ayahInSurah + 3)
 
       if (audioRef.current) {
         audioRef.current.onended = null
@@ -400,7 +401,7 @@ export default function QuranRecitationPanel() {
         a = new Audio(playSrc)
       }
 
-      a.volume = 0.55
+      a.volume = 1
       audioRef.current = a
       setPlayingKey(key)
 
@@ -410,26 +411,32 @@ export default function QuranRecitationPanel() {
           return
         }
         const next = ayahInSurah + 1
-        if (next <= list.length) {
+        if (next > list.length) {
+          setPlayingKey(null)
+          return
+        }
+        // Prefer already-buffered element so play() starts with no await gap
+        const nextPre = preloadMapRef.current.get(next)
+        if (nextPre?.audio) {
           void playAyahContinuous(next)
         } else {
-          setPlayingKey(null)
+          void playAyahContinuous(next)
         }
       }
       a.onerror = () => setPlayingKey(null)
       a.ontimeupdate = () => {
         if (!Number.isFinite(a.duration) || a.duration <= 0) return
-        // Final seconds: ensure next is already buffered
-        if (a.currentTime >= Math.max(0, a.duration - 2.5)) {
+        const remaining = a.duration - a.currentTime
+        if (remaining <= 2.5) {
           void ensurePreloaded(ayahInSurah + 1)
           void ensurePreloaded(ayahInSurah + 2)
         }
       }
 
       try {
-        // Reset to start if this element was pre-buffered mid-file
-        if (a.currentTime > 0.05) a.currentTime = 0
-        await a.play()
+        if (a.currentTime > 0.02) a.currentTime = 0
+        const playPromise = a.play()
+        if (playPromise) await playPromise
       } catch {
         setPlayingKey(null)
       }
