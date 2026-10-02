@@ -20,11 +20,11 @@
     },
     "pdfUrl": "https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/files/Intebih Ante Murakeb (intebih-ante-murakeb)/انتَبه أنتَ مُراقَب.pdf",
     "pdfSize": "1.2 MB",
-    "dersCount": 5,
+    "dersCount": 7,
     "description": {
-      "am": "«ኢንተቢህ አነተ ሙራቀብ» — አላህን ሙሉ ጊዜ የሚያስታውስ ድንቅ የ5 ክፍሎች ድርስ።",
-      "ar": "انتبه أنت مراقب — سلسلة إيمانية في 5 أجزاء تذكّر بمراقبة الله.",
-      "en": "Intebih Ante Murakeb — an inspiring 5-part lecture series on Allah's watchfulness and heart purification."
+      "am": "«ኢንተቢህ አተ መውሪቁብ» — አላህን ሙሉ ጊዜ የሚያስታውስ ድንቅ የ7 ክፍሎች ድርስ።",
+      "ar": "انتبه أنت مراقب — سلسلة إيمانية في 7 أجزاء تذكّر بمراقبة الله.",
+      "en": "Intebih Ante Murakeb — an inspiring 7-part lecture series on Allah's watchfulness and heart purification."
     },
     "dersList": [
       {
@@ -127,7 +127,49 @@
         "audioUrl": "https://cdn.jsdelivr.net/gh/mesudhassen5450-sketch/sileqelbachin-media@main/files/Intebih Ante Murakeb (intebih-ante-murakeb)/intebih5.m4a",
         "kitabId": "intebih-ante-murakeb",
         "kitabTitle": {
-          "am": "ኢንተቢህ አነተ ሙራቀብ",
+          "am": "ኢንተቢህ አተ መውሪቁብ",
+          "ar": "انتبه أنت مراقب",
+          "en": "Intebih Ante Murakeb"
+        }
+      },
+      {
+        "id": "intebih-ante-murakeb-ders-6",
+        "title": {
+          "am": "ኢንተቢህ- ክፍል 6",
+          "ar": "الجزء 06",
+          "en": "Part 06"
+        },
+        "speaker": {
+          "am": "ኡስታዝ አቡሱፍያን አልበናን",
+          "ar": "الأستاذ أبو سفيان البنان",
+          "en": "Ustaz Abu Sufiyan Albenan"
+        },
+        "duration": "",
+        "audioUrl": "",
+        "kitabId": "intebih-ante-murakeb",
+        "kitabTitle": {
+          "am": "ኢንተቢህ አተ መውሪቁብ",
+          "ar": "انتبه أنت مراقب",
+          "en": "Intebih Ante Murakeb"
+        }
+      },
+      {
+        "id": "intebih-ante-murakeb-ders-7",
+        "title": {
+          "am": "ኢንተቢህ- ክፍል 7",
+          "ar": "الجزء 07",
+          "en": "Part 07"
+        },
+        "speaker": {
+          "am": "ኡስታዝ አቡሱፍያን አልበናን",
+          "ar": "الأستاذ أبو سفيان البنان",
+          "en": "Ustaz Abu Sufiyan Albenan"
+        },
+        "duration": "",
+        "audioUrl": "",
+        "kitabId": "intebih-ante-murakeb",
+        "kitabTitle": {
+          "am": "ኢንተቢህ አተ መውሪቁብ",
           "ar": "انتبه أنت مراقب",
           "en": "Intebih Ante Murakeb"
         }

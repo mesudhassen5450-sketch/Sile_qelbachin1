@@ -43,6 +43,10 @@ export type NavItem = {
   items: MenuItem[]
 }
 
+/**
+ * Client Admin IA — each public section has independent sub-types.
+ * Old Muhadara / Reminders / Sahabah / Ders routes redirect into these.
+ */
 export const navItems: NavItem[] = [
   {
     groupLabel: 'Overview',
@@ -55,38 +59,96 @@ export const navItems: NavItem[] = [
     ]
   },
   {
-    groupLabel: 'CMS',
+    groupLabel: 'Content',
     items: [
       {
         icon: 'BookOpen',
-        label: 'Content',
+        label: "Qur'an Recitations",
+        href: '/content/quran-recitations'
+      },
+      {
+        icon: 'Mic',
+        label: "Da'wah",
         childItems: [
-          { label: 'Kitabs', href: '/content/kitabs' },
-          { label: 'Ders', href: '/content/ders' },
-          { label: 'Audio', href: '/content/audio' },
-          { label: 'Video', href: '/content/video' },
-          { label: 'PDFs', href: '/content/pdfs' },
-          { label: 'Muhadara', href: '/content/muhadara' },
-          { label: 'Reminders', href: '/content/reminders' },
-          { label: 'Sahabah', href: '/content/sahabah' }
+          {
+            label: 'Talks (audio 1 min+)',
+            href: '/content/dawah/talks',
+            activePath: '/content/dawah/talks'
+          },
+          {
+            label: 'Reminders',
+            href: '/content/dawah/reminders',
+            activePath: '/content/dawah/reminders'
+          }
         ]
       },
+      {
+        icon: 'Timer',
+        label: '1-Minute (under 1 min)',
+        childItems: [
+          { label: 'Video', href: '/content/one-minute/video', activePath: '/content/one-minute/video' },
+          { label: 'Audio', href: '/content/one-minute/audio', activePath: '/content/one-minute/audio' },
+          { label: 'Text', href: '/content/one-minute/text', activePath: '/content/one-minute/text' }
+        ]
+      },
+      {
+        icon: 'Film',
+        label: 'Videos (1 min+)',
+        href: '/content/videos'
+      },
+      {
+        icon: 'Library',
+        label: 'Library',
+        childItems: [
+          { label: 'Kitabs', href: '/content/library/kitabs', activePath: '/content/library/kitabs' },
+          { label: 'PDFs', href: '/content/library/pdfs', activePath: '/content/library/pdfs' },
+          { label: 'Notes', href: '/content/library/notes', activePath: '/content/library/notes' }
+        ]
+      },
+      {
+        icon: 'Heart',
+        label: 'Youth & Heart',
+        childItems: [
+          {
+            label: 'Marriage & Love',
+            href: '/content/marriage',
+            activePath: '/content/marriage'
+          },
+          {
+            label: 'Articles',
+            href: '/content/articles',
+            activePath: '/content/articles'
+          },
+          {
+            label: 'Q & A',
+            href: '/content/questions',
+            activePath: '/content/questions'
+          }
+        ]
+      }
+    ]
+  },
+  {
+    groupLabel: 'Community',
+    items: [
+      {
+        icon: 'Inbox',
+        label: 'Question Submissions',
+        href: '/community/questions'
+      }
+    ]
+  },
+  {
+    groupLabel: 'Media',
+    items: [
       {
         icon: 'Image',
-        label: 'Media',
+        label: 'Cloudflare media',
         childItems: [
-          { label: 'Storage sync', href: '/media/cloudflare' },
-          { label: 'Library', href: '/media/library' },
+          { label: 'Media Library', href: '/media/library' },
           { label: 'Uploads', href: '/media/uploads' },
+          { label: 'Storage Sync', href: '/media/cloudflare' },
           { label: 'Media Health', href: '/media/health' }
-        ]
-      },
-      {
-        icon: 'Users',
-        label: 'Users',
-        childItems: [
-          { label: 'Website Users', href: '/users/website' },
-          { label: 'Mobile Users', href: '/users/mobile' }
         ]
       }
     ]
@@ -121,9 +183,7 @@ export const navItems: NavItem[] = [
       {
         icon: 'Settings',
         label: 'System',
-        childItems: [
-          { label: 'Health', href: '/system/health' }
-        ]
+        childItems: [{ label: 'Health', href: '/system/health' }]
       }
     ]
   }

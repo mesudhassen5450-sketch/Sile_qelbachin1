@@ -5,6 +5,7 @@ import {
   saveLocalStore,
   upsertBySlug
 } from '@/lib/cms/local-store'
+import { insertNewAtFront } from '@/lib/cms/priority-cascade'
 import { getServiceSupabase, isSupabaseConfigured } from '@/lib/cms/supabase'
 import type {
   AudioItemRecord,
@@ -34,6 +35,20 @@ function markAssetLinked(store: ReturnType<typeof loadLocalStore>, assetId: stri
       ? { ...a, is_orphan: false, status: 'published' as ContentStatus, updated_at: now }
       : a
   )
+}
+
+/** Supabase `ders` has no featured / priority / scheduled_at columns. */
+function dersPayloadForSupabase(row: DersRecord) {
+  const { featured: _f, priority: _p, scheduled_at: _s, ...rest } = row
+  return {
+    ...rest,
+    metadata: {
+      ...(row.metadata || {}),
+      featured: row.featured,
+      priority: row.priority,
+      scheduled_at: row.scheduled_at
+    }
+  }
 }
 
 export type CreateKitabInput = {
@@ -92,6 +107,9 @@ export async function createKitabWithDers(input: CreateKitabInput) {
     speaker_id: null,
     ders_count: input.ders?.length || 0,
     status,
+    priority: 1,
+    featured: false,
+    scheduled_at: null,
     legacy_source: 'admin_create',
     metadata: { source: 'admin_ui' },
     created_at: now,
@@ -119,6 +137,9 @@ export async function createKitabWithDers(input: CreateKitabInput) {
       duration_label: null,
       audio_asset_id: d.audio_asset_id,
       status,
+      priority: i + 1,
+      featured: false,
+      scheduled_at: null,
       metadata: { source: 'admin_ui' },
       created_at: now,
       updated_at: now,
@@ -129,17 +150,25 @@ export async function createKitabWithDers(input: CreateKitabInput) {
   const up = upsertBySlug(store.kitabs, kitab)
   store.kitabs = up.rows
   store.ders = [...store.ders, ...dersRows]
+  await insertNewAtFront(store, 'kitabs', kitab.id, now, { persist: false })
   saveLocalStore(store)
 
   if (isSupabaseConfigured()) {
     const sb = getServiceSupabase()
     if (sb) {
-      await sb.from('kitabs').upsert(kitab, { onConflict: 'slug' })
-      if (dersRows.length) await sb.from('ders').upsert(dersRows, { onConflict: 'id' })
+      const fresh = store.kitabs.find(k => k.id === kitab.id) || kitab
+      await sb.from('kitabs').upsert(fresh, { onConflict: 'slug' })
+      // Cascade sibling kitabs that shifted down
+      for (const k of store.kitabs) {
+        if (k.id === kitab.id) continue
+        await sb.from('kitabs').update({ priority: k.priority, updated_at: now }).eq('id', k.id)
+      }
+      if (dersRows.length)
+        await sb.from('ders').upsert(dersRows.map(dersPayloadForSupabase), { onConflict: 'id' })
     }
   }
 
-  return { kitab, ders: dersRows }
+  return { kitab: store.kitabs.find(k => k.id === kitab.id) || kitab, ders: dersRows }
 }
 
 export async function createAudioItem(input: {
@@ -175,8 +204,16 @@ export async function createAudioItem(input: {
     duration_label: null,
     play_count: 0,
     download_count: 0,
-    is_muhadara: Boolean(input.is_muhadara),
+    is_muhadara:
+      String(input.category || '')
+        .trim()
+        .toLowerCase() === 'one_minute'
+        ? false
+        : Boolean(input.is_muhadara),
     status,
+    priority: 1,
+    featured: false,
+    scheduled_at: null,
     metadata: { source: 'admin_ui', cover_asset_id: input.cover_asset_id || null },
     created_at: now,
     updated_at: now,
@@ -184,14 +221,22 @@ export async function createAudioItem(input: {
   }
 
   store.audio_items = [row, ...store.audio_items]
+  await insertNewAtFront(store, 'audio', row.id, now, { persist: false })
   saveLocalStore(store)
 
   if (isSupabaseConfigured()) {
     const sb = getServiceSupabase()
-    if (sb) await sb.from('audio_items').upsert(row, { onConflict: 'id' })
+    if (sb) {
+      const fresh = store.audio_items.find(a => a.id === row.id) || row
+      await sb.from('audio_items').upsert(fresh, { onConflict: 'id' })
+      for (const a of store.audio_items) {
+        if (a.id === row.id) continue
+        await sb.from('audio_items').update({ priority: a.priority, updated_at: now }).eq('id', a.id)
+      }
+    }
   }
 
-  return row
+  return store.audio_items.find(a => a.id === row.id) || row
 }
 
 export async function createVideoItem(input: {
@@ -228,6 +273,9 @@ export async function createVideoItem(input: {
     view_count: 0,
     download_count: 0,
     status,
+    priority: 1,
+    featured: false,
+    scheduled_at: null,
     metadata: { source: 'admin_ui' },
     created_at: now,
     updated_at: now,
@@ -235,14 +283,22 @@ export async function createVideoItem(input: {
   }
 
   store.video_items = [row, ...store.video_items]
+  await insertNewAtFront(store, 'video', row.id, now, { persist: false })
   saveLocalStore(store)
 
   if (isSupabaseConfigured()) {
     const sb = getServiceSupabase()
-    if (sb) await sb.from('video_items').upsert(row, { onConflict: 'id' })
+    if (sb) {
+      const fresh = store.video_items.find(v => v.id === row.id) || row
+      await sb.from('video_items').upsert(fresh, { onConflict: 'id' })
+      for (const v of store.video_items) {
+        if (v.id === row.id) continue
+        await sb.from('video_items').update({ priority: v.priority, updated_at: now }).eq('id', v.id)
+      }
+    }
   }
 
-  return row
+  return store.video_items.find(v => v.id === row.id) || row
 }
 
 export async function createPdfItem(input: {
@@ -251,6 +307,7 @@ export async function createPdfItem(input: {
   title_en?: string
   media_asset_id: string
   cover_asset_id?: string | null
+  category?: string | null
   status?: ContentStatus
 }) {
   const store = loadLocalStore()
@@ -271,6 +328,10 @@ export async function createPdfItem(input: {
     view_count: 0,
     download_count: 0,
     status,
+    category: input.category || 'pdf',
+    priority: 1,
+    featured: false,
+    scheduled_at: null,
     metadata: { source: 'admin_ui', cover_asset_id: input.cover_asset_id || null },
     created_at: now,
     updated_at: now,
@@ -278,14 +339,22 @@ export async function createPdfItem(input: {
   }
 
   store.pdf_items = [row, ...store.pdf_items]
+  await insertNewAtFront(store, 'pdfs', row.id, now, { persist: false })
   saveLocalStore(store)
 
   if (isSupabaseConfigured()) {
     const sb = getServiceSupabase()
-    if (sb) await sb.from('pdf_items').upsert(row, { onConflict: 'id' })
+    if (sb) {
+      const fresh = store.pdf_items.find(p => p.id === row.id) || row
+      await sb.from('pdf_items').upsert(fresh, { onConflict: 'id' })
+      for (const p of store.pdf_items) {
+        if (p.id === row.id) continue
+        await sb.from('pdf_items').update({ priority: p.priority, updated_at: now }).eq('id', p.id)
+      }
+    }
   }
 
-  return row
+  return store.pdf_items.find(p => p.id === row.id) || row
 }
 
 export async function createSahabahItem(input: {
@@ -426,6 +495,9 @@ export async function createDersForKitab(input: {
     duration_label: null,
     audio_asset_id: input.audio_asset_id,
     status,
+    priority: nextNum,
+    featured: false,
+    scheduled_at: null,
     metadata: { source: 'admin_ui' },
     created_at: now,
     updated_at: now,
@@ -443,8 +515,20 @@ export async function createDersForKitab(input: {
   saveLocalStore(store)
 
   if (sb) {
-    await sb.from('ders').upsert(row, { onConflict: 'id' })
-    await sb.from('kitabs').update({ ders_count: dersCount, updated_at: now }).eq('id', kitab.id)
+    const { error: dersErr } = await sb
+      .from('ders')
+      .upsert(dersPayloadForSupabase(row), { onConflict: 'id' })
+    if (dersErr) {
+      throw new Error(`Could not save new ders to database: ${dersErr.message}`)
+    }
+    const { error: kitabErr } = await sb
+      .from('kitabs')
+      .update({ ders_count: dersCount, updated_at: now })
+      .eq('id', kitab.id)
+    if (kitabErr) {
+      // ders row is saved; count mismatch is non-fatal
+      console.warn('[createDersForKitab] ders_count update:', kitabErr.message)
+    }
   }
 
   return row

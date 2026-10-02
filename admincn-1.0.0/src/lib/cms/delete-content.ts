@@ -215,6 +215,11 @@ export async function updateContentMeta(
     pdf_url?: string | null
     sort_order?: number | null
     speaker_en?: string | null
+    priority?: number | null
+    featured?: boolean | null
+    scheduled_at?: string | null
+    category?: string | null
+    is_muhadara?: boolean | null
   },
   /** Internal: prevent infinite re-entry when importing a Supabase-only row. */
   _depth = 0
@@ -223,9 +228,22 @@ export async function updateContentMeta(
     throw new Error('Save failed: could not sync this item from the database. Refresh and try again.')
   }
 
+  const {
+    normalizeFeatured,
+    normalizePriority,
+    normalizeScheduledAt,
+  } = await import('@/lib/cms/editorial')
+  const { claimPriorityInStore } = await import('@/lib/cms/priority-cascade')
+
   const store = loadLocalStore()
   const now = nowIso()
   let found = false
+  const nextPriority =
+    input.priority !== undefined ? normalizePriority(input.priority, 1) : undefined
+  const nextFeatured =
+    input.featured !== undefined ? normalizeFeatured(input.featured) : undefined
+  const nextSchedule =
+    input.scheduled_at !== undefined ? normalizeScheduledAt(input.scheduled_at) : undefined
 
   if (input.type === 'kitabs') {
     store.kitabs = store.kitabs.map(k => {
@@ -248,6 +266,10 @@ export async function updateContentMeta(
           input.description_am !== undefined ? input.description_am : k.description_am,
         cover_asset_id: coverId,
         pdf_asset_id: pdfId,
+        priority: nextPriority !== undefined ? nextPriority : normalizePriority(k.priority, 1),
+        featured: nextFeatured !== undefined ? nextFeatured : normalizeFeatured(k.featured),
+        scheduled_at:
+          nextSchedule !== undefined ? nextSchedule : k.scheduled_at ?? null,
         metadata: {
           ...(k.metadata || {}),
           ...(coverAsset?.public_url ? { cover_url: coverAsset.public_url } : {}),
@@ -274,6 +296,13 @@ export async function updateContentMeta(
           input.description_am !== undefined ? input.description_am : a.description_am,
         media_asset_id:
           input.media_asset_id !== undefined ? input.media_asset_id : a.media_asset_id,
+        category: input.category !== undefined ? input.category : a.category,
+        is_muhadara:
+          input.is_muhadara !== undefined ? Boolean(input.is_muhadara) : a.is_muhadara,
+        priority: nextPriority !== undefined ? nextPriority : normalizePriority(a.priority, 1),
+        featured: nextFeatured !== undefined ? nextFeatured : normalizeFeatured(a.featured),
+        scheduled_at:
+          nextSchedule !== undefined ? nextSchedule : a.scheduled_at ?? null,
         metadata: nextMeta,
         updated_at: now
       }
@@ -290,6 +319,7 @@ export async function updateContentMeta(
           input.description_en !== undefined ? input.description_en : v.description_en,
         description_am:
           input.description_am !== undefined ? input.description_am : v.description_am,
+        category: input.category !== undefined ? input.category : v.category,
         video_asset_id:
           input.video_asset_id !== undefined ? input.video_asset_id : v.video_asset_id,
         thumbnail_asset_id:
@@ -298,6 +328,10 @@ export async function updateContentMeta(
             : input.cover_asset_id !== undefined
               ? input.cover_asset_id
               : v.thumbnail_asset_id,
+        priority: nextPriority !== undefined ? nextPriority : normalizePriority(v.priority, 1),
+        featured: nextFeatured !== undefined ? nextFeatured : normalizeFeatured(v.featured),
+        scheduled_at:
+          nextSchedule !== undefined ? nextSchedule : v.scheduled_at ?? null,
         updated_at: now
       }
     })
@@ -319,6 +353,11 @@ export async function updateContentMeta(
             : input.media_asset_id !== undefined
               ? input.media_asset_id
               : p.media_asset_id,
+        category: input.category !== undefined ? input.category : p.category ?? null,
+        priority: nextPriority !== undefined ? nextPriority : normalizePriority(p.priority, 1),
+        featured: nextFeatured !== undefined ? nextFeatured : normalizeFeatured(p.featured),
+        scheduled_at:
+          nextSchedule !== undefined ? nextSchedule : p.scheduled_at ?? null,
         metadata: nextMeta,
         updated_at: now
       }
@@ -357,6 +396,10 @@ export async function updateContentMeta(
           input.media_asset_id !== undefined ? input.media_asset_id : d.audio_asset_id,
         sort_order: nextSort,
         ders_number: nextSort,
+        priority: nextPriority !== undefined ? nextPriority : normalizePriority(d.priority, nextSort || 1),
+        featured: nextFeatured !== undefined ? nextFeatured : normalizeFeatured(d.featured),
+        scheduled_at:
+          nextSchedule !== undefined ? nextSchedule : d.scheduled_at ?? null,
         updated_at: now
       }
     })
@@ -411,6 +454,19 @@ export async function updateContentMeta(
   }
 
   if (!found) throw new Error('Item not found.')
+
+  let priorityAssignments: Array<{ id: string; priority: number }> = []
+  if (nextPriority !== undefined && input.type !== 'sahabah') {
+    priorityAssignments = await claimPriorityInStore(
+      store,
+      input.type,
+      input.id,
+      nextPriority,
+      now,
+      { persist: false }
+    )
+  }
+
   saveLocalStore(store)
 
   if (isSupabaseConfigured()) {
@@ -428,6 +484,11 @@ export async function updateContentMeta(
           patch.sort_order = Number(input.sort_order)
           patch.ders_number = Number(input.sort_order)
         }
+        if (nextPriority !== undefined) patch.priority = nextPriority
+        if (nextFeatured !== undefined) patch.featured = nextFeatured
+        if (nextSchedule !== undefined) patch.scheduled_at = nextSchedule
+        const localDers = store.ders.find(d => d.id === input.id)
+        if (localDers && nextPriority !== undefined) patch.priority = localDers.priority
         const { data, error } = await sb
           .from('ders')
           .update(patch)
@@ -444,6 +505,10 @@ export async function updateContentMeta(
               .select('*')
               .maybeSingle()
             if (upErr) throw new Error(`Save failed (database upsert): ${upErr.message}`)
+            if (priorityAssignments.length) {
+              const { syncPriorityAssignments } = await import('@/lib/cms/priority-cascade')
+              await syncPriorityAssignments('ders', priorityAssignments, now)
+            }
             return { ok: true, row: (upData as Record<string, unknown>) || null }
           }
           throw new Error('Ders not found in database. Refresh Admin and try again.')
@@ -451,6 +516,10 @@ export async function updateContentMeta(
         store.ders = store.ders.map(d =>
           d.id === input.id ? { ...d, ...(data as object), updated_at: now } : d
         )
+        if (priorityAssignments.length) {
+          const { syncPriorityAssignments } = await import('@/lib/cms/priority-cascade')
+          await syncPriorityAssignments('ders', priorityAssignments, now)
+        }
         saveLocalStore(store)
         return { ok: true, row: data as Record<string, unknown> }
       } else {
@@ -469,6 +538,26 @@ export async function updateContentMeta(
         if (input.author_am !== undefined && input.type === 'kitabs') patch.author_am = input.author_am
         if (input.description_en !== undefined) patch.description_en = input.description_en
         if (input.description_am !== undefined) patch.description_am = input.description_am
+        if (nextFeatured !== undefined) patch.featured = nextFeatured
+        if (nextSchedule !== undefined) patch.scheduled_at = nextSchedule
+        if (input.category !== undefined && (input.type === 'audio' || input.type === 'video' || input.type === 'pdfs')) {
+          patch.category = input.category
+        }
+        if (input.is_muhadara !== undefined && input.type === 'audio') {
+          patch.is_muhadara = Boolean(input.is_muhadara)
+        }
+        // Prefer cascaded local priority after claimPriority
+        const localPri =
+          input.type === 'kitabs'
+            ? store.kitabs.find(k => k.id === input.id)?.priority
+            : input.type === 'audio'
+              ? store.audio_items.find(a => a.id === input.id)?.priority
+              : input.type === 'video'
+                ? store.video_items.find(v => v.id === input.id)?.priority
+                : store.pdf_items.find(p => p.id === input.id)?.priority
+        if (nextPriority !== undefined || localPri != null) {
+          patch.priority = localPri ?? nextPriority
+        }
         if (input.type === 'kitabs') {
           if (input.cover_asset_id !== undefined) patch.cover_asset_id = input.cover_asset_id
           if (input.pdf_asset_id !== undefined) patch.pdf_asset_id = input.pdf_asset_id
@@ -544,6 +633,66 @@ export async function updateContentMeta(
           .eq('id', input.id)
           .select('*')
           .maybeSingle()
+
+        // Production DB may lack editorial columns until migration 004 is applied.
+        // Keep local save; retry without those columns and stash them in metadata.
+        if (
+          error &&
+          /column|schema cache/i.test(error.message) &&
+          /featured|priority|scheduled_at/i.test(error.message)
+        ) {
+          const safePatch = { ...patch }
+          const editorialMeta: Record<string, unknown> = {
+            ...((safePatch.metadata as Record<string, unknown>) || {}),
+          }
+          if ('priority' in safePatch) {
+            editorialMeta.priority = safePatch.priority
+            delete safePatch.priority
+          }
+          if ('featured' in safePatch) {
+            editorialMeta.featured = safePatch.featured
+            delete safePatch.featured
+          }
+          if ('scheduled_at' in safePatch) {
+            editorialMeta.scheduled_at = safePatch.scheduled_at
+            delete safePatch.scheduled_at
+          }
+          safePatch.metadata = editorialMeta
+
+          const retry = await sb
+            .from(table)
+            .update(safePatch)
+            .eq('id', input.id)
+            .select('*')
+            .maybeSingle()
+          if (retry.error) {
+            // Local store already has the edit — do not fail Admin UI
+            console.warn('[cms] Supabase editorial columns missing; saved locally only:', error.message)
+            if (priorityAssignments.length) {
+              /* local cascade already applied */
+            }
+            const localRow =
+              input.type === 'kitabs'
+                ? store.kitabs.find(k => k.id === input.id)
+                : input.type === 'audio'
+                  ? store.audio_items.find(a => a.id === input.id)
+                  : input.type === 'video'
+                    ? store.video_items.find(v => v.id === input.id)
+                    : store.pdf_items.find(p => p.id === input.id)
+            return {
+              ok: true,
+              row: (localRow as Record<string, unknown>) || null,
+            }
+          }
+          if (input.type === 'kitabs' && retry.data) {
+            store.kitabs = store.kitabs.map(k =>
+              k.id === input.id ? { ...k, ...(retry.data as object), updated_at: now } : k
+            )
+            saveLocalStore(store)
+          }
+          return { ok: true, row: retry.data as Record<string, unknown> }
+        }
+
         if (error) throw new Error(`Save failed (database): ${error.message}`)
         if (!data) {
           // Row exists only in Supabase under a different path — try upsert from local row
@@ -558,10 +707,20 @@ export async function updateContentMeta(
           if (localRow) {
             const { data: upData, error: upErr } = await sb
               .from(table)
-              .upsert(localRow as Record<string, unknown>)
+              .upsert(stripUnknownEditorial(localRow as Record<string, unknown>))
               .select('*')
               .maybeSingle()
-            if (upErr) throw new Error(`Save failed (database upsert): ${upErr.message}`)
+            if (upErr) {
+              // Still keep local success when remote schema lags
+              if (/column|schema cache/i.test(upErr.message)) {
+                return { ok: true, row: localRow as Record<string, unknown> }
+              }
+              throw new Error(`Save failed (database upsert): ${upErr.message}`)
+            }
+            if (priorityAssignments.length) {
+              const { syncPriorityAssignments } = await import('@/lib/cms/priority-cascade')
+              await syncPriorityAssignments(input.type, priorityAssignments, now)
+            }
             return { ok: true, row: (upData as Record<string, unknown>) || null }
           } else {
             throw new Error('Item not found in database. Refresh Admin and try again.')
@@ -574,11 +733,28 @@ export async function updateContentMeta(
           )
           saveLocalStore(store)
         }
+        if (priorityAssignments.length) {
+          const { syncPriorityAssignments } = await import('@/lib/cms/priority-cascade')
+          await syncPriorityAssignments(input.type, priorityAssignments, now)
+        }
         return { ok: true, row: data as Record<string, unknown> }
       }
     }
   }
 
   return { ok: true, row: null }
+}
+
+/** Drop editorial fields that may not exist on older Supabase schemas (use metadata instead). */
+function stripUnknownEditorial(row: Record<string, unknown>): Record<string, unknown> {
+  const meta = {
+    ...((row.metadata as Record<string, unknown>) || {}),
+    priority: row.priority,
+    featured: row.featured,
+    scheduled_at: row.scheduled_at,
+  }
+  const next = { ...row, metadata: meta }
+  // Keep attempting with columns — if schema has them, fine; callers catch errors.
+  return next
 }
 

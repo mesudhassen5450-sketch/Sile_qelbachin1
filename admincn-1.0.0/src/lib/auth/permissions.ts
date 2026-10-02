@@ -256,6 +256,7 @@ export const NAV_PERMISSION_MAP: Array<{ match: RegExp; permissions: Permission[
   { match: /^\/security\/audit/, permissions: ['audit.view'] },
   { match: /^\/security\//, permissions: ['security.view'] },
   { match: /^\/system\//, permissions: ['system.view'] },
+  { match: /^\/community\//, permissions: ['kitabs.view', 'dashboard.view'] },
   { match: /^\/account/, permissions: ['account.view'] }
 ]
 

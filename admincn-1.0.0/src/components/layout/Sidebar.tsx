@@ -451,6 +451,7 @@ const SidebarLayout = () => {
 
   // Remove this state when the nav-apps API is removed. Until then, this state is used to hold the external nav-apps fetched from the API JSON.
   const [externalApps, setExternalApps] = useState<MenuItem[]>([])
+  const [inboxUnseen, setInboxUnseen] = useState(0)
 
   // Branches the user has explicitly opened or closed, keyed by label. It lives here rather
   // than inside each Collapsible so it survives the swap between the inline sub-menu and the
@@ -481,8 +482,85 @@ const SidebarLayout = () => {
     }
   }, [])
 
+  // Poll unseen question inbox count for the sidebar badge
+  useEffect(() => {
+    let mounted = true
+    // On the inbox page itself, badge should be clear (page marks seen)
+    if (pathname.startsWith('/community/questions')) {
+      setInboxUnseen(0)
+    }
+    const poll = async () => {
+      try {
+        const res = await fetch('/api/admin/questions?unseen=1', { cache: 'no-store' })
+        const data = await res.json().catch(() => ({}))
+        if (!mounted || !res.ok || typeof data.unseen !== 'number') return
+        // Keep badge off while viewing the inbox
+        if (pathname.startsWith('/community/questions')) {
+          setInboxUnseen(0)
+        } else {
+          setInboxUnseen(data.unseen)
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    void poll()
+    const timer = window.setInterval(() => void poll(), 20000)
+    return () => {
+      mounted = false
+      window.clearInterval(timer)
+    }
+  }, [pathname])
+
   // Nav groups rendered in the sidebar — filtered by role permissions (UI only; APIs still enforce).
   const navGroups = useMemo(() => {
+    const withInboxBadge = (items: MenuItem[]): MenuItem[] =>
+      items.map(item => {
+        if (item.href === '/community/questions') {
+          return inboxUnseen > 0
+            ? {
+                ...item,
+                badge: inboxUnseen > 99 ? '99+' : String(inboxUnseen),
+                badgeClassName: 'bg-red-600/90 text-white',
+              }
+            : { ...item, badge: undefined, badgeClassName: undefined }
+        }
+        if (item.childItems) {
+          return {
+            ...item,
+            childItems: item.childItems.map(sub => {
+              if ('childItems' in sub && Array.isArray(sub.childItems)) {
+                return {
+                  ...sub,
+                  childItems: sub.childItems.map(leaf =>
+                    leaf.href === '/community/questions'
+                      ? inboxUnseen > 0
+                        ? {
+                            ...leaf,
+                            badge: inboxUnseen > 99 ? '99+' : String(inboxUnseen),
+                            badgeClassName: 'bg-red-600/90 text-white',
+                          }
+                        : { ...leaf, badge: undefined, badgeClassName: undefined }
+                      : leaf
+                  ),
+                }
+              }
+              if ('href' in sub && sub.href === '/community/questions') {
+                return inboxUnseen > 0
+                  ? {
+                      ...sub,
+                      badge: inboxUnseen > 99 ? '99+' : String(inboxUnseen),
+                      badgeClassName: 'bg-red-600/90 text-white',
+                    }
+                  : { ...sub, badge: undefined, badgeClassName: undefined }
+              }
+              return sub
+            }),
+          }
+        }
+        return item
+      })
+
     const base =
       externalApps.length > 0
         ? navItems.map(item =>
@@ -490,9 +568,14 @@ const SidebarLayout = () => {
           )
         : navItems
 
-    if (!role) return base
+    const withBadge = base.map(group => ({
+      ...group,
+      items: withInboxBadge(group.items),
+    }))
 
-    return base
+    if (!role) return withBadge
+
+    return withBadge
       .map(group => ({
         ...group,
         items: group.items
@@ -514,7 +597,7 @@ const SidebarLayout = () => {
           .filter(Boolean) as MenuItem[]
       }))
       .filter(group => group.items.length > 0)
-  }, [externalApps, canPath, role])
+  }, [externalApps, canPath, role, inboxUnseen])
 
   const activeBranchKeys = useMemo(
     () => getActiveBranchKeys(navGroups, pathname, searchParams),

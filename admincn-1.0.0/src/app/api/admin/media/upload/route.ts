@@ -34,16 +34,38 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: diag.issues.join(' ') }, { status: 503 })
   }
 
+  const contentType = request.headers.get('content-type') || ''
+  if (!contentType.toLowerCase().includes('multipart/form-data')) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          'Expected multipart form upload. Choose a file again (do not submit an empty upload).'
+      },
+      { status: 400 }
+    )
+  }
+
   let form: FormData
   try {
     form = await request.formData()
-  } catch {
-    return NextResponse.json({ ok: false, error: 'Expected multipart form upload.' }, { status: 400 })
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : 'parse failed'
+    return NextResponse.json(
+      {
+        ok: false,
+        error: `Could not read the uploaded file (${detail}). Try a smaller file or refresh and upload again.`
+      },
+      { status: 400 }
+    )
   }
 
   const file = form.get('file')
-  if (!(file instanceof File)) {
-    return NextResponse.json({ ok: false, error: 'file field required.' }, { status: 400 })
+  if (!(file instanceof File) || file.size <= 0) {
+    return NextResponse.json(
+      { ok: false, error: 'Choose an audio/video file before uploading.' },
+      { status: 400 }
+    )
   }
 
   const folder = String(form.get('folder') || 'staff-uploads')

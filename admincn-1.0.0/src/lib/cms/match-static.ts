@@ -282,6 +282,9 @@ export async function matchStaticContent(options?: {
       speaker_id: null,
       ders_count: k.dersList?.length || k.dersCount || 0,
       status: publishStatus,
+      priority: existing?.priority ?? 100,
+      featured: existing?.featured ?? false,
+      scheduled_at: existing?.scheduled_at ?? null,
       legacy_source: 'static',
       metadata: { pdfSize: k.pdfSize || null },
       created_at: existing?.created_at || nowIso(),
@@ -330,6 +333,9 @@ export async function matchStaticContent(options?: {
         duration_label: d.duration || null,
         audio_asset_id: audioAssetId,
         status: publishStatus,
+        priority: index + 1,
+        featured: false,
+        scheduled_at: null,
         metadata: {},
         created_at: nowIso(),
         updated_at: nowIso(),
@@ -372,6 +378,9 @@ export async function matchStaticContent(options?: {
         download_count: 0,
         is_muhadara: true,
         status: publishStatus,
+        priority: 100,
+        featured: false,
+        scheduled_at: null,
         metadata: {
           fileSize: item.fileSize,
           date: item.date,
@@ -405,6 +414,9 @@ export async function matchStaticContent(options?: {
         view_count: 0,
         download_count: 0,
         status: publishStatus,
+        priority: 100,
+        featured: false,
+        scheduled_at: null,
         metadata: {
           fileSize: item.fileSize,
           date: item.date,
@@ -434,6 +446,10 @@ export async function matchStaticContent(options?: {
         view_count: 0,
         download_count: 0,
         status: publishStatus,
+        category: null,
+        priority: 100,
+        featured: false,
+        scheduled_at: null,
         metadata: {
           fileSize: item.fileSize,
           date: item.date,
@@ -500,7 +516,21 @@ export async function matchStaticContent(options?: {
     const sb = getServiceSupabase()
     if (sb) {
       await sb.from('kitabs').upsert(store.kitabs, { onConflict: 'slug' })
-      await sb.from('ders').upsert(store.ders, { onConflict: 'legacy_id' })
+      await sb.from('ders').upsert(
+        store.ders.map(d => {
+          const { featured: _f, priority: _p, scheduled_at: _s, ...rest } = d
+          return {
+            ...rest,
+            metadata: {
+              ...(d.metadata || {}),
+              featured: d.featured,
+              priority: d.priority,
+              scheduled_at: d.scheduled_at
+            }
+          }
+        }),
+        { onConflict: 'legacy_id' }
+      )
       await sb.from('audio_items').upsert(store.audio_items, { onConflict: 'legacy_id' })
       await sb.from('video_items').upsert(store.video_items, { onConflict: 'legacy_id' })
       await sb.from('pdf_items').upsert(store.pdf_items, { onConflict: 'legacy_id' })

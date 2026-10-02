@@ -5,6 +5,7 @@ import {
   saveLocalStore,
   upsertByLegacyId
 } from '@/lib/cms/local-store'
+import { insertNewAtFront } from '@/lib/cms/priority-cascade'
 import { isSupabaseConfigured, getServiceSupabase } from '@/lib/cms/supabase'
 import type {
   AudioItemRecord,
@@ -52,6 +53,7 @@ export async function upsertPublishableContent(input: PublishContentInput) {
   )
 
   let row: AudioItemRecord | VideoItemRecord | PdfItemRecord
+  let isNew = !input.id
 
   if (input.type === 'audio') {
     const next: AudioItemRecord = {
@@ -70,6 +72,9 @@ export async function upsertPublishableContent(input: PublishContentInput) {
       download_count: 0,
       is_muhadara: Boolean(input.is_muhadara),
       status,
+      priority: 1,
+      featured: false,
+      scheduled_at: null,
       metadata: { source: 'staff_publish' },
       created_at: now,
       updated_at: now,
@@ -78,17 +83,23 @@ export async function upsertPublishableContent(input: PublishContentInput) {
     if (input.id) {
       const idx = store.audio_items.findIndex(r => r.id === input.id)
       if (idx >= 0) {
+        isNew = false
         next.id = store.audio_items[idx].id
         next.legacy_id = store.audio_items[idx].legacy_id
         next.created_at = store.audio_items[idx].created_at
         next.play_count = store.audio_items[idx].play_count
+        next.priority = store.audio_items[idx].priority ?? 1
+        next.featured = store.audio_items[idx].featured ?? false
+        next.scheduled_at = store.audio_items[idx].scheduled_at ?? null
         store.audio_items[idx] = next
       } else {
+        isNew = true
         store.audio_items.push(next)
       }
     } else {
       const up = upsertByLegacyId(store.audio_items, next)
       store.audio_items = up.rows
+      isNew = up.action !== 'updated'
     }
     row = next
   } else if (input.type === 'video') {
@@ -108,6 +119,9 @@ export async function upsertPublishableContent(input: PublishContentInput) {
       view_count: 0,
       download_count: 0,
       status,
+      priority: 1,
+      featured: false,
+      scheduled_at: null,
       metadata: { source: 'staff_publish' },
       created_at: now,
       updated_at: now,
@@ -116,16 +130,22 @@ export async function upsertPublishableContent(input: PublishContentInput) {
     if (input.id) {
       const idx = store.video_items.findIndex(r => r.id === input.id)
       if (idx >= 0) {
+        isNew = false
         next.id = store.video_items[idx].id
         next.legacy_id = store.video_items[idx].legacy_id
         next.created_at = store.video_items[idx].created_at
+        next.priority = store.video_items[idx].priority ?? 1
+        next.featured = store.video_items[idx].featured ?? false
+        next.scheduled_at = store.video_items[idx].scheduled_at ?? null
         store.video_items[idx] = next
       } else {
+        isNew = true
         store.video_items.push(next)
       }
     } else {
       const up = upsertByLegacyId(store.video_items, next)
       store.video_items = up.rows
+      isNew = up.action !== 'updated'
     }
     row = next
   } else {
@@ -141,6 +161,10 @@ export async function upsertPublishableContent(input: PublishContentInput) {
       view_count: 0,
       download_count: 0,
       status,
+      category: input.category || null,
+      priority: 1,
+      featured: false,
+      scheduled_at: null,
       metadata: { source: 'staff_publish' },
       created_at: now,
       updated_at: now,
@@ -149,18 +173,28 @@ export async function upsertPublishableContent(input: PublishContentInput) {
     if (input.id) {
       const idx = store.pdf_items.findIndex(r => r.id === input.id)
       if (idx >= 0) {
+        isNew = false
         next.id = store.pdf_items[idx].id
         next.legacy_id = store.pdf_items[idx].legacy_id
         next.created_at = store.pdf_items[idx].created_at
+        next.priority = store.pdf_items[idx].priority ?? 1
+        next.featured = store.pdf_items[idx].featured ?? false
+        next.scheduled_at = store.pdf_items[idx].scheduled_at ?? null
         store.pdf_items[idx] = next
       } else {
+        isNew = true
         store.pdf_items.push(next)
       }
     } else {
       const up = upsertByLegacyId(store.pdf_items, next)
       store.pdf_items = up.rows
+      isNew = up.action !== 'updated'
     }
     row = next
+  }
+
+  if (isNew) {
+    await insertNewAtFront(store, input.type, row.id, now, { persist: false })
   }
 
   saveLocalStore(store)
@@ -168,16 +202,38 @@ export async function upsertPublishableContent(input: PublishContentInput) {
   if (isSupabaseConfigured()) {
     const sb = getServiceSupabase()
     if (sb) {
+      const collection = input.type
+      const fresh =
+        collection === 'audio'
+          ? store.audio_items.find(r => r.id === row.id) || row
+          : collection === 'video'
+            ? store.video_items.find(r => r.id === row.id) || row
+            : store.pdf_items.find(r => r.id === row.id) || row
       if (input.type === 'audio') {
-        await sb.from('audio_items').upsert(row as AudioItemRecord, { onConflict: 'id' })
+        await sb.from('audio_items').upsert(fresh as AudioItemRecord, { onConflict: 'id' })
       } else if (input.type === 'video') {
-        await sb.from('video_items').upsert(row as VideoItemRecord, { onConflict: 'id' })
+        await sb.from('video_items').upsert(fresh as VideoItemRecord, { onConflict: 'id' })
       } else {
-        await sb.from('pdf_items').upsert(row as PdfItemRecord, { onConflict: 'id' })
+        await sb.from('pdf_items').upsert(fresh as PdfItemRecord, { onConflict: 'id' })
+      }
+      if (isNew) {
+        const { syncPriorityAssignments } = await import('@/lib/cms/priority-cascade')
+        const peers =
+          collection === 'audio'
+            ? store.audio_items
+            : collection === 'video'
+              ? store.video_items
+              : store.pdf_items
+        await syncPriorityAssignments(
+          collection,
+          peers.map(p => ({ id: p.id, priority: normalizePublishPriority(p.priority) })),
+          now
+        )
       }
       await sb.from('media_assets').upsert(asset, {
         onConflict: 'storage_provider,bucket,object_key'
       })
+      row = fresh as typeof row
     }
   }
 
@@ -186,6 +242,11 @@ export async function upsertPublishableContent(input: PublishContentInput) {
     public_url: asset.public_url,
     published: status === 'published'
   }
+}
+
+function normalizePublishPriority(value: unknown): number {
+  const n = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1
 }
 
 export async function setContentStatus(input: {

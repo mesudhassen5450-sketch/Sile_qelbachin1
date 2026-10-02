@@ -19,7 +19,7 @@ export default function KitabCard({ kitab }: { kitab: Kitab }) {
   const isArabic = language === 'ar';
 
   return (
-    <div className="group relative bg-white dark:bg-[#18181b] border border-neutral-200 dark:border-zinc-800 hover:border-red-700/50 dark:hover:border-red-900/60 rounded-xl overflow-hidden transition-all duration-300 flex flex-col justify-between hover:shadow-xl hover:shadow-red-950/10 hover:scale-[1.02]">
+    <div className="group relative bg-white dark:bg-[#18181b] border border-[#e5e7eb] dark:border-zinc-800 hover:border-[#A91F24]/35 hover:bg-[rgba(169,31,36,0.06)] dark:hover:border-red-500/40 dark:hover:bg-red-600/10 rounded-xl overflow-hidden transition-all duration-300 flex flex-col justify-between shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_28px_-14px_rgba(15,23,42,0.12)] hover:shadow-[0_2px_6px_rgba(169,31,36,0.08),0_18px_40px_-16px_rgba(169,31,36,0.18)] dark:hover:shadow-xl dark:hover:shadow-red-950/20 hover:scale-[1.01]">
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-zinc-200 dark:bg-zinc-900">
         {coverSrc ? (
           <Image
@@ -54,7 +54,7 @@ export default function KitabCard({ kitab }: { kitab: Kitab }) {
       <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
         <div className="space-y-2">
           <h3
-            className={`text-lg font-bold text-neutral-900 dark:text-white group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors line-clamp-1 ${
+            className={`text-lg font-bold text-[#111827] dark:text-white group-hover:text-red-700 dark:group-hover:text-red-400 transition-colors line-clamp-1 ${
               isArabic ? 'arabic-text' : ''
             }`}
           >

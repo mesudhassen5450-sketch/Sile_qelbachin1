@@ -8,7 +8,7 @@ import { Phone, Send, Video, MessageSquare, CheckCircle2, ShieldCheck, Youtube }
 export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
   const [formData, setFormData] = useState({ name: '', email: '', message: '' });
-  const { t } = useLanguage();
+  const { t, getLocalized } = useLanguage();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,18 +19,109 @@ export default function ContactPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
-      
+      {/* Stay Connected — social */}
+      <section className="portfolio-card p-8 sm:p-10 space-y-6">
+        <div className="space-y-2 text-center sm:text-start">
+          <p className="text-xs font-bold uppercase tracking-wider text-red-600">
+            {getLocalized({
+              en: 'Our social pages',
+              am: 'የማህበራዊ ሚዲያ ገጾቻችን',
+              ar: 'صفحاتنا الاجتماعية',
+            })}
+          </p>
+          <h1 className="title-gold text-2xl sm:text-3xl font-bold">
+            {getLocalized({ en: 'Connect with us', am: 'ከእኛ ጋር ይገናኙ', ar: 'تواصل معنا' })}
+          </h1>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400 max-w-2xl leading-relaxed">
+            {getLocalized({
+              en: 'Official pages — Telegram, YouTube, and TikTok.',
+              am: 'ይፋዊ ገጾቻችን — ቴሌግራም፣ ዩቲዩብ እና ቲክቶክ።',
+              ar: 'صفحاتنا الرسمية — تلغرام ويوتيوب وتيك توك.',
+            })}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <a
+            href={siteMetadata.telegramUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex items-center gap-4 rounded-2xl border border-sky-500/30 bg-sky-600/10 hover:bg-sky-600 px-5 py-4 transition"
+          >
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-sky-600 text-white shadow-md group-hover:bg-white group-hover:text-sky-600 transition">
+              <Send className="w-5 h-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-bold text-neutral-900 dark:text-white group-hover:text-white transition">
+                Telegram
+              </span>
+              <span className="block text-xs text-neutral-500 group-hover:text-sky-100 transition truncate">
+                {siteMetadata.telegramHandle}
+              </span>
+            </span>
+          </a>
+
+          <a
+            href={siteMetadata.youtubeUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex items-center gap-4 rounded-2xl border border-red-500/30 bg-red-700/10 hover:bg-red-700 px-5 py-4 transition"
+          >
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-red-700 text-white shadow-md group-hover:bg-white group-hover:text-red-700 transition">
+              <Youtube className="w-5 h-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-bold text-neutral-900 dark:text-white group-hover:text-white transition">
+                YouTube
+              </span>
+              <span className="block text-xs text-neutral-500 group-hover:text-red-100 transition truncate">
+                @sle_qelbachn1
+              </span>
+            </span>
+          </a>
+
+          <a
+            href={siteMetadata.tiktokUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex items-center gap-4 rounded-2xl border border-neutral-400/40 bg-neutral-200/40 dark:bg-neutral-800/60 hover:bg-neutral-800 px-5 py-4 transition"
+          >
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-neutral-900 text-white shadow-md group-hover:bg-white group-hover:text-neutral-900 transition">
+              <Video className="w-5 h-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-bold text-neutral-900 dark:text-white group-hover:text-white transition">
+                TikTok
+              </span>
+              <span className="block text-xs text-neutral-500 group-hover:text-neutral-200 transition truncate">
+                {siteMetadata.tiktokHandle}
+              </span>
+            </span>
+          </a>
+        </div>
+      </section>
+
       {/* Header Banner */}
       <div className="portfolio-card p-6 sm:p-10 space-y-4 text-center sm:text-left">
         <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-400 text-xs font-semibold border border-red-200 dark:border-red-900/40">
           <Phone className="w-3.5 h-3.5" />
-          <span>የመገናኛ ገፅ (Contact & Verified Links)</span>
+          <span>
+            {getLocalized({
+              en: 'Contact page',
+              am: 'የመገናኛ ገጽ',
+              ar: 'صفحة التواصل',
+            })}
+          </span>
         </div>
-        <h1 className="text-3xl sm:text-4xl font-bold text-neutral-900 dark:text-white">
-          {t('contactTitle')}
-        </h1>
+        <h2 className="text-3xl sm:text-4xl font-bold text-neutral-900 dark:text-white">
+          {getLocalized({ en: 'Contact', am: 'ግንኙነት', ar: 'اتصل بنا' })}
+        </h2>
         <p className="text-base text-neutral-600 dark:text-neutral-300 max-w-2xl leading-relaxed">
-          ከቻናላችን አዘጋጆች ጋር ለመገናኘት፣ አስተያየት ለመስጠት ወይም ትምህርታዊ ጥያቄዎችን ለመጠየቅ ከታች ያሉትን ይፋዊ አድራሻዎች ይጠቀሙ።
+          {getLocalized({
+            en: 'Use the official contacts below to reach our team, share feedback, or ask questions.',
+            am: 'ከዝግጅት ክፍላችን ጋር ለመገናኘት፣ አስተያየት ለመስጠት ወይም ጥያቄዎችን ለመጠየቅ ከታች ያሉትን ይፋዊ አድራሻዎች ይጠቀሙ።',
+            ar: 'استخدم وسائل التواصل الرسمية أدناه للتواصل مع فريقنا أو إبداء الرأي أو طرح الأسئلة.',
+          })}
         </p>
       </div>
 

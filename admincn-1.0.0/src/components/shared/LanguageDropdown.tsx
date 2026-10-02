@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import type { ReactElement } from 'react'
 
 import {
@@ -8,8 +7,9 @@ import {
   DropdownMenuContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
-  DropdownMenuTrigger
+  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { useAdminLocale, type AdminLang } from '@/context/AdminLocaleContext'
 
 type Props = {
   trigger: ReactElement
@@ -17,19 +17,20 @@ type Props = {
   align?: 'start' | 'center' | 'end'
 }
 
+/** Admin UI language: Amharic or English only (one at a time). */
 const LanguageDropdown = ({ defaultOpen, align, trigger }: Props) => {
-  const [language, setLanguage] = useState('english')
+  const { lang, setLang } = useAdminLocale()
 
   return (
     <DropdownMenu defaultOpen={defaultOpen}>
       <DropdownMenuTrigger render={trigger} />
-      <DropdownMenuContent className='w-50' align={align || 'end'}>
-        <DropdownMenuRadioGroup value={language} onValueChange={setLanguage}>
-          <DropdownMenuRadioItem value='english'>English</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value='german'>Deutsch</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value='spanish'>Española</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value='portuguese'>Português</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value='korean'>한국인</DropdownMenuRadioItem>
+      <DropdownMenuContent className="w-44" align={align || 'end'}>
+        <DropdownMenuRadioGroup
+          value={lang}
+          onValueChange={v => setLang(v as AdminLang)}
+        >
+          <DropdownMenuRadioItem value="am">አማርኛ</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="en">English</DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>

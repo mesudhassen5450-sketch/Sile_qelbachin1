@@ -52,6 +52,7 @@ export function KitabChildAudioEditor({ kitabId, onChanged }: KitabChildAudioEdi
   const [adding, setAdding] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [newAudio, setNewAudio] = useState<UploadedAsset | null>(null)
+  const [addSuccess, setAddSuccess] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -108,6 +109,7 @@ export function KitabChildAudioEditor({ kitabId, onChanged }: KitabChildAudioEdi
     if (!asset?.id) return
     setBusyId(id)
     setError(null)
+    setAddSuccess(null)
     try {
       await patchDers({ id, audio_asset_id: asset.id, media_asset_id: asset.id })
       setRows(prev =>
@@ -121,6 +123,10 @@ export function KitabChildAudioEditor({ kitabId, onChanged }: KitabChildAudioEdi
               }
             : r
         )
+      )
+      const idx = rows.findIndex(r => r.id === id)
+      setAddSuccess(
+        `Saved audio on Ders ${idx >= 0 ? idx + 1 : ''} — website / app will show it.`
       )
       onChanged?.()
     } catch (err) {
@@ -176,21 +182,25 @@ export function KitabChildAudioEditor({ kitabId, onChanged }: KitabChildAudioEdi
     }
   }
 
-  const addDers = async () => {
-    if (!newAudio?.id) {
+  const addDers = async (asset?: UploadedAsset | null, titleOverride?: string) => {
+    const audio = asset ?? newAudio
+    if (!audio?.id) {
       setError('Upload an audio file before adding.')
       return
     }
     setAdding(true)
     setError(null)
+    setAddSuccess(null)
+    const title =
+      (titleOverride ?? newTitle).trim() || `Part ${String(rows.length + 1).padStart(2, '0')}`
     try {
       const res = await fetch('/api/admin/content/ders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           kitab_id: kitabId,
-          title_en: newTitle.trim() || `Ders ${rows.length + 1}`,
-          audio_asset_id: newAudio.id,
+          title_en: title,
+          audio_asset_id: audio.id,
           status: 'published'
         })
       })
@@ -201,11 +211,23 @@ export function KitabChildAudioEditor({ kitabId, onChanged }: KitabChildAudioEdi
       setNewTitle('')
       setNewAudio(null)
       await load()
+      const nextNum = rows.length + 1
+      setAddSuccess(
+        `Part ${nextNum} added and published. Open the kitab page to hear it (refresh if needed).`
+      )
       onChanged?.()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
       setAdding(false)
+    }
+  }
+
+  /** Upload alone used to look “successful” without creating a ders — auto-add on file ready. */
+  const onNewAudioUploaded = (asset: UploadedAsset | null) => {
+    setNewAudio(asset)
+    if (asset?.id) {
+      void addDers(asset)
     }
   }
 
@@ -300,21 +322,26 @@ export function KitabChildAudioEditor({ kitabId, onChanged }: KitabChildAudioEdi
         })}
       </div>
 
-      <div className='space-y-2 rounded-md border border-dashed p-3'>
-        <p className='text-sm font-medium'>Add child audio</p>
+      <div className='space-y-2 rounded-md border border-dashed border-primary/50 bg-primary/5 p-3'>
+        <p className='text-sm font-medium'>Add Part {rows.length + 1} (new child audio)</p>
+        <p className='text-muted-foreground text-xs'>
+          Tip: uploading a file here creates the new ders automatically. Replacing audio on Ders 1–
+          {Math.max(rows.length, 1)} only updates that existing part — it does not create Part{' '}
+          {rows.length + 1}.
+        </p>
         <Input
-          placeholder='New ders title (EN)'
+          placeholder={`New ders title (EN) — e.g. Part ${String(rows.length + 1).padStart(2, '0')}`}
           value={newTitle}
           onChange={e => setNewTitle(e.target.value)}
           disabled={adding}
         />
         <R2FileField
-          label='Audio file'
+          label='Audio file for new part'
           accept='audio/*,.mp3,.m4a,.ogg,.wav'
           folder='staff-uploads/kitabs/ders'
           value={newAudio}
-          onChange={setNewAudio}
-          hint='Upload the audio, then click Add ders audio.'
+          onChange={onNewAudioUploaded}
+          hint='Choose the file — Part will be saved to the kitab right after upload.'
         />
         <Button
           type='button'
@@ -328,9 +355,15 @@ export function KitabChildAudioEditor({ kitabId, onChanged }: KitabChildAudioEdi
           ) : (
             <PlusIcon className='size-4' />
           )}
-          {adding ? 'Adding…' : 'Add ders audio'}
+          {adding ? 'Adding…' : `+ Add Part ${rows.length + 1}`}
         </Button>
       </div>
+
+      {addSuccess ? (
+        <p className='text-emerald-600 dark:text-emerald-400 text-xs font-medium' role='status'>
+          {addSuccess}
+        </p>
+      ) : null}
 
       {error ? (
         <p className='text-destructive text-xs' role='alert'>

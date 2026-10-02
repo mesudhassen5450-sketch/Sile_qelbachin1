@@ -285,7 +285,7 @@ export const translations: Record<string, Record<Language, string>> = {
     EN: 'Contact',
   },
   verifiedSocials: {
-    AM: 'ይፋዊ ሶሻል ሚዲያ አድራሻዎች',
+    AM: 'ይፋዊ የማህበራዊ ሚዲያ አድራሻዎች',
     AR: 'حسابات التواصل الرسمية',
     EN: 'Official Social Media Accounts',
   },

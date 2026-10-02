@@ -77,6 +77,10 @@ export type KitabRecord = {
   speaker_id: string | null
   ders_count: number
   status: ContentStatus
+  /** 1 = highest priority on public lists */
+  priority: number
+  featured: boolean
+  scheduled_at: string | null
   legacy_source: string
   metadata: Record<string, unknown>
   created_at: string
@@ -99,6 +103,9 @@ export type DersRecord = {
   duration_label: string | null
   audio_asset_id: string | null
   status: ContentStatus
+  priority: number
+  featured: boolean
+  scheduled_at: string | null
   metadata: Record<string, unknown>
   created_at: string
   updated_at: string
@@ -121,6 +128,10 @@ export type AudioItemRecord = {
   download_count: number
   is_muhadara: boolean
   status: ContentStatus
+  /** 1 = highest; used for public home/list order */
+  priority: number
+  featured: boolean
+  scheduled_at: string | null
   metadata: Record<string, unknown>
   created_at: string
   updated_at: string
@@ -143,6 +154,9 @@ export type VideoItemRecord = {
   view_count: number
   download_count: number
   status: ContentStatus
+  priority: number
+  featured: boolean
+  scheduled_at: string | null
   metadata: Record<string, unknown>
   created_at: string
   updated_at: string
@@ -161,6 +175,11 @@ export type PdfItemRecord = {
   view_count: number
   download_count: number
   status: ContentStatus
+  /** Use category `notes` for Library → Notes; otherwise PDFs */
+  category: string | null
+  priority: number
+  featured: boolean
+  scheduled_at: string | null
   metadata: Record<string, unknown>
   created_at: string
   updated_at: string
@@ -201,6 +220,9 @@ export type ReminderRecord = {
   description_ar: string | null
   status: ContentStatus
   sort_order: number
+  priority: number
+  featured: boolean
+  scheduled_at: string | null
   metadata: Record<string, unknown>
   created_at: string
   updated_at: string

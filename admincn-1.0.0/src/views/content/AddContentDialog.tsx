@@ -24,6 +24,9 @@ type AddContentDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   onCreated: () => void
+  /** Section defaults so new items land in the correct Admin module pool */
+  defaultCategory?: string | null
+  defaultIsMuhadara?: boolean
 }
 
 type DersDraft = {
@@ -41,7 +44,14 @@ const titles: Record<ContentKind, string> = {
   sahabah: 'Add Sahabah'
 }
 
-const AddContentDialog = ({ kind, open, onOpenChange, onCreated }: AddContentDialogProps) => {
+const AddContentDialog = ({
+  kind,
+  open,
+  onOpenChange,
+  onCreated,
+  defaultCategory = null,
+  defaultIsMuhadara,
+}: AddContentDialogProps) => {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -125,7 +135,8 @@ const AddContentDialog = ({ kind, open, onOpenChange, onCreated }: AddContentDia
           description_am: descriptionAm || null,
           media_asset_id: mainFile.id,
           cover_asset_id: cover?.id || null,
-          is_muhadara: isMuhadara,
+          is_muhadara: defaultIsMuhadara !== undefined ? defaultIsMuhadara : isMuhadara,
+          category: defaultCategory || (isMuhadara ? 'dawah' : 'quran'),
           status: 'published'
         }
       } else if (kind === 'video') {
@@ -140,6 +151,7 @@ const AddContentDialog = ({ kind, open, onOpenChange, onCreated }: AddContentDia
           description_am: descriptionAm || null,
           video_asset_id: mainFile.id,
           cover_asset_id: cover?.id || null,
+          category: defaultCategory || 'long',
           status: 'published'
         }
       } else if (kind === 'pdfs') {
@@ -152,6 +164,7 @@ const AddContentDialog = ({ kind, open, onOpenChange, onCreated }: AddContentDia
           title_am: titleAm || null,
           media_asset_id: mainFile.id,
           cover_asset_id: cover?.id || null,
+          category: defaultCategory || 'pdf',
           status: 'published'
         }
       } else {

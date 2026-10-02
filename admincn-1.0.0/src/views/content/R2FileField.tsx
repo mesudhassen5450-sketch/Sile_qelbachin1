@@ -43,25 +43,50 @@ export function R2FileField({
       onChange(null)
       return
     }
+    if (file.size <= 0) {
+      setError('That file is empty. Choose another audio file.')
+      onChange(null)
+      return
+    }
+    // Soft client hint — server allows up to ~100MB after middleware bypass
+    const maxBytes = 95 * 1024 * 1024
+    if (file.size > maxBytes) {
+      setError('File is too large (max ~95 MB). Compress or split the audio, then try again.')
+      onChange(null)
+      return
+    }
     setBusy(true)
     try {
       const form = new FormData()
-      form.append('file', file)
+      // Explicit filename helps some browsers build a valid multipart body
+      form.append('file', file, file.name || 'upload.bin')
       form.append('folder', folder)
-      const res = await fetch('/api/admin/media/upload', { method: 'POST', body: form })
-      const data = await res.json()
-      if (!res.ok || !data.ok) {
+      const res = await fetch('/api/admin/media/upload', {
+        method: 'POST',
+        body: form
+        // Do not set Content-Type — browser must add multipart boundary
+      })
+      let data: { ok?: boolean; error?: string; asset?: UploadedAsset; public_url?: string; object_key?: string } =
+        {}
+      try {
+        data = await res.json()
+      } catch {
+        setError('Upload failed — server returned an invalid response. Refresh and try again.')
+        onChange(null)
+        return
+      }
+      if (!res.ok || !data.ok || !data.asset?.id) {
         setError(data.error || 'Upload failed. Please try again.')
         onChange(null)
         return
       }
       onChange({
         id: data.asset.id,
-        public_url: data.public_url,
-        object_key: data.object_key
+        public_url: data.public_url || data.asset.public_url,
+        object_key: data.object_key || data.asset.object_key
       })
     } catch {
-      setError('Upload failed. Please try again.')
+      setError('Upload failed (network). Check your connection and try again.')
       onChange(null)
     } finally {
       setBusy(false)

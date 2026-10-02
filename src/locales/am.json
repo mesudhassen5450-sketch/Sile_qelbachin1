@@ -9,7 +9,7 @@
     "knowledge": "ዕውቀት",
     "sahabah": "የሶሓቦች ታሪክ",
     "muhadara": "ሙሓደራዎች",
-    "videos": "ቪዲዮዎች"
+    "videos": "የቪዲዮ ትምህርቶች"
   },
   "hero": {
     "badge": "የእስልምና ትምህርታዊ ቻናል",
@@ -38,17 +38,17 @@
   "buttons": {
     "play": "አዳምጥ",
     "pause": "አቁም",
-    "openKitab": "ኪታቡን ክፈት",
+    "openKitab": "ኪታብ ክፈት",
     "sendMessage": "መልእክት ላክ",
     "joiningTelegram": "Telegram ይቀላቀሉ"
   },
   "contact": {
     "title": "ግንኙነትና አድራሻዎች",
-    "verifiedSocials": "የተረጋገጡ አድራሻዎች",
-    "sendMessageTitle": "መልእክት ወይም ጥያቄ ይላኩ",
-    "yourName": "ስምዎ",
-    "yourContact": "የመገናኛ አድራሻዎ (ቴሌግራም/ስልክ/ኢሜይል)",
-    "yourMessage": "መልእክትዎ",
+    "verifiedSocials": "ይፋዊ የማህበራዊ ሚዲያ አድራሻዎች",
+    "sendMessageTitle": "መልእክት ይላኩ",
+    "yourName": "ስምዎ *",
+    "yourContact": "ኢሜይል ወይም ስልክ",
+    "yourMessage": "መልእክትዎ *",
     "successMessage": "መልእክትዎ በተሳካ ሁኔታ ደርሶናል!"
   },
   "audioLecture": {
@@ -58,5 +58,5 @@
     "upcoming": "የሚመጡ የቀጥታ መርሃ-ግብሮች",
     "previous": "ያለፉ የቀጥታ ስርጭት የተቀረፁ ትምህርቶች"
   },
-  "rightsReserved": "መብቱ በህግ የተጠበቀ ነው።"
+  "rightsReserved": "ሁሉም መብቱ በሕግ የተጠበቀ ነው።"
 }

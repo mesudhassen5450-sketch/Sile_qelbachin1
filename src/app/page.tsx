@@ -1,694 +1,854 @@
-'use client';
+'use client'
 
-import Image from 'next/image';
-import Link from 'next/link';
+import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import {
-  siteMetadata,
-  kitabsData,
-  remindersData,
-  sahabahData,
-  knowledgeData,
-} from '@/data/channelData';
-import KitabCard from '@/components/KitabCard';
-import AudioCard from '@/components/AudioCard';
-import FeaturedAudioBlock from '@/components/FeaturedAudioBlock';
-import CompactAudioRow from '@/components/CompactAudioRow';
-import { useLanguage } from '@/context/LanguageContext';
-import {
+  ArrowRight,
   BookOpen,
   Headphones,
-  Send,
-  ArrowRight,
   Heart,
-  ShieldCheck,
-  Sparkles,
-  Bookmark,
-  Radio,
-  ChevronRight,
-  Smartphone,
-  Compass,
-  BookMarked,
-  Bell,
-  Globe2,
-  Clock3,
-} from 'lucide-react';
-import HomeReminders from '@/components/HomeReminders';
-import HeroCardMedia from '@/components/HeroCardMedia';
-import PartnerIkhlasSection from '@/components/PartnerIkhlasSection';
-import { SITELINK_PAGES, getSitePageCopy } from '@/lib/seo';
-import { useEffect, useState } from 'react';
+  MessageCircleQuestion,
+  Send,
+  Youtube,
+} from 'lucide-react'
 
-const CMS_KITABS_URL = (
-  process.env.NEXT_PUBLIC_CMS_API_BASE || 'https://admin.sileqelbachin1.com/api/public/v1'
-).replace(/\/+$/, '') + '/kitabs';
+import FeaturedAudioBlock from '@/components/FeaturedAudioBlock'
+import CompactAudioRow from '@/components/CompactAudioRow'
+import HomeHero from '@/components/HomeHero'
+import AskQuestionNavLink from '@/components/AskQuestionNavLink'
+import HomeQuranIntro from '@/components/HomeQuranIntro'
+import KitabCard from '@/components/KitabCard'
+import { EDUCATIONAL_ARCHIVE, YOUTH_HEART_CORNER } from '@/config/siteNav'
+import { kitabsData, siteMetadata, type Kitab } from '@/data/channelData'
+import { getLocalOneMinuteSlides } from '@/data/oneMinuteCatalog'
+import { useLanguage } from '@/context/LanguageContext'
+import {
+  fetchPublishedAudio,
+  fetchPublishedKitabs,
+  fetchPublishedQuestions,
+  type CmsAudio,
+  type CmsKitab,
+  type CmsLoc,
+} from '@/lib/cmsClient'
+
+type PopularTrack = {
+  title: { am: string; ar: string; en: string }
+  speaker: string
+  description: { am: string; ar: string; en: string }
+  category: { am: string; ar: string; en: string }
+  audioUrl: string
+  duration?: string
+}
+
+function cmsKitabToKitab(k: CmsKitab): Kitab {
+  const loc = (v?: { am?: string | null; ar?: string | null; en?: string | null }) => ({
+    am: v?.am || '',
+    ar: v?.ar || '',
+    en: v?.en || '',
+  })
+  return {
+    slug: k.slug,
+    title: loc(k.title),
+    author: loc(k.author),
+    category: { am: '', ar: '', en: '' },
+    coverImage: k.coverImage || undefined,
+    pdfUrl: k.pdfUrl || undefined,
+    dersCount: k.dersCount ?? (k.dersList?.length || 0),
+    description: loc(k.description),
+    dersList: (k.dersList || []).map(d => ({
+      id: d.id,
+      title: loc(d.title),
+      speaker: loc(d.speaker),
+      duration: d.duration || '',
+      audioUrl: d.audioUrl || '',
+      kitabId: k.slug,
+    })),
+  }
+}
+
+function cmsAudioToPopular(a: CmsAudio): PopularTrack | null {
+  if (!a.fileUrl) return null
+  const cat = (a.category || 'Audio').trim()
+  const title = {
+    am: a.title?.am || a.title?.en || '',
+    ar: a.title?.ar || a.title?.en || '',
+    en: a.title?.en || a.title?.am || '',
+  }
+  if (!title.en && !title.am) return null
+  const desc = {
+    am: a.description?.am || a.description?.en || '',
+    ar: a.description?.ar || a.description?.en || '',
+    en: a.description?.en || a.description?.am || '',
+  }
+  const norm = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase()
+  const titleBlob = norm(`${title.am} ${title.en} ${title.ar}`)
+  const descBlob = norm(`${desc.am} ${desc.en} ${desc.ar}`)
+  const descIsDup =
+    !descBlob ||
+    descBlob === titleBlob ||
+    (title.am && norm(desc.am) === norm(title.am)) ||
+    (title.en && norm(desc.en) === norm(title.en)) ||
+    (title.am && desc.am && (norm(desc.am).startsWith(norm(title.am)) || norm(title.am).startsWith(norm(desc.am))))
+  // Do not copy description into speaker — that duplicated the same text on the card
+  return {
+    title,
+    speaker: a.isMuhadara ? 'Muhadara' : cat || 'Da’wah',
+    description: descIsDup ? { am: '', ar: '', en: '' } : desc,
+    category: { am: cat, ar: cat, en: cat },
+    audioUrl: a.fileUrl,
+  }
+}
+
+/** Home FAQ cards — Admin marks Youth → Q&A as Featured (top 4 by priority). */
+type HomeGuideQ = {
+  id: string
+  q: { en: string; am: string; ar: string }
+  href: string
+}
+
+function featuredFirst<T extends { featured?: boolean; priority?: number }>(
+  rows: T[],
+  limit: number
+): T[] {
+  const scored = [...rows].sort((a, b) => {
+    const fa = a.featured ? 1 : 0
+    const fb = b.featured ? 1 : 0
+    if (fa !== fb) return fb - fa
+    const pa = typeof a.priority === 'number' && a.priority >= 1 ? a.priority : 9999
+    const pb = typeof b.priority === 'number' && b.priority >= 1 ? b.priority : 9999
+    if (pa !== pb) return pa - pb
+    return 0
+  })
+  const featured = scored.filter(r => r.featured)
+  if (featured.length >= limit) return featured.slice(0, limit)
+  return scored.slice(0, limit)
+}
+
+function Skeleton({ className = '' }: { className?: string }) {
+  return <div className={`animate-pulse rounded-xl bg-neutral-200/80 dark:bg-neutral-800 ${className}`} />
+}
 
 export default function HomePage() {
-  const { t, getLocalized, language } = useLanguage();
-
-  const [featuredKitabs, setFeaturedKitabs] = useState(() => kitabsData.slice(0, 3));
-  const latestDersList = [...(featuredKitabs[0]?.dersList || kitabsData[0].dersList)].reverse().slice(0, 5);
-  const featuredReminder = remindersData[0];
-  const featuredSahabah = sahabahData[0];
-  const featuredKnowledge = knowledgeData[0];
+  const { language, getLocalized, t } = useLanguage()
+  const [featuredKitabs, setFeaturedKitabs] = useState<Kitab[]>(() => kitabsData.slice(0, 3))
+  const [allKitabs, setAllKitabs] = useState<Kitab[]>(kitabsData)
+  const [kitabsLoading, setKitabsLoading] = useState(true)
+  const [popularAudio, setPopularAudio] = useState<PopularTrack[]>([])
+  const [audioLoading, setAudioLoading] = useState(true)
+  const [homeQuestions, setHomeQuestions] = useState<HomeGuideQ[]>([])
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`${CMS_KITABS_URL}?t=${Date.now()}`, { cache: 'no-store' });
-        const body = await res.json();
-        if (!res.ok || !body?.ok || !Array.isArray(body.data) || !body.data.length) return;
-        const order = [
-          'intebih-ante-murakeb',
-          'adewae-kitab',
-          'fatihu-awliya',
-          'alwasail-almufida',
-          'teshilu-alimu-sheria',
-          'yekelb-medreq',
-          'betewbet-mengede-lay',
-        ];
-        const mapped = body.data.map((row: {
-          slug: string;
-          title?: { am?: string; en?: string; ar?: string };
-          author?: { am?: string; en?: string; ar?: string };
-          description?: { am?: string; en?: string; ar?: string };
-          coverImage?: string | null;
-          pdfUrl?: string | null;
-          dersCount?: number;
-          dersList?: typeof kitabsData[0]['dersList'];
-        }) => {
-          const loc = (v?: { am?: string; en?: string; ar?: string }) => ({
-            am: v?.am || '',
-            ar: v?.ar || '',
-            en: v?.en || '',
-          });
-          return {
-            slug: row.slug,
-            title: loc(row.title),
-            author: loc(row.author),
-            category: { am: '', ar: '', en: '' },
-            coverImage: row.coverImage || undefined,
-            pdfUrl: row.pdfUrl || undefined,
-            dersCount: row.dersCount ?? (row.dersList?.length || 0),
-            description: loc(row.description),
-            dersList: row.dersList || [],
-          };
-        });
-        mapped.sort((a: { slug: string }, b: { slug: string }) => {
-          const ia = order.indexOf(a.slug);
-          const ib = order.indexOf(b.slug);
-          return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
-        });
-        if (!cancelled) setFeaturedKitabs(mapped.slice(0, 3));
-      } catch {
-        // keep static until API is reachable
+    let cancelled = false
+    const safety = window.setTimeout(() => {
+      if (!cancelled) {
+        setKitabsLoading(false)
+        setAudioLoading(false)
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    }, 9000)
+    void (async () => {
+      try {
+        const [kitabRows, audioRows, questionRows] = await Promise.all([
+          fetchPublishedKitabs(),
+          fetchPublishedAudio(),
+          fetchPublishedQuestions<{
+            id: string
+            title?: CmsLoc
+            question?: CmsLoc | string
+            featured?: boolean
+            priority?: number
+          }>(),
+        ])
+        if (cancelled) return
 
-  const appFeatures = [
-    { label: t('appFeatureQibla'), icon: Compass },
-    { label: t('appFeatureQuran'), icon: BookMarked },
-    { label: t('appFeatureAzan'), icon: Clock3 },
-    { label: t('appFeatureReminder'), icon: Bell },
-    { label: t('appFeatureDers'), icon: Headphones },
-    { label: t('appFeatureKitab'), icon: BookOpen },
-    { label: t('appFeatureGlobal'), icon: Globe2 },
-  ];
+        if (kitabRows?.length) {
+          const mapped = kitabRows.map(cmsKitabToKitab)
+          // Prefer CMS rows; keep static kitabs that CMS has not replaced yet
+          const bySlug = new Map(kitabsData.map(k => [k.slug, k]))
+          for (const k of mapped) bySlug.set(k.slug, k)
+          setAllKitabs(Array.from(bySlug.values()))
+
+          const picked = featuredFirst(kitabRows, 3).map(cmsKitabToKitab)
+          if (picked.length) setFeaturedKitabs(picked)
+        }
+
+        if (audioRows?.length) {
+          // Admin Featured only — no static/hardcoded home tracks
+          const featuredOnly = audioRows.filter(a => a.featured)
+          const pool = featuredOnly.length ? featuredOnly : featuredFirst(audioRows, 3)
+          const fromCms = featuredFirst(pool, 3)
+            .map(cmsAudioToPopular)
+            .filter((t): t is PopularTrack => Boolean(t))
+          setPopularAudio(fromCms)
+        } else {
+          setPopularAudio([])
+        }
+
+        if (questionRows?.length) {
+          const picked = featuredFirst(questionRows, 4)
+            .map(row => {
+              const title =
+                typeof row.question === 'string'
+                  ? row.question
+                  : row.title?.en ||
+                    row.title?.am ||
+                    (typeof row.question === 'object'
+                      ? row.question?.en || row.question?.am || ''
+                      : '')
+              const am =
+                typeof row.question === 'object'
+                  ? row.question?.am || title
+                  : row.title?.am || title
+              const ar =
+                typeof row.question === 'object'
+                  ? row.question?.ar || title
+                  : row.title?.ar || title
+              const en =
+                typeof row.question === 'object'
+                  ? row.question?.en || title
+                  : row.title?.en || title
+              if (!en && !am) return null
+              return {
+                id: row.id,
+                q: { en: en || am, am: am || en, ar: ar || en || am },
+                href: '/questions',
+              } satisfies HomeGuideQ
+            })
+            .filter((x): x is HomeGuideQ => Boolean(x))
+          setHomeQuestions(picked)
+        }
+      } catch {
+        /* keep empty until CMS responds */
+      } finally {
+        if (!cancelled) {
+          setKitabsLoading(false)
+          setAudioLoading(false)
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+      window.clearTimeout(safety)
+    }
+  }, [])
 
   return (
-    <div className="space-y-16 sm:space-y-24">
-      
-      {/* 1. PROFESSIONAL HIGH-IMPACT HERO SECTION */}
-      <section className="w-screen relative left-1/2 -translate-x-1/2 -mt-6 mb-12 overflow-hidden bg-neutral-950 border-b border-neutral-800 shadow-2xl">
-        
-        {/* Background Image Layer with Calligraphy & Dark Contrast Gradient */}
-        <div className="absolute inset-0 w-full h-full -z-10 flex items-center justify-center">
-          <div className="relative w-[82%] sm:w-full h-full max-w-4xl mx-auto">
-            <Image
-              src="/logo2hero.jpg"
-              alt={siteMetadata.channelName}
-              width={800}
-              height={800}
-              priority
-              className="w-full h-auto opacity-20 filter blur-sm mx-auto block"
-              style={{ objectFit: 'contain' }}
-            />
-          </div>
-          <div className="absolute inset-0 bg-gradient-to-r from-neutral-950/95 via-neutral-950/85 to-red-950/60" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-red-600/15 via-transparent to-transparent" />
-        </div>
+    <div className="space-y-10 sm:space-y-16 sm:space-y-20 overflow-x-hidden">
+      <HomeHero />
 
-        {/* Hero Content Grid Layer */}
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-28 flex flex-col lg:flex-row items-center justify-between gap-12">
-          
-          {/* Left Column: Typography, Hadith Glass Box, and Interactive CTAs */}
-          <div className="w-full lg:w-7/12 space-y-8 text-start">
-            
-            <div className="space-y-4">
-              <div className="inline-flex items-center space-x-2.5 px-4 py-1.5 rounded-full bg-red-950/80 text-red-400 border border-red-800/60 text-xs font-bold uppercase tracking-wider backdrop-blur-md shadow-md">
-                <Sparkles className="w-4 h-4 text-red-500 animate-pulse" />
-                <span>{t('hero.badge')}</span>
-              </div>
-
-              <h1 className="text-4xl sm:text-6xl font-black text-white tracking-tight leading-tight">
-                {siteMetadata.channelName}{' '}
-                <span className="block text-2xl sm:text-3xl font-bold font-mono text-red-500 mt-2">
-                  {siteMetadata.telegramHandle}
-                </span>
-              </h1>
-            </div>
-
-            {/* Hadith Quote Glass Box Component */}
-            <div className="backdrop-blur-xl bg-neutral-900/80 border border-neutral-800/80 p-6 sm:p-8 rounded-3xl border-s-4 border-s-red-600 shadow-2xl space-y-4">
-              <p className={`text-lg sm:text-2xl font-semibold leading-relaxed text-neutral-100 tracking-tight ${language === 'ar' ? 'arabic-text' : ''}`}>
-                {getLocalized(siteMetadata.heroHadithText)}
-              </p>
-              <div className="flex items-center justify-end font-bold text-xs sm:text-sm text-red-400">
-                <span>{getLocalized(siteMetadata.heroHadithSource)}</span>
-              </div>
-            </div>
-
-            {/* Interactive Primary & Secondary CTA Buttons */}
-            <div className="flex flex-wrap items-center gap-4 pt-2">
-              <Link
-                href="/audio-lecture"
-                className="btn-red inline-flex items-center space-x-2.5 px-7 py-4 rounded-2xl font-bold text-sm sm:text-base shadow-xl hover:scale-105 transition"
-              >
-                <Headphones className="w-5 h-5 text-white" />
-                <span>{t('hero.listenAudio')}</span>
-                <ChevronRight className="w-4 h-4 text-white/80 rtl:rotate-180" />
-              </Link>
-
-              <Link
-                href="/kitab"
-                className="inline-flex items-center space-x-2.5 px-7 py-4 rounded-2xl font-bold text-sm sm:text-base bg-neutral-900/90 text-white hover:bg-neutral-800 border border-neutral-700/80 backdrop-blur-md shadow-xl hover:border-red-600/50 transition"
-              >
-                <BookOpen className="w-5 h-5 text-red-500" />
-                <span>{t('hero.exploreKitab')}</span>
-              </Link>
-
-              <a
-                href={siteMetadata.telegramUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center space-x-2.5 px-6 py-4 rounded-2xl font-bold text-sm sm:text-base bg-sky-600/90 hover:bg-sky-500 text-white transition shadow-xl border border-sky-500/30"
-              >
-                <Send className="w-5 h-5" />
-                <span>{t('hero.telegramChannel')}</span>
-              </a>
-            </div>
-
-          </div>
-
-          {/* Right Column: Interactive Card Showcase */}
-          <div className="w-full lg:w-5/12 flex justify-center">
-            <div className="relative group w-full max-w-md">
-              <div className="absolute -inset-1 bg-gradient-to-r from-red-600 to-amber-600 rounded-3xl blur-xl opacity-30 group-hover:opacity-60 transition duration-500" />
-              <div className="relative bg-neutral-900 border border-neutral-800 rounded-3xl overflow-hidden p-6 space-y-6 shadow-2xl">
-                
-                <HeroCardMedia />
-
-                <div className="space-y-3 text-xs text-neutral-300">
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-neutral-950/60 border border-neutral-800">
-                    <span className="flex items-center space-x-2">
-                      <Radio className="w-4 h-4 text-red-500" />
-                      <span>{t('audioArchives')}</span>
-                    </span>
-                    <span className="font-mono text-red-400 font-bold">180+ Tracks</span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-neutral-950/60 border border-neutral-800">
-                    <span className="flex items-center space-x-2">
-                      <BookOpen className="w-4 h-4 text-red-500" />
-                      <span>{t('kitabPdfs')}</span>
-                    </span>
-                    <span className="font-mono text-red-400 font-bold">22+ Books</span>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          </div>
-
-        </div>
+      {/* Purpose */}
+      <section className="max-w-3xl mx-auto text-center space-y-4 px-2">
+        <h2 className="text-2xl sm:text-3xl font-bold text-[#111827] dark:text-white">
+          {getLocalized({
+            en: 'About Our Hearts…',
+            am: 'ስለ ቀልባችን…',
+            ar: 'عن قلوبنا…',
+          })}
+        </h2>
+        <p className="text-neutral-600 dark:text-neutral-300 leading-relaxed text-base sm:text-lg">
+          {getLocalized(siteMetadata.purposeParagraph1)}
+        </p>
       </section>
 
-      {/* 2. EDITORIAL PURPOSE SECTION (Matching Portfolio Card Aesthetic) */}
-      <section className="max-w-4xl mx-auto">
-        <div className="portfolio-card p-8 md:p-10 space-y-4">
-          <div className="flex items-center gap-3">
-            <span className="text-[#D32F2F] text-xl">❤️</span>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{t('purpose.title')}</h2>
-          </div>
-          <p className="text-gray-700 dark:text-gray-300 leading-relaxed text-base pt-2">
-            {getLocalized(siteMetadata.purposeParagraph1)}
-          </p>
-          <p className="text-gray-700 dark:text-gray-300 leading-relaxed text-base pt-2 border-t border-gray-100 dark:border-gray-800">
-            {getLocalized(siteMetadata.purposeParagraph2)}
-          </p>
-        </div>
-      </section>
+      {/* Qur’an */}
+      <HomeQuranIntro />
 
-      <HomeReminders />
-
-      {/* 2b. SITELINK / SECTION DIRECTORY (clear homepage anchors for Google + visitors) */}
+      {/* Marriage under Qur’an — banner only */}
       <section className="space-y-6">
-        <div>
-          <div className="flex items-center space-x-2 text-red-600 font-semibold text-xs tracking-wider uppercase mb-1">
-            <Sparkles className="w-4 h-4" />
-            <span>{t('sections.exploreSite')}</span>
+        <div className="portfolio-card overflow-hidden border-red-500/20">
+          <div className="grid grid-cols-1 lg:grid-cols-5">
+            <div className="lg:col-span-3 p-8 sm:p-10 space-y-5 bg-gradient-to-br from-red-950/40 via-neutral-950 to-neutral-900 dark:from-neutral-900 dark:via-neutral-950 dark:to-neutral-950 text-white">
+              <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-red-400">
+                <span>💍</span>
+                {getLocalized({
+                  en: 'Youth & Heart · Marriage',
+                  am: 'ወጣቶች እና ልብ · ጋብቻ',
+                  ar: 'الشباب والقلب · الزواج',
+                })}
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-black leading-tight text-white">
+                {getLocalized({
+                  en: 'Marriage & Love — guided by mercy and character',
+                  am: 'ጋብቻ እና ፍቅር — በእዝነት እና በሥነ-ምግባር የተመራ',
+                  ar: 'الزواج والحب — على أساس الرحمة والخلق',
+                })}
+              </h2>
+              <p className="text-sm sm:text-base text-white/80 leading-relaxed max-w-xl">
+                {getLocalized({
+                  en: 'For youth seeking marriage or already in married life: put faith first, pursue halal love, and build family peace — then ask privately.',
+                  am: 'ትዳር ለሚፈልጉ ወይም በትዳር ሕይወት ውስጥ ላሉ ወጣቶች፦ እምነትን አስቀድሞ መምረጥ፣ ሐላል ፍቅር እና የቤተሰብ ሰላምን መገንባት — በመቀጠል በግል ይጠይቁ።',
+                  ar: 'للشباب الباحثين عن الزواج أو في الحياة الزوجية: قدّم الإيمان، واتبع الحب الحلال، وابنِ سلام الأسرة — ثم اسأل بخصوصية.',
+                })}
+              </p>
+              <Link
+                href="/marriage"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition"
+              >
+                {getLocalized({
+                  en: 'Marriage & Love center →',
+                  am: 'የጋብቻ እና ፍቅር ማዕከል →',
+                  ar: 'مركز الزواج والحب →',
+                })}
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+            <div className="lg:col-span-2 p-6 sm:p-8 bg-white dark:bg-neutral-950 space-y-5 flex flex-col justify-center">
+              <p className="text-xs font-bold uppercase tracking-wider text-[#A91F24]">
+                {getLocalized({ en: 'Private guidance', am: 'የግል መመሪያ', ar: 'إرشاد خاص' })}
+              </p>
+              <p className="text-sm font-medium text-[#6b7280] dark:text-neutral-400 leading-relaxed">
+                {getLocalized({
+                  en: 'Topics are prepared and published by Admin. Until then, ask privately — an Ustaz will reply by email.',
+                  am: 'ርዕሶች በአድሚኑ ተዘጋጅተው ይታተማሉ። እስከዚያው በግል ይጠይቁ — እስታዝ በኢሜይል ይመልሳል።',
+                  ar: 'تُعدّ المواضيع وتنشر من الإدارة. إلى ذلك اسأل بخصوصية — يرد الأستاذ عبر البريد.',
+                })}
+              </p>
+              <AskQuestionNavLink className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#A91F24] hover:bg-[#8F171C] text-white text-sm font-bold transition" />
+            </div>
           </div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-white">
-            {t('sections.mainSections')}
+        </div>
+      </section>
+
+      {/* Educational Archive section cards (image 7) */}
+      <section id="archive" className="space-y-6 scroll-mt-28">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-red-600 mb-1">
+            {getLocalized({
+              en: 'Educational Archive',
+              am: 'ትምህርታዊ ማህደር',
+              ar: 'الأرشيف التعليمي',
+            })}
+          </p>
+          <h2 className="text-2xl sm:text-3xl font-bold text-[#111827] dark:text-white">
+            {getLocalized({
+              en: 'Choose a section',
+              am: 'ክፍል ይምረጡ',
+              ar: 'اختر قسماً',
+            })}
           </h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {SITELINK_PAGES.map((page) => {
-            const copy = getSitePageCopy(page, language);
-            return (
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4">
+          {EDUCATIONAL_ARCHIVE.map(item => (
             <Link
-              key={page.path}
-              href={page.path}
-              className="portfolio-card p-5 space-y-2 hover:border-red-500/40 hover:-translate-y-0.5 transition group"
+              key={item.href}
+              href={item.href}
+              className="portfolio-card p-3 sm:p-5 space-y-1.5 sm:space-y-2 hover:border-red-500/40 hover:-translate-y-0.5 transition group min-w-0"
             >
-              <h3 className="text-lg font-bold text-neutral-900 dark:text-white group-hover:text-red-600 transition">
-                {copy.name}
+              <span className="text-xl sm:text-2xl" aria-hidden>
+                {item.emoji}
+              </span>
+              <h3 className="text-sm sm:text-lg font-bold text-[#111827] dark:text-white group-hover:text-red-600 transition line-clamp-2">
+                {getLocalized(item.label)}
               </h3>
-              <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
-                {copy.description}
+              <p className="hidden sm:block text-sm text-[#6b7280] dark:text-neutral-400 leading-relaxed">
+                {getLocalized(item.description)}
               </p>
-              <span className="inline-flex items-center text-sm font-semibold text-red-600">
-                {language === 'en' ? `${t('sections.open')} ${copy.name}` : `${copy.name} ${t('sections.open')}`}
-                <ArrowRight className="w-4 h-4 ml-1" />
+              <span className="inline-flex items-center text-xs sm:text-sm font-semibold text-red-600">
+                {item.cta
+                  ? getLocalized(item.cta)
+                  : language === 'en'
+                    ? `${t('sections.open')} ${getLocalized(item.label)}`
+                    : `${getLocalized(item.label)} ${t('sections.open')}`}
+                <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 ml-1 shrink-0" />
               </span>
             </Link>
-            );
-          })}
+          ))}
         </div>
       </section>
 
-      {/* 3. FEATURED KITAB SECTION */}
+      {/* 3 kitabs */}
       <section className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
-            <div className="flex items-center space-x-2 text-red-600 font-semibold text-xs tracking-wider uppercase mb-1">
+            <div className="flex items-center gap-2 text-red-600 font-semibold text-xs tracking-wider uppercase mb-1">
               <BookOpen className="w-4 h-4" />
-              <span>{t('sections.featuredKitabLabel')}</span>
+              <span>
+                {getLocalized({
+                  en: 'Library introduction',
+                  am: 'የቤተ-መጻሕፍት መግቢያ',
+                  ar: 'مقدمة المكتبة',
+                })}
+              </span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-white">
-              {t('sections.featuredKitab')}
+            <h2 className="text-2xl sm:text-3xl font-bold text-[#111827] dark:text-white">
+              {getLocalized({
+                en: 'Three featured kitabs',
+                am: 'ሦስት ተመራጭ ኪታቦች',
+                ar: 'ثلاثة كتب مختارة',
+              })}
             </h2>
           </div>
           <Link
-            href="/kitab"
-            className="inline-flex items-center space-x-2 text-sm font-semibold text-red-600 hover:text-red-700 dark:text-red-400"
+            href="/library"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-red-600 hover:text-red-700"
           >
-            <span>{t('sections.viewAllKitabs')}</span>
+            {getLocalized({ en: 'Open library', am: 'ቤተ-መጻሕፍት ክፈት', ar: 'افتح المكتبة' })}
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {featuredKitabs.map((kitab) => (
-            <KitabCard key={kitab.slug} kitab={kitab} />
-          ))}
-        </div>
-      </section>
-
-      {/* 4. LATEST DERS SECTION */}
-      <section className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center space-x-2 text-red-600 font-semibold text-xs tracking-wider uppercase mb-1">
-              <Headphones className="w-4 h-4" />
-              <span>{t('sections.latestDers')}</span>
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-white">
-              {t('sections.latestDers')}
-            </h2>
+        {kitabsLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+            {[1, 2, 3].map(i => (
+              <Skeleton key={i} className="h-72" />
+            ))}
           </div>
-        </div>
-
-        <div className="space-y-3">
-          {latestDersList.map((ders) => (
-            <AudioCard key={ders.id} track={ders} playlist={latestDersList} />
-          ))}
-        </div>
-      </section>
-
-      {/* 5. FEATURED AUDIO SECTION - LATEST CONTENT */}
-      <section className="space-y-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center space-x-2 text-red-600 font-semibold text-xs tracking-wider uppercase mb-1">
-              <Headphones className="w-4 h-4" />
-              <span>{t('sections.popularAudioLabel')}</span>
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-white">
-              {t('sections.popularAudio')}
-            </h2>
-          </div>
-          <Link
-            href="/audio-lecture"
-            className="inline-flex items-center space-x-2 text-sm font-semibold text-red-600 hover:text-red-700 dark:text-red-400"
-          >
-            <span>{t('sections.viewAllAudio')}</span>
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-
-        {/* Featured Blocks: Three Main Tracks (Removed Intebih Part 4) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* Track 1: Poetry */}
-          <FeaturedAudioBlock
-            title={{ am: "#ግጥም1 — ማረኝ ጌታየ ሆይ!!", ar: "قصيدة — يا ربي", en: "Poetry — My Lord" }}
-            speaker="በ ኡስታዝ፦ ሙሓመድ ሲራጅ ተገጥሞ፤ በ ወንድም አቡ ሱፍያን ድምፅ የቀረበ"
-            audioUrl="/telegram_media/files/home page audio/ማረኝ_የኔ_ጌታ…!የ_ኡስታዝ_መመሀመድ_ሲራጁ_ግጥም.m4a"
-            category={{ am: 'ግጥም', ar: 'شعر', en: 'Poetry' }}
-          />
-
-          {/* Track 2: Anxiety & Stress Advice */}
-          <FeaturedAudioBlock
-            title={{ am: "ከ ሐሳብ እና ከ ጭንቀት እንዴት መውጣት እንችላለን?", ar: "كيف نتخلص من القلق والحزن؟", en: "How to Overcome Anxiety & Stress?" }}
-            speaker="አቅራቢ፦ ኡስታዝ አብዱ ረዛቅ አል-ባጂ"
-            audioUrl="/telegram_media/files/home page audio/ከጭንቀት_እና_ከ_ሐሳብ_መውጫ_መንገዶች!.mp3"
-            category={{ am: 'መልእክት', ar: 'نصيحة', en: 'Advice' }}
-          />
-
-          {/* Track 3: Marriage & Islam */}
-          <FeaturedAudioBlock
-            title={{ am: "ትዳር እና እስልምና 🌷 🌹 🥀 - የ ወንጀል መዘዝ!!", ar: "الزواج والإسلام — عواقب الذنوب", en: "Marriage & Islam — Consequences of Sin" }}
-            speaker="ወንድም አቡ ሱፍያን"
-            duration="52:43"
-            description="ወንጀልን መሥራት በሰው ልጅ ላይ በዱንያ እና በ ኣኺራ ላይ የሚያመጣው ተፅዕኖ!"
-            audioUrl="/telegram_media/files/home page audio/ትዳር እና እስልምና.ogg"
-            category={{ am: 'ትዳር', ar: 'الزواج', en: 'Marriage' }}
-          />
-
-        </div>
-      </section>
-
-      {/* 6. REMINDER & SAHABAH GRID SECTION */}
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        
-        {/* Featured Reminder */}
-        <div className="portfolio-card p-6 sm:p-8 flex flex-col justify-between space-y-6">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-red-50 dark:bg-red-950/50 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/40">
-                <Heart className="w-3.5 h-3.5" />
-                <span>{t('nav.reminders')}</span>
-              </span>
-              <span className="text-xs font-semibold text-neutral-500">
-                {featuredReminder.category}
-              </span>
-            </div>
-
-            <h3 className="text-xl font-bold text-neutral-900 dark:text-white">
-              {getLocalized(featuredReminder.title)}
-            </h3>
-
-            <p className="text-base text-neutral-700 dark:text-neutral-300 italic leading-relaxed">
-              "{getLocalized(featuredReminder.content)}"
-            </p>
-            
-            <p className="text-xs font-bold text-red-600 dark:text-red-400">
-              — {getLocalized(featuredReminder.source)}
-            </p>
-          </div>
-
-          <div className="pt-4 border-t border-neutral-100 dark:border-neutral-800">
-            <Link
-              href="/reminders"
-              className="inline-flex items-center space-x-2 text-sm font-bold text-red-600 hover:text-red-700 dark:text-red-400"
-            >
-              <span>{t('sections.viewReminders')}</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-        </div>
-
-        {/* Featured Sahabah Lesson */}
-        <div className="portfolio-card p-6 sm:p-8 flex flex-col justify-between space-y-6">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
-                <ShieldCheck className="w-3.5 h-3.5 text-red-500" />
-                <span>{t('nav.sahabah')}</span>
-              </span>
-            </div>
-
-            <h3 className="text-xl font-bold text-neutral-900 dark:text-white">
-              {getLocalized(featuredSahabah.name)}
-            </h3>
-
-            <p className="text-xs font-semibold text-red-600 dark:text-red-400">
-              {getLocalized(featuredSahabah.title)}
-            </p>
-
-            <p className="text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed">
-              {getLocalized(featuredSahabah.shortDescription)}
-            </p>
-          </div>
-
-          <div className="pt-4 border-t border-neutral-100 dark:border-neutral-800">
-            <Link
-              href={`/sahabah/${featuredSahabah.slug}`}
-              className="inline-flex items-center space-x-2 text-sm font-bold text-neutral-900 dark:text-white hover:text-red-600 dark:hover:text-red-400 transition"
-            >
-              <span>{t('sections.readSahabah')}</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-        </div>
-
-      </section>
-
-      {/* 7. QUR'AN & HADITH SPOTLIGHT */}
-      <section>
-        <div className="bg-gradient-to-r from-neutral-900 via-neutral-900 to-red-950 text-white rounded-2xl p-6 sm:p-10 border border-neutral-800 shadow-lg space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-neutral-800">
-            <div className="flex items-center space-x-2 text-red-400 font-bold text-sm">
-              <Bookmark className="w-4 h-4" />
-              <span>{t('sections.spotlight')}</span>
-            </div>
-            <Link
-              href="/knowledge"
-              className="text-xs font-semibold text-neutral-300 hover:text-white flex items-center space-x-1"
-            >
-              <span>{t('sections.viewKnowledge')}</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
-          <div className="space-y-4">
-            <div className="arabic-text text-2xl sm:text-3xl text-amber-300 font-bold">
-              {featuredKnowledge.arabicText}
-            </div>
-            <p className="text-lg text-white font-semibold">
-              {getLocalized(featuredKnowledge.amharicText)}
-            </p>
-            <p className="text-xs text-neutral-400 font-mono">
-              {getLocalized(featuredKnowledge.reference)}
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* 8. MOBILE APP COMING SOON */}
-      <section className="relative overflow-hidden rounded-3xl border border-neutral-800 bg-neutral-950 text-white shadow-2xl">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-80"
-          style={{
-            background:
-              'radial-gradient(ellipse 70% 60% at 85% 20%, rgba(185,28,28,0.35), transparent 55%), radial-gradient(ellipse 50% 40% at 10% 90%, rgba(127,29,29,0.25), transparent 50%), linear-gradient(160deg, #0a0a0b 0%, #171717 55%, #1c1917 100%)',
-          }}
-        />
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.07]"
-          style={{
-            backgroundImage:
-              'linear-gradient(to right, rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.5) 1px, transparent 1px)',
-            backgroundSize: '28px 28px',
-          }}
-        />
-
-        <div className="relative grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-10 lg:gap-6 p-6 sm:p-10 lg:p-12 items-center">
-          <div className="space-y-6 max-w-xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-red-500/30 bg-red-950/50 px-3 py-1 text-xs font-semibold tracking-wide text-red-300">
-              <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-              <span>{t('appComingSoonBadge')}</span>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-red-400">
-                <Smartphone className="w-5 h-5" />
-                <span className="text-xs font-bold uppercase tracking-[0.18em]">Digital App</span>
-              </div>
-              <h2 className="text-3xl sm:text-4xl font-extrabold leading-tight tracking-tight">
-                {t('appComingSoonTitle')}
-              </h2>
-              <p className="text-base sm:text-lg text-neutral-300 leading-relaxed">
-                {t('appComingSoonBody')}
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-2.5">
-              {appFeatures.map(({ label, icon: Icon }) => (
-                <span
-                  key={label}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs sm:text-sm font-semibold text-neutral-100 backdrop-blur-sm transition hover:border-red-500/40 hover:bg-red-950/40"
-                >
-                  <Icon className="w-3.5 h-3.5 text-red-400" />
-                  {label}
-                </span>
+        ) : (
+          <>
+            <div className="md:hidden flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory scrollbar-thin">
+              {featuredKitabs.map(kitab => (
+                <div key={kitab.slug} className="min-w-[78%] max-w-[78%] snap-start shrink-0">
+                  <KitabCard kitab={kitab} />
+                </div>
               ))}
             </div>
+            <div className="hidden md:grid grid-cols-1 md:grid-cols-3 gap-6">
+              {featuredKitabs.map(kitab => (
+                <KitabCard key={kitab.slug} kitab={kitab} />
+              ))}
+            </div>
+          </>
+        )}
+      </section>
 
-            <p className="text-sm text-neutral-400">
-              {t('appNotifyHint')}:{' '}
-              <a
-                href={siteMetadata.telegramUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-bold text-red-400 hover:text-red-300 transition"
-              >
-                {siteMetadata.telegramHandle}
-              </a>
+      {/* Intebih Ante Murakeb — 7-part introduction between Kitabs and popular audio */}
+      <section className="space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-[#A91F24] mb-1">
+              {getLocalized({
+                en: 'Introduction series',
+                am: 'መግቢያ ተከታታይ',
+                ar: 'سلسلة تعريفية',
+              })}
+            </p>
+            <h2 className="text-2xl sm:text-3xl font-bold text-[#111827] dark:text-white">
+              {getLocalized({
+                en: 'Intebih Ante Murakeb — 7 parts',
+                am: 'ኢንተቢህ አንተ ሙራቀቡን — 7 ክፍሎች',
+                ar: 'انتبه أنت مراقب — 7 أجزاء',
+              })}
+            </h2>
+            <p className="mt-1 text-sm font-medium text-[#6b7280] dark:text-neutral-400 max-w-2xl">
+              {getLocalized({
+                en: 'Start here: seven introduction lessons from Intebih Ante Murakeb.',
+                am: 'እዚህ ይጀምሩ፦ «ኢንተቢህ አንተ ሙራቀቡን» የተሰኙ የ7 ክፍሎች መግቢያ ትምህርቶች።',
+                ar: 'ابدأ هنا: الدروس السبعة التعريفية من انتبه أنت مراقب.',
+              })}
             </p>
           </div>
-
-          {/* Phone mock — visual only */}
-          <div className="relative mx-auto w-full max-w-[260px] sm:max-w-[280px] lg:justify-self-end">
-            <div className="absolute -inset-8 rounded-full bg-red-600/20 blur-3xl animate-pulse" />
-            <div className="relative rounded-[2rem] border border-neutral-700 bg-neutral-900 p-2.5 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.7)] rotate-[-2deg] hover:rotate-0 transition-transform duration-500">
-              <div className="rounded-[1.5rem] overflow-hidden bg-neutral-950 border border-neutral-800">
-                <div className="h-7 bg-neutral-900 flex items-center justify-center">
-                  <div className="h-1.5 w-16 rounded-full bg-neutral-700" />
-                </div>
-                <div className="px-4 pt-3 pb-5 space-y-4 min-h-[380px]">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[10px] uppercase tracking-wider text-red-400 font-bold">Sile Qelbachin</p>
-                      <p className="text-sm font-bold text-white">ስለ ቀልባችን</p>
-                    </div>
-                    <div className="w-8 h-8 rounded-full bg-red-600/20 border border-red-500/40 flex items-center justify-center">
-                      <Heart className="w-3.5 h-3.5 text-red-400" />
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl bg-gradient-to-br from-red-900/60 to-neutral-900 border border-red-800/40 p-4 space-y-2">
-                    <div className="flex items-center gap-2 text-red-300 text-xs font-semibold">
-                      <Compass className="w-3.5 h-3.5" />
-                      <span>{t('appFeatureQibla')}</span>
-                    </div>
-                    <div className="mx-auto w-20 h-20 rounded-full border-2 border-red-500/50 flex items-center justify-center relative">
-                      <div className="absolute inset-2 rounded-full border border-dashed border-red-400/30 animate-[spin_12s_linear_infinite]" />
-                      <div className="w-0 h-0 border-l-[6px] border-r-[6px] border-b-[18px] border-l-transparent border-r-transparent border-b-red-500" />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { icon: BookMarked, label: t('appFeatureQuran') },
-                      { icon: Clock3, label: t('appFeatureAzan') },
-                      { icon: Bell, label: t('appFeatureReminder') },
-                      { icon: Headphones, label: t('appFeatureDers') },
-                      { icon: BookOpen, label: t('appFeatureKitab') },
-                      { icon: Globe2, label: t('appFeatureGlobal') },
-                    ].map(({ icon: Icon, label }) => (
-                      <div
-                        key={label}
-                        className="rounded-xl bg-white/5 border border-white/10 p-2.5 flex flex-col items-center gap-1.5 text-center"
-                      >
-                        <Icon className="w-4 h-4 text-red-400" />
-                        <span className="text-[9px] leading-tight text-neutral-300 font-medium line-clamp-2">
-                          {label}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="rounded-xl bg-red-600 text-center py-2.5 text-xs font-bold tracking-wide">
-                    {t('appComingSoonBadge')}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <Link
+            href="/kitab/intebih-ante-murakeb"
+            className="inline-flex items-center gap-2 text-sm font-bold text-[#A91F24] dark:text-red-400 hover:underline shrink-0"
+          >
+            {getLocalized({
+              en: 'Go to kitab →',
+              am: 'ወደ ኪታብ ይሂዱ →',
+              ar: 'اذهب إلى الكتاب →',
+            })}
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+        <div className="portfolio-card overflow-hidden divide-y divide-[#e3e2e0] dark:divide-neutral-800">
+          {(() => {
+            const fallback =
+              kitabsData.find(k => k.slug === 'intebih-ante-murakeb')?.dersList || []
+            const fromCms =
+              allKitabs.find(k => k.slug === 'intebih-ante-murakeb')?.dersList || []
+            // Prefer CMS audio; fill gaps from static. Never show empty "Coming soon" rows.
+            const ders: Array<{
+              id: string
+              title: { am: string; ar: string; en: string }
+              speaker: { am: string; ar: string; en: string }
+              audioUrl: string
+              partNum: number
+            }> = []
+            for (let i = 0; i < 7; i++) {
+              const c = fromCms[i]
+              const f = fallback[i]
+              const audioUrl = (c?.audioUrl || f?.audioUrl || '').trim()
+              if (!audioUrl) continue
+              const title = c?.title || f?.title
+              const speaker = c?.speaker || f?.speaker
+              if (!title || !speaker) continue
+              ders.push({
+                id: c?.id || f?.id || `intebih-part-${i + 1}`,
+                title,
+                speaker,
+                audioUrl,
+                partNum: i + 1,
+              })
+            }
+            return ders.map(d => (
+              <CompactAudioRow
+                key={d.id}
+                title={d.title}
+                speaker={getLocalized(d.speaker)}
+                kitabTitle={getLocalized({
+                  en: `Part ${d.partNum} of 7`,
+                  am: `ክፍል ${d.partNum} ከ 7`,
+                  ar: `الجزء ${d.partNum} من 7`,
+                })}
+                audioUrl={d.audioUrl}
+              />
+            ))
+          })()}
         </div>
       </section>
 
-      {/* 8b. LIVE DERS — STAY TUNED (honest teaser) */}
-      <section className="rounded-2xl border border-neutral-800 bg-neutral-950/90 text-white overflow-hidden">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 p-4 sm:p-5">
-          <div className="flex items-center gap-3 min-w-0 flex-1">
-            <div className="relative flex-shrink-0 w-11 h-11 rounded-xl bg-red-950/80 border border-red-800/60 flex items-center justify-center">
-              <Radio className="w-5 h-5 text-red-400" />
-              <span className="absolute -top-1 -end-1 h-2.5 w-2.5 rounded-full bg-neutral-500 border border-neutral-900" />
+      {/* Popular audio — same structure day/night; white/elevated cards */}
+      <section className="space-y-6 rounded-3xl bg-[#f1f3f6]/80 dark:bg-transparent px-0 sm:px-2 py-2 sm:py-0">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-[#A91F24] dark:text-red-400 font-bold text-xs tracking-wider uppercase mb-1">
+              <Headphones className="w-4 h-4" />
+              <span>
+                {getLocalized({
+                  en: 'Featured audio',
+                  am: 'ተመራጭ ድምጽ',
+                  ar: 'صوت مميز',
+                })}
+              </span>
             </div>
-            <div className="min-w-0 space-y-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 bg-neutral-900 border border-neutral-700 px-2 py-0.5 rounded-full">
-                  {t('liveStayTunedBadge')}
-                </span>
-                <span className="text-[10px] font-semibold text-neutral-500">
-                  {t('liveStayTunedStyle')}
-                </span>
-              </div>
-              <h3 className="text-sm sm:text-base font-extrabold tracking-tight truncate">
-                {t('liveStayTunedTitle')}
-              </h3>
-              <p className="text-xs text-neutral-400 leading-relaxed">
-                {t('liveStayTunedBody')}
-              </p>
-            </div>
+            <h2 className="text-2xl sm:text-3xl font-bold text-[#111827] dark:text-neutral-100">
+              {getLocalized({
+                en: 'Popular audio lessons',
+                am: 'ታዋቂ የድምፅ ትምህርቶች',
+                ar: 'دروس صوتية شائعة',
+              })}
+            </h2>
+            <p className="mt-1 text-sm font-medium text-[#6b7280] dark:text-neutral-400 max-w-xl">
+              {getLocalized({
+                en: 'Listen with presence — lessons that settle the heart.',
+                am: 'በትኩረት ያዳምጡ — ልብን የሚያረጋጉ ትምህርቶች።',
+                ar: 'استمع بحضور — دروس تطمئن القلب.',
+              })}
+            </p>
           </div>
-          <div className="flex-shrink-0 sm:text-end space-y-1">
-            <p className="text-[11px] font-semibold text-neutral-500">{t('liveNotActiveYet')}</p>
-            <a
-              href={siteMetadata.telegramUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-red-400 hover:text-red-300 transition"
+          <Link
+            href="/dawah"
+            className="inline-flex items-center gap-2 text-sm font-bold text-[#A91F24] dark:text-red-400 hover:text-[#8F171C] dark:hover:text-red-300"
+          >
+            {getLocalized({
+              en: 'View all audios',
+              am: 'ሁሉንም ድምጾች ይመልከቱ',
+              ar: 'عرض كل الصوتيات',
+            })}
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+        <div className="lg:grid lg:grid-cols-3 lg:gap-5">
+          {audioLoading ? (
+            <div className="flex gap-3 overflow-x-auto pb-2 lg:contents">
+              {[1, 2, 3].map(i => (
+                <Skeleton key={i} className="h-56 min-w-[82%] max-w-[82%] lg:min-w-0 lg:max-w-none shrink-0" />
+              ))}
+            </div>
+          ) : popularAudio.length === 0 ? (
+            <p className="text-sm text-[#6b7280] dark:text-neutral-400 col-span-full">
+              {getLocalized({
+                en: 'Mark audio as Featured in Admin to show it here.',
+                am: 'እዚህ ለማሳየት በአድሚን ድምጹን Featured ያድርጉ።',
+                ar: 'علّم الصوت كمميز في الإدارة ليظهر هنا.',
+              })}
+            </p>
+          ) : (
+            <>
+              <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory lg:hidden">
+                {popularAudio.map(track => (
+                  <div
+                    key={track.audioUrl}
+                    className="min-w-[82%] max-w-[82%] sm:min-w-[55%] sm:max-w-[55%] snap-start shrink-0"
+                  >
+                    <FeaturedAudioBlock
+                      title={track.title}
+                      speaker={track.speaker}
+                      audioUrl={track.audioUrl}
+                      category={track.category}
+                      duration={track.duration}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="hidden lg:contents">
+                {popularAudio.map(track => (
+                  <FeaturedAudioBlock
+                    key={track.audioUrl}
+                    title={track.title}
+                    speaker={track.speaker}
+                    audioUrl={track.audioUrl}
+                    category={track.category}
+                    duration={track.duration}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </section>
+
+      {/* Video / Audio section choice (image 7) — under AV, not above marriage */}
+      <section className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-red-600 mb-1">
+              {getLocalized({
+                en: 'Video & audio',
+                am: 'ቪዲዮና ድምጽ',
+                ar: 'فيديو وصوت',
+              })}
+            </p>
+            <h2 className="text-2xl sm:text-3xl font-bold text-[#111827] dark:text-white">
+              {getLocalized({
+                en: 'Choose video or audio',
+                am: 'ቪዲዮ ወይም ድምጽ ይምረጡ',
+                ar: 'اختر فيديو أو صوت',
+              })}
+            </h2>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/videos"
+              className="inline-flex items-center gap-2 text-sm font-semibold text-red-600 hover:text-red-700"
             >
-              <Send className="w-3.5 h-3.5" />
-              {siteMetadata.telegramHandle}
-            </a>
+              {getLocalized({ en: 'All videos (1 min+)', am: 'ሁሉም ቪዲዮ (1 ደቂቃ+)', ar: 'كل الفيديو (دقيقة+)' })}
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link
+              href="/dawah"
+              className="inline-flex items-center gap-2 text-sm font-semibold text-red-600 hover:text-red-700"
+            >
+              {getLocalized({ en: 'Da’wah audio', am: 'የዳዕዋ ድምጽ', ar: 'صوت الدعوة' })}
+              <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
+        </div>
+
+        {(() => {
+          const om = getLocalOneMinuteSlides()
+          const vCount = om.filter(s => s.kind === 'video').length
+          const aCount = om.filter(s => s.kind === 'audio').length
+          return (
+            <div className="grid grid-cols-2 gap-3">
+              <Link
+                href="/one-minute"
+                className="portfolio-card p-6 text-center space-y-1 hover:border-red-500/40 transition group"
+              >
+                <p className="font-mono font-black text-3xl sm:text-4xl text-red-600">{vCount}</p>
+                <p className="text-sm text-neutral-500 group-hover:text-neutral-800 dark:group-hover:text-neutral-200">
+                  {getLocalized({ en: 'Video', am: 'ቪዲዮ', ar: 'فيديو' })}
+                </p>
+                <p className="text-[11px] text-neutral-400">
+                  {getLocalized({ en: 'Under 1 minute', am: 'ከ1 ደቂቃ በታች', ar: 'أقل من دقيقة' })}
+                </p>
+              </Link>
+              <Link
+                href="/one-minute"
+                className="portfolio-card p-6 text-center space-y-1 hover:border-red-500/40 transition group"
+              >
+                <p className="font-mono font-black text-3xl sm:text-4xl text-red-600">{aCount}</p>
+                <p className="text-sm text-neutral-500 group-hover:text-neutral-800 dark:group-hover:text-neutral-200">
+                  {getLocalized({ en: 'Audio', am: 'ድምጽ', ar: 'صوت' })}
+                </p>
+                <p className="text-[11px] text-neutral-400">
+                  {getLocalized({ en: 'Under 1 minute', am: 'ከ1 ደቂቃ በታች', ar: 'أقل من دقيقة' })}
+                </p>
+              </Link>
+            </div>
+          )
+        })()}
+      </section>
+
+      {/* Youth & Heart Corner — under video/audio section choice */}
+      <section className="space-y-6">
+        <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-red-600">
+          <Heart className="w-3.5 h-3.5" />
+          {getLocalized({
+            en: 'Youth & Heart Corner',
+            am: 'የወጣቶች እና የልብ ማዕከል',
+            ar: 'ركن الشباب والقلب',
+          })}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {YOUTH_HEART_CORNER.map(item => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`portfolio-card p-5 space-y-2 hover:border-red-500/40 hover:-translate-y-0.5 transition group ${
+                item.href === '/questions' ? 'border-[#D4AF37]/50' : ''
+              }`}
+            >
+              <span className="text-2xl" aria-hidden>
+                {item.emoji}
+              </span>
+              <h3 className="text-lg font-bold text-[#111827] dark:text-white group-hover:text-red-600 transition">
+                {getLocalized(item.label)}
+              </h3>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                {getLocalized(item.description)}
+              </p>
+              <span className="inline-flex items-center text-sm font-semibold text-red-600">
+                {language === 'en'
+                  ? `${t('sections.open')} ${getLocalized(item.label)}`
+                  : `${getLocalized(item.label)} ${t('sections.open')}`}
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </span>
+            </Link>
+          ))}
         </div>
       </section>
 
-      {/* 9. TELEGRAM BANNER SECTION */}
-      <section>
-        <div className="bg-sky-950/80 border border-sky-800/60 rounded-2xl p-6 sm:p-10 text-white flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl">
-          <div className="space-y-2 text-center sm:text-left">
-            <h3 className="text-2xl font-bold">{t('hero.joinTelegramBanner')}</h3>
-            <p className="text-sm text-sky-200">
-              {t('hero.telegramBannerSub')}: <strong className="text-white">{siteMetadata.telegramHandle}</strong>
-            </p>
+      {/* Home FAQ (image 3) — not the full Q&A feed */}
+      <section className="portfolio-card p-8 sm:p-10 space-y-6 bg-red-50/40 dark:bg-red-950/20 border-red-200/50 dark:border-red-900/40">
+        <div className="space-y-2">
+          <div className="inline-flex items-center gap-2 text-red-600 text-xs font-bold uppercase tracking-wider">
+            <MessageCircleQuestion className="w-4 h-4" />
+            {getLocalized({
+              en: 'Guidance for visitors',
+              am: 'ለጎብኚዎች መመሪያ',
+              ar: 'إرشاد للزوار',
+            })}
           </div>
+          <h2 className="text-2xl sm:text-3xl font-bold text-[#111827] dark:text-white">
+            {getLocalized({ en: 'Have a Question?', am: 'ጥያቄ አለዎት?', ar: 'هل لديك سؤال؟' })}
+          </h2>
+          <p className="text-sm sm:text-base text-neutral-600 dark:text-neutral-400 max-w-2xl leading-relaxed">
+            {getLocalized({
+              en: 'These common questions show what you can find here — tap one to open the right section, or send your own.',
+              am: 'እነዚህ ተደጋጋሚ ጥያቄዎች በጣቢያው ላይ ምን እንደሚገኝ ያሳያሉ — ክፍሉን ለመክፈት ይጫኑ ወይም የራስዎን ይላኩ።',
+              ar: 'هذه الأسئلة الشائعة تُعرّف بما في الموقع — اضغط لفتح القسم المناسب أو أرسل سؤالك.',
+            })}
+          </p>
+        </div>
 
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {homeQuestions.length > 0
+            ? homeQuestions.map(item => (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  className="group flex items-start gap-3 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white/70 dark:bg-neutral-950/50 px-4 py-3.5 hover:border-red-500/50 transition"
+                >
+                  <span className="mt-0.5 text-red-600 font-bold text-sm">?</span>
+                  <span className="text-sm font-medium text-neutral-800 dark:text-neutral-200 group-hover:text-red-600 transition leading-snug">
+                    {getLocalized(item.q)}
+                  </span>
+                </Link>
+              ))
+            : [0, 1, 2, 3].map(i => (
+                <div
+                  key={`home-q-slot-${i}`}
+                  className="flex items-start gap-3 rounded-2xl border border-dashed border-neutral-300 dark:border-neutral-700 bg-white/40 dark:bg-neutral-950/30 px-4 py-3.5"
+                >
+                  <span className="mt-0.5 text-red-600/50 font-bold text-sm">?</span>
+                  <span className="text-sm text-neutral-500 dark:text-neutral-500 leading-snug">
+                    {getLocalized({
+                      en: 'Coming soon — Admin will choose a question for this spot.',
+                      am: 'በቅርብ — አስተዳዳሪ ለዚህ ቦታ ጥያቄ ይመርጣል።',
+                      ar: 'قريبًا — سيختار المشرف سؤالًا لهذا المكان.',
+                    })}
+                  </span>
+                </div>
+              ))}
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          <AskQuestionNavLink
+            className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-red-600 text-white font-bold text-sm hover:bg-red-700 shadow-lg shadow-red-900/20 transition"
+            trailing={<ArrowRight className="w-4 h-4" />}
+          />
+          <Link
+            href="/questions"
+            className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl border border-red-600/40 text-red-600 font-bold text-sm hover:bg-red-50 dark:hover:bg-red-950/30 transition"
+          >
+            {getLocalized({
+              en: 'Browse published answers',
+              am: 'የታተሙ መልሶችን ይመልከቱ',
+              ar: 'تصفح الإجابات المنشورة',
+            })}
+          </Link>
+        </div>
+      </section>
+
+      {/* Stay Connected — social before footer / contact */}
+      <section className="portfolio-card p-8 sm:p-10 space-y-6">
+        <div className="space-y-2 text-center sm:text-start">
+          <p className="text-xs font-bold uppercase tracking-wider text-red-600">
+            {getLocalized({
+              en: 'Our social pages',
+              am: 'የማህበራዊ ሚዲያ ገጾቻችን',
+              ar: 'صفحاتنا الاجتماعية',
+            })}
+          </p>
+          <h2 className="title-gold text-2xl sm:text-3xl font-bold">
+            {getLocalized({ en: 'Connect with us', am: 'ከእኛ ጋር ይገናኙ', ar: 'تواصل معنا' })}
+          </h2>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400">
+            {getLocalized({
+              en: 'Official pages — Telegram, YouTube, and TikTok.',
+              am: 'ይፋዊ ገጾቻችን — ቴሌግራም፣ ዩቲዩብ እና ቲክቶክ።',
+              ar: 'صفحاتنا الرسمية — تلغرام ويوتيوب وتيك توك.',
+            })}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <a
             href={siteMetadata.telegramUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="btn-red inline-flex items-center space-x-3 px-6 py-3.5 rounded-xl font-bold text-base shadow-lg hover:scale-105 transition flex-shrink-0"
+            className="group flex items-center gap-4 rounded-2xl border border-sky-500/30 bg-sky-600/10 hover:bg-sky-600 px-5 py-4 transition"
           >
-            <Send className="w-5 h-5" />
-            <span>{t('hero.btnTelegram')}</span>
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-sky-600 text-white shadow-md group-hover:bg-white group-hover:text-sky-600 transition">
+              <Send className="w-5 h-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-bold text-[#111827] dark:text-white group-hover:text-white transition">
+                Telegram
+              </span>
+              <span className="block text-xs text-neutral-500 group-hover:text-sky-100 transition truncate">
+                {siteMetadata.telegramHandle}
+              </span>
+            </span>
+          </a>
+
+          <a
+            href={siteMetadata.youtubeUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex items-center gap-4 rounded-2xl border border-red-500/30 bg-red-700/10 hover:bg-red-700 px-5 py-4 transition"
+          >
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-red-700 text-white shadow-md group-hover:bg-white group-hover:text-red-700 transition">
+              <Youtube className="w-5 h-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-bold text-[#111827] dark:text-white group-hover:text-white transition">
+                YouTube
+              </span>
+              <span className="block text-xs text-neutral-500 group-hover:text-red-100 transition truncate">
+                @sle_qelbachn1
+              </span>
+            </span>
+          </a>
+
+          <a
+            href={siteMetadata.tiktokUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex items-center gap-4 rounded-2xl border border-neutral-400/40 bg-neutral-200/40 dark:bg-neutral-800/60 hover:bg-neutral-800 px-5 py-4 transition"
+          >
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-neutral-900 text-white shadow-md group-hover:bg-white group-hover:text-neutral-900 transition">
+              <span className="text-sm font-black">♪</span>
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-bold text-[#111827] dark:text-white group-hover:text-white transition">
+                TikTok
+              </span>
+              <span className="block text-xs text-neutral-500 group-hover:text-neutral-200 transition truncate">
+                @sle_qelbachn1
+              </span>
+            </span>
           </a>
         </div>
       </section>
-
-      {/* 10. PARTNER — ኢኽላስ (directly above footer) */}
-      <PartnerIkhlasSection />
-
     </div>
-  );
+  )
 }

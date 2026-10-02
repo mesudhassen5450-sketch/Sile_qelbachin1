@@ -23,17 +23,22 @@ import {
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from '@/components/ui/table'
 import AddContentDialog from '@/views/content/AddContentDialog'
 import { KitabChildAudioEditor } from '@/views/content/KitabChildAudioEditor'
 import { R2FileField } from '@/views/content/R2FileField'
+import {
+  compareByPriorityThenDate,
+  defaultCategoryForAudioSection,
+  defaultCategoryForPdfSection,
+  defaultCategoryForVideoSection,
+  endPriorityDefault,
+  matchesAudioSection,
+  matchesPdfSection,
+  matchesVideoSection,
+  type AudioSection,
+  type PdfSection,
+  type VideoSection,
+} from '@/lib/cms/editorial'
 
 type ContentType = 'kitabs' | 'ders' | 'audio' | 'video' | 'pdfs' | 'library' | 'sahabah'
 
@@ -41,9 +46,13 @@ type ContentListPageProps = {
   title: string
   description: string
   type: ContentType
-  columns?: Array<'title' | 'meta' | 'status' | 'media' | 'updated'>
+  columns?: Array<'title' | 'meta' | 'status' | 'media' | 'updated' | 'priority'>
   /** Show Add button + create dialog (kitabs/audio/video/pdfs/sahabah). */
   allowCreate?: boolean
+  /** Isolate shared pools (audio/video/pdfs) into Admin sidebar sections. */
+  audioSection?: AudioSection
+  videoSection?: VideoSection
+  pdfSection?: PdfSection
 }
 
 type Row = Record<string, unknown>
@@ -90,8 +99,11 @@ const ContentListPage = ({
   title,
   description,
   type,
-  columns = ['title', 'meta', 'status', 'updated'],
-  allowCreate
+  columns = ['title', 'meta', 'status', 'priority', 'updated'],
+  allowCreate,
+  audioSection,
+  videoSection,
+  pdfSection,
 }: ContentListPageProps) => {
   const [rows, setRows] = useState<Row[]>([])
   const [count, setCount] = useState(0)
@@ -108,6 +120,9 @@ const ContentListPage = ({
   const [editAuthorAm, setEditAuthorAm] = useState('')
   const [editDescEn, setEditDescEn] = useState('')
   const [editDescAm, setEditDescAm] = useState('')
+  const [editPriority, setEditPriority] = useState('1')
+  const [editFeatured, setEditFeatured] = useState(false)
+  const [editScheduledAt, setEditScheduledAt] = useState('')
   const [editCover, setEditCover] = useState<UploadedAsset | null>(null)
   const [editPdf, setEditPdf] = useState<UploadedAsset | null>(null)
   const [editMedia, setEditMedia] = useState<UploadedAsset | null>(null)
@@ -120,6 +135,15 @@ const ContentListPage = ({
   const canManage = type !== 'library'
   const canSyncR2 =
     type === 'kitabs' || type === 'audio' || type === 'video' || type === 'pdfs' || type === 'library'
+
+  const defaultCategory =
+    type === 'audio' && audioSection
+      ? defaultCategoryForAudioSection(audioSection)
+      : type === 'video' && videoSection
+        ? defaultCategoryForVideoSection(videoSection)
+        : type === 'pdfs' && pdfSection
+          ? defaultCategoryForPdfSection(pdfSection)
+          : null
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -134,14 +158,59 @@ const ContentListPage = ({
       if (!res.ok || !data.ok) {
         throw new Error(typeof data.error === 'string' ? data.error : 'Failed to load')
       }
-      setRows((data.rows as Row[]) || [])
-      setCount(typeof data.count === 'number' ? data.count : 0)
+      let list = ((data.rows as Row[]) || []).slice()
+      if (type === 'audio' && audioSection) {
+        list = list.filter(r =>
+          matchesAudioSection(
+            {
+              category: r.category as string | null,
+              is_muhadara: Boolean(r.is_muhadara),
+              metadata: (r.metadata as Record<string, unknown> | null) || null,
+            },
+            audioSection
+          )
+        )
+      }
+      if (type === 'video' && videoSection) {
+        list = list.filter(r =>
+          matchesVideoSection(
+            {
+              category: r.category as string | null,
+              metadata: (r.metadata as Record<string, unknown> | null) || null,
+            },
+            videoSection
+          )
+        )
+      }
+      if (type === 'pdfs' && pdfSection) {
+        list = list.filter(r =>
+          matchesPdfSection({ category: r.category as string | null }, pdfSection)
+        )
+      }
+      list.sort((a, b) =>
+        compareByPriorityThenDate(
+          {
+            priority: a.priority as number,
+            featured: Boolean(a.featured),
+            updated_at: a.updated_at as string,
+            created_at: a.created_at as string,
+          },
+          {
+            priority: b.priority as number,
+            featured: Boolean(b.featured),
+            updated_at: b.updated_at as string,
+            created_at: b.created_at as string,
+          }
+        )
+      )
+      setRows(list)
+      setCount(list.length)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
       setLoading(false)
     }
-  }, [q, type])
+  }, [q, type, audioSection, videoSection, pdfSection])
 
   const loadR2 = useCallback(async () => {
     try {
@@ -158,7 +227,10 @@ const ContentListPage = ({
     void loadR2()
   }, [load, loadR2])
 
-  const setStatus = async (id: string, status: 'published' | 'draft' | 'unpublished') => {
+  const setStatus = async (
+    id: string,
+    status: 'published' | 'draft' | 'unpublished' | 'archived'
+  ) => {
     if (type === 'library') return
     setBusyId(id)
     setError(null)
@@ -186,6 +258,13 @@ const ContentListPage = ({
     setEditAuthorAm(String(row.author_am || ''))
     setEditDescEn(String(row.description_en || ''))
     setEditDescAm(String(row.description_am || ''))
+    setEditPriority(String(row.priority ?? endPriorityDefault(rows.length)))
+    setEditFeatured(Boolean(row.featured))
+    setEditScheduledAt(
+      row.scheduled_at
+        ? new Date(String(row.scheduled_at)).toISOString().slice(0, 16)
+        : ''
+    )
     const coverId = row.cover_asset_id || row.thumbnail_asset_id
     const coverUrlVal = row.cover_url || row.thumbnail_url
     setEditCover(
@@ -301,6 +380,9 @@ const ContentListPage = ({
     const authorAm = editAuthorAm
     const descEn = editDescEn
     const descAm = editDescAm
+    const priority = editPriority
+    const featured = editFeatured
+    const scheduledAt = editScheduledAt
 
     if (!row || type === 'library') return
     setBusyId(String(row.id))
@@ -312,7 +394,15 @@ const ContentListPage = ({
         title_en: titleEn || null,
         title_am: titleAm || null,
         description_en: descEn || null,
-        description_am: descAm || null
+        description_am: descAm || null,
+        priority: Number(priority) || 1,
+        featured,
+        scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+      }
+      if (defaultCategory) {
+        body.category = defaultCategory
+        if (type === 'audio' && audioSection === 'dawah') body.is_muhadara = true
+        if (type === 'audio' && audioSection === 'quran') body.is_muhadara = false
       }
       if (type === 'kitabs') {
         body.author_en = authorEn || null
@@ -462,6 +552,64 @@ const ContentListPage = ({
     return typeof u === 'string' && u ? u : null
   }
 
+  /** Real media preview: prefer actual video/audio file — never sticker-only covers. */
+  const MediaPreview = ({ row }: { row: Row }) => {
+    const cover = coverUrl(row)
+    const media =
+      typeof row.media_url === 'string' && row.media_url ? String(row.media_url) : null
+    // Videos: always show a frame from the real file when available
+    if (type === 'video' && media) {
+      return (
+        <video
+          src={media}
+          muted
+          playsInline
+          preload='metadata'
+          className='h-24 w-full object-cover bg-black'
+          onLoadedMetadata={e => {
+            const el = e.currentTarget
+            try {
+              // Seek past intro stickers / logos when possible
+              if (Number.isFinite(el.duration) && el.duration > 1.2) {
+                el.currentTime = Math.min(Math.max(el.duration * 0.12, 0.8), 3)
+              } else if (Number.isFinite(el.duration) && el.duration > 0.4) {
+                el.currentTime = 0.35
+              }
+            } catch {
+              /* ignore */
+            }
+          }}
+        />
+      )
+    }
+    if (type === 'audio' && media) {
+      return (
+        <div className='bg-muted relative flex h-24 w-full flex-col items-center justify-center gap-1 px-2'>
+          {cover ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={cover}
+              alt=''
+              className='absolute inset-0 h-full w-full object-cover opacity-40'
+            />
+          ) : null}
+          <audio src={media} preload='metadata' className='relative z-[1] w-full max-w-[90%]' controls />
+        </div>
+      )
+    }
+    if (cover) {
+      return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={cover} alt='' className='h-24 w-full object-cover' />
+      )
+    }
+    return (
+      <div className='bg-muted text-muted-foreground flex h-24 items-center justify-center text-xs'>
+        No media
+      </div>
+    )
+  }
+
   const ActionButtons = ({ row }: { row: Row }) => (
     <div className='flex flex-wrap items-center gap-1'>
       <Button
@@ -522,6 +670,29 @@ const ContentListPage = ({
               onClick={() => void setStatus(String(row.id), 'unpublished')}
             >
               Unpublish
+            </Button>
+          )}
+          {row.status === 'archived' ? (
+            <Button
+              type='button'
+              size='sm'
+              variant='outline'
+              className='h-8'
+              disabled={busyId === String(row.id)}
+              onClick={() => void setStatus(String(row.id), 'draft')}
+            >
+              Restore
+            </Button>
+          ) : (
+            <Button
+              type='button'
+              size='sm'
+              variant='ghost'
+              className='h-8 text-muted-foreground'
+              disabled={busyId === String(row.id)}
+              onClick={() => void setStatus(String(row.id), 'archived')}
+            >
+              Archive
             </Button>
           )}
         </>
@@ -614,104 +785,64 @@ const ContentListPage = ({
         </Card>
       ) : null}
 
-      {type !== 'library' && type !== 'ders' ? (
-        <div className='grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
-          {rows.slice(0, 16).map(row => {
-            const cover = coverUrl(row)
-            return (
-              <Card key={String(row.id)} className='overflow-hidden'>
-                {cover ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={cover} alt='' className='h-24 w-full object-cover' />
-                ) : (
-                  <div className='bg-muted text-muted-foreground flex h-24 items-center justify-center text-xs'>
-                    No cover
-                  </div>
-                )}
-                <CardHeader className='space-y-1 p-3 pb-1'>
-                  <CardTitle className='line-clamp-2 text-sm leading-snug'>
-                    {String(row.title || row.name_en || row.slug || row.id)}
-                  </CardTitle>
-                  <CardDescription className='line-clamp-1 text-xs'>{metaFor(row)}</CardDescription>
-                </CardHeader>
-                <CardContent className='space-y-2 p-3 pt-1'>
-                  <Badge variant='outline' className='text-[10px]'>
-                    {String(row.status || '—')}
-                  </Badge>
-                  <ActionButtons row={row} />
-                </CardContent>
-              </Card>
-            )
-          })}
-          {!loading && rows.length === 0 ? (
-            <Card className='sm:col-span-2 lg:col-span-3 xl:col-span-4'>
-              <CardContent className='text-muted-foreground py-8 text-center text-sm'>
-                No items yet. Click <strong>Add</strong> to create content — it will appear here and
-                on the website / app (newest first).
-              </CardContent>
-            </Card>
-          ) : null}
-        </div>
-      ) : null}
-
       <Card>
         <CardHeader className='p-4 pb-2'>
           <CardTitle className='text-base'>All records</CardTitle>
           <CardDescription>
-            {loading ? 'Loading…' : `${count} records · newest first`}
+            {loading ? 'Loading…' : `${count} records · card view · newest / priority first`}
           </CardDescription>
         </CardHeader>
-        <CardContent className='overflow-x-auto p-2 sm:p-4'>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {columns.includes('title') ? <TableHead>Title</TableHead> : null}
-                {columns.includes('meta') ? <TableHead>Meta</TableHead> : null}
-                {columns.includes('media') ? <TableHead>Media</TableHead> : null}
-                {columns.includes('status') ? <TableHead>Status</TableHead> : null}
-                {columns.includes('updated') ? <TableHead>Updated</TableHead> : null}
-                {canManage ? <TableHead className='min-w-[220px]'>Actions</TableHead> : null}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map(row => (
-                <TableRow key={String(row.id)}>
-                  {columns.includes('title') ? (
-                    <TableCell className='max-w-[180px] truncate font-medium'>
-                      {String(row.title || row.name_en || row.slug || row.object_key || row.id)}
-                    </TableCell>
+        <CardContent className='p-3 sm:p-4'>
+          <div className='grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
+            {rows.map(row => (
+              <Card key={String(row.id)} className='overflow-hidden border-border/80 shadow-sm'>
+                <MediaPreview row={row} />
+                <CardHeader className='space-y-1 p-3 pb-1'>
+                  <CardTitle className='line-clamp-2 text-sm leading-snug'>
+                    {String(row.title || row.name_en || row.slug || row.object_key || row.id)}
+                  </CardTitle>
+                  <CardDescription className='line-clamp-1 text-xs'>{metaFor(row)}</CardDescription>
+                </CardHeader>
+                <CardContent className='space-y-2 p-3 pt-1'>
+                  <div className='flex flex-wrap gap-1'>
+                    <Badge variant='outline' className='text-[10px]'>
+                      {String(row.status || row.health_status || '—')}
+                    </Badge>
+                    <Badge variant='secondary' className='text-[10px]'>
+                      P{String(row.priority ?? endPriorityDefault(count))}
+                    </Badge>
+                    {row.featured ? (
+                      <Badge className='bg-amber-600/90 text-[10px] text-white'>Featured</Badge>
+                    ) : null}
+                  </div>
+                  {row.updated_at || row.created_at ? (
+                    <p className='text-muted-foreground text-[10px]'>
+                      {new Date(String(row.updated_at || row.created_at)).toLocaleString()}
+                    </p>
                   ) : null}
-                  {columns.includes('meta') ? (
-                    <TableCell className='text-muted-foreground max-w-[140px] truncate'>
-                      {metaFor(row)}
-                    </TableCell>
+                  {typeof row.media_url === 'string' && row.media_url ? (
+                    <a
+                      href={String(row.media_url)}
+                      target='_blank'
+                      rel='noreferrer'
+                      className='text-primary block truncate text-[10px] hover:underline'
+                    >
+                      Open media
+                    </a>
                   ) : null}
-                  {columns.includes('media') ? (
-                    <TableCell className='text-muted-foreground max-w-[160px] truncate'>
-                      {mediaFor(row)}
-                    </TableCell>
-                  ) : null}
-                  {columns.includes('status') ? (
-                    <TableCell>
-                      <Badge variant='outline'>{String(row.status || row.health_status || '—')}</Badge>
-                    </TableCell>
-                  ) : null}
-                  {columns.includes('updated') ? (
-                    <TableCell className='text-muted-foreground whitespace-nowrap text-xs'>
-                      {row.updated_at || row.created_at
-                        ? new Date(String(row.updated_at || row.created_at)).toLocaleString()
-                        : '—'}
-                    </TableCell>
-                  ) : null}
-                  {canManage ? (
-                    <TableCell>
-                      <ActionButtons row={row} />
-                    </TableCell>
-                  ) : null}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  {canManage ? <ActionButtons row={row} /> : null}
+                </CardContent>
+              </Card>
+            ))}
+            {!loading && rows.length === 0 ? (
+              <Card className='sm:col-span-2 lg:col-span-3 xl:col-span-4'>
+                <CardContent className='text-muted-foreground py-8 text-center text-sm'>
+                  No items yet. Click <strong>Add</strong> to create content — it will appear here and
+                  on the website / app (newest first).
+                </CardContent>
+              </Card>
+            ) : null}
+          </div>
         </CardContent>
       </Card>
 
@@ -720,6 +851,8 @@ const ContentListPage = ({
           kind={kind}
           open={addOpen}
           onOpenChange={setAddOpen}
+          defaultCategory={defaultCategory}
+          defaultIsMuhadara={audioSection === 'dawah' ? true : audioSection === 'quran' ? false : undefined}
           onCreated={() => {
             void load()
             void loadR2()
@@ -728,7 +861,7 @@ const ContentListPage = ({
       ) : null}
 
       <Dialog open={Boolean(viewRow)} onOpenChange={o => !o && setViewRow(null)}>
-        <DialogContent className='max-h-[min(85dvh,640px)] w-[calc(100%-1rem)] gap-4 overflow-y-auto p-4 sm:max-w-lg sm:p-6'>
+        <DialogContent className='max-h-[min(85dvh,720px)] w-[calc(100%-1rem)] max-w-xl gap-4 overflow-y-auto p-4 sm:max-w-2xl sm:p-6'>
           <DialogHeader className='pr-8'>
             <DialogTitle>View</DialogTitle>
             <DialogDescription>Details for this item.</DialogDescription>
@@ -748,6 +881,16 @@ const ContentListPage = ({
               {coverUrl(viewRow) ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={coverUrl(viewRow)!} alt='' className='max-h-40 rounded-md object-contain' />
+              ) : typeof viewRow.media_url === 'string' && viewRow.media_url && type === 'video' ? (
+                <video
+                  src={String(viewRow.media_url)}
+                  controls
+                  playsInline
+                  preload='metadata'
+                  className='max-h-48 w-full rounded-md bg-black'
+                />
+              ) : typeof viewRow.media_url === 'string' && viewRow.media_url && type === 'audio' ? (
+                <audio src={String(viewRow.media_url)} controls preload='metadata' className='w-full' />
               ) : null}
               <p className='break-all text-xs text-muted-foreground'>
                 {typeof viewRow.media_url === 'string' && viewRow.media_url
@@ -784,7 +927,7 @@ const ContentListPage = ({
           if (!o) closeEditDialog()
         }}
       >
-        <DialogContent className='max-h-[min(92dvh,820px)] w-[calc(100%-1rem)] gap-4 overflow-y-auto p-4 sm:max-w-lg sm:gap-6 sm:p-6'>
+        <DialogContent className='max-h-[min(94dvh,900px)] w-[calc(100%-0.75rem)] max-w-[min(100vw-1.5rem,48rem)] gap-4 overflow-y-auto p-4 sm:max-w-2xl sm:gap-5 sm:p-6 md:max-w-3xl lg:max-w-4xl'>
           <DialogHeader className='pr-8'>
             <DialogTitle>Edit content</DialogTitle>
             <DialogDescription>
@@ -821,6 +964,42 @@ const ContentListPage = ({
               <FieldLabel>Description (Amharic)</FieldLabel>
               <Textarea value={editDescAm} onChange={e => setEditDescAm(e.target.value)} rows={3} />
             </Field>
+            <div className='grid grid-cols-2 gap-3'>
+              <Field>
+                <FieldLabel>Priority (1 = highest)</FieldLabel>
+                <Input
+                  type='number'
+                  min={1}
+                  max={9999}
+                  value={editPriority}
+                  onChange={e => setEditPriority(e.target.value)}
+                />
+              </Field>
+              <Field>
+                <FieldLabel>Schedule publish (optional)</FieldLabel>
+                <Input
+                  type='datetime-local'
+                  value={editScheduledAt}
+                  onChange={e => setEditScheduledAt(e.target.value)}
+                />
+              </Field>
+            </div>
+            <label className='flex items-center gap-2 text-sm'>
+              <input
+                type='checkbox'
+                checked={editFeatured}
+                onChange={e => setEditFeatured(e.target.checked)}
+                className='size-4 rounded border'
+              />
+              Featured on home
+              {type === 'kitabs'
+                ? ' — home shows top 3 featured kitabs'
+                : type === 'audio'
+                  ? ' — home popular audio (top 3 featured, 1 min+ Da’wah talks)'
+                  : type === 'video'
+                    ? ' — highlighted video lists'
+                    : ''}
+            </label>
             {type === 'kitabs' || type === 'audio' || type === 'video' || type === 'pdfs' || type === 'sahabah' ? (
               <R2FileField
                 label='Cover image (replace)'

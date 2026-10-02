@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Bell } from 'lucide-react'
 
 import { useLanguage } from '@/context/LanguageContext'
+import { getCmsApiBase } from '@/lib/cmsClient'
 
 type ReminderItem = {
   id: string
@@ -11,7 +12,7 @@ type ReminderItem = {
   description: { am?: string | null; ar?: string | null; en?: string | null }
 }
 
-const CMS_BASE = (process.env.NEXT_PUBLIC_CMS_API_BASE || '').replace(/\/+$/, '')
+const CMS_BASE = getCmsApiBase()
 
 function pick(
   loc: { am?: string | null; ar?: string | null; en?: string | null } | undefined,

@@ -4,7 +4,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { siteMetadata } from '@/data/channelData';
 import { useLanguage } from '@/context/LanguageContext';
-import { Send, Video, BookOpen, Headphones, ShieldCheck, Heart, Sparkles, Youtube } from 'lucide-react';
+import { Send, Video, Youtube } from 'lucide-react';
+import { ASK_QUESTION, NAV_SECTIONS } from '@/config/siteNav';
 
 export default function Footer() {
   const { t, getLocalized } = useLanguage();
@@ -13,22 +14,13 @@ export default function Footer() {
     <footer className="bg-neutral-900 text-neutral-300 border-t border-neutral-800 transition-colors pt-12 pb-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 pb-10 border-b border-neutral-800">
-          
-          {/* Channel Info & Purpose */}
-          <div className="md:col-span-6 space-y-4">
+          <div className="md:col-span-5 space-y-4">
             <div className="flex items-center space-x-3">
               <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-red-500/40">
-                <Image
-                  src="/logo.jpg"
-                  alt={siteMetadata.channelName}
-                  fill
-                  className="object-cover"
-                />
+                <Image src="/logo.jpg" alt={siteMetadata.channelName} fill className="object-cover" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-white tracking-wide">
-                  {siteMetadata.channelName}
-                </h3>
+                <h3 className="text-xl font-bold text-white tracking-wide">{siteMetadata.channelName}</h3>
                 <p className="text-xs text-red-400 font-mono">{t('hero.badge')}</p>
               </div>
             </div>
@@ -37,7 +29,6 @@ export default function Footer() {
               {getLocalized(siteMetadata.purposeParagraph1)}
             </p>
 
-            {/* Social Verification Badges */}
             <div className="flex flex-wrap gap-3 pt-2">
               <a
                 href={siteMetadata.telegramUrl}
@@ -48,7 +39,6 @@ export default function Footer() {
                 <Send className="w-3.5 h-3.5" />
                 <span>Telegram: {siteMetadata.telegramHandle}</span>
               </a>
-
               <a
                 href="https://youtube.com/@sle_qelbachn1?si=jwFjYSDtGE-clwJn"
                 target="_blank"
@@ -56,9 +46,8 @@ export default function Footer() {
                 className="inline-flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-red-950/60 border border-red-800/50 text-red-300 text-xs hover:bg-red-900 transition"
               >
                 <Youtube className="w-3.5 h-3.5" />
-                <span>YouTube: @sle_qelbachn1</span>
+                <span>YouTube</span>
               </a>
-
               <a
                 href={siteMetadata.tiktokUrl}
                 target="_blank"
@@ -66,75 +55,61 @@ export default function Footer() {
                 className="inline-flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs hover:bg-neutral-700 transition"
               >
                 <Video className="w-3.5 h-3.5" />
-                <span>TikTok: {siteMetadata.tiktokHandle}</span>
+                <span>TikTok</span>
               </a>
             </div>
           </div>
 
-          {/* Quick Subpages Grid */}
-          <div className="md:col-span-3 space-y-3">
+          {NAV_SECTIONS.map((section, idx) => (
+            <div key={section.id} className={`md:col-span-2 space-y-3 ${idx === 0 ? 'md:col-span-3' : 'md:col-span-2'}`}>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400">
+                {getLocalized(section.title)}
+              </h4>
+              <ul className="space-y-2 text-sm">
+                {section.items.map(item => (
+                  <li key={item.href}>
+                    <Link href={item.href} className="hover:text-red-400 transition">
+                      {item.emoji} {getLocalized(item.label)}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+
+          <div className="md:col-span-2 space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400">
-              {t('nav.subpages')}
+              {getLocalized({ en: 'More', am: 'ተጨማሪ', ar: 'المزيد' })}
             </h4>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="/reminders" className="hover:text-red-400 transition flex items-center space-x-2">
-                  <Heart className="w-3.5 h-3.5 text-red-500" />
-                  <span>{t('nav.reminders')}</span>
+                <Link href={ASK_QUESTION.href} className="hover:text-red-400 transition font-semibold text-red-400">
+                  {ASK_QUESTION.emoji} {getLocalized(ASK_QUESTION.label)}
                 </Link>
               </li>
               <li>
-                <Link href="/knowledge" className="hover:text-red-400 transition flex items-center space-x-2">
-                  <BookOpen className="w-3.5 h-3.5 text-red-500" />
-                  <span>{t('nav.knowledge')}</span>
+                <Link href="/contact" className="hover:text-white transition">
+                  {t('nav.contact')}
                 </Link>
               </li>
               <li>
-                <Link href="/sahabah" className="hover:text-red-400 transition flex items-center space-x-2">
-                  <ShieldCheck className="w-3.5 h-3.5 text-red-500" />
-                  <span>{t('nav.sahabah')}</span>
+                <Link href="/kitab" className="hover:text-white transition">
+                  {t('nav.kitab')}
                 </Link>
               </li>
               <li>
-                <Link href="/muhadara" className="hover:text-red-400 transition flex items-center space-x-2">
-                  <Headphones className="w-3.5 h-3.5 text-red-500" />
-                  <span>{t('nav.muhadara')}</span>
-                </Link>
-              </li>
-              <li>
-                <Link href="/video-lecture" className="hover:text-red-400 transition flex items-center space-x-2">
-                  <Sparkles className="w-3.5 h-3.5 text-red-500" />
-                  <span>{t('nav.videos')}</span>
+                <Link href="/reminders" className="hover:text-white transition">
+                  {t('nav.reminders')}
                 </Link>
               </li>
             </ul>
           </div>
-
-          {/* Main Nav Items */}
-          <div className="md:col-span-3 space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400">
-              {t('mainNavigation')}
-            </h4>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <Link href="/" className="hover:text-white transition">{t('nav.home')}</Link>
-              </li>
-              <li>
-                <Link href="/kitab" className="hover:text-white transition">{t('nav.kitab')}</Link>
-              </li>
-              <li>
-                <Link href="/audio-lecture" className="hover:text-white transition">{t('nav.audioLecture')}</Link>
-              </li>
-              <li>
-                <Link href="/contact" className="hover:text-white transition">{t('nav.contact')}</Link>
-              </li>
-            </ul>
-          </div>
-
         </div>
 
         <div className="pt-6 flex flex-col sm:flex-row items-center justify-between text-xs text-neutral-500 space-y-3 sm:space-y-0">
-          <p>© {new Date().getFullYear()} {siteMetadata.channelName} — {t('rightsReserved')}</p>
+          <p>
+            © {new Date().getFullYear()} {siteMetadata.channelName} — {t('rightsReserved')}
+          </p>
           <p className="flex items-center space-x-1">
             <span>{t('footerBlessing')}</span>
           </p>

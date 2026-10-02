@@ -8,6 +8,11 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'
+    /*
+     * Skip static assets and large multipart uploads.
+     * Media upload must not pass through middleware body limits —
+     * auth still runs in the route via requireApiPermission.
+     */
+    '/((?!_next/static|_next/image|favicon.ico|api/admin/media/upload|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'
   ]
 }

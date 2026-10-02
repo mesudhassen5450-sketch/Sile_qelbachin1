@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server'
 
 import { requireApiPermission } from '@/lib/auth/guards'
+import { endPriorityDefault } from '@/lib/cms/editorial'
 import { sortKitabsForDisplay } from '@/lib/cms/kitab-order'
-import { loadLocalStore } from '@/lib/cms/local-store'
+import { loadLocalStore, saveLocalStore } from '@/lib/cms/local-store'
+import { reindexAllContentPools } from '@/lib/cms/priority-cascade'
 import { isSupabaseConfigured, loadSupabaseSnapshot } from '@/lib/cms/supabase'
+import { syncOneMinuteCategories } from '@/lib/cms/sync-one-minute'
 import type { CmsStoreSnapshot } from '@/lib/cms/types'
 
 export const runtime = 'nodejs'
@@ -11,6 +14,12 @@ export const dynamic = 'force-dynamic'
 
 async function getStore(): Promise<CmsStoreSnapshot> {
   const local = loadLocalStore()
+  // Retag short clips so Admin 1-Minute sections list the same records as the public feed
+  let dirty = syncOneMinuteCategories(local) > 0
+  // Repair stuck P100 / duplicate priorities → consecutive 1..n (newest first when tied)
+  if (reindexAllContentPools(local) > 0) dirty = true
+  if (dirty) saveLocalStore(local)
+
   if (isSupabaseConfigured()) {
     try {
       const remote = await loadSupabaseSnapshot()
@@ -22,26 +31,74 @@ async function getStore(): Promise<CmsStoreSnapshot> {
             a
           ])
         )
-        return {
+        const localExtra = local as CmsStoreSnapshot & { one_minute_items?: unknown }
+        const merged = {
           ...remote,
           media_assets: Array.from(mediaByKey.values()),
           sahabah_items: local.sahabah_items?.length
             ? local.sahabah_items
             : remote.sahabah_items || [],
           reminders: remote.reminders?.length ? remote.reminders : local.reminders || [],
-          // Supabase is source of truth for published content (local must not hide Admin saves)
-          kitabs: mergePreferRemote(remote.kitabs, local.kitabs),
-          ders: mergePreferRemote(remote.ders, local.ders),
-          audio_items: mergePreferRemote(remote.audio_items, local.audio_items),
-          video_items: mergePreferRemote(remote.video_items, local.video_items),
-          pdf_items: mergePreferRemote(remote.pdf_items, local.pdf_items)
+          one_minute_items: localExtra.one_minute_items,
+          // Prefer local priorities when we just reindexed (remote may still be all 100)
+          kitabs: mergePreferLocalPriority(remote.kitabs, local.kitabs),
+          ders: mergePreferLocalPriority(remote.ders, local.ders),
+          audio_items: mergePreferLocalPriority(remote.audio_items, local.audio_items),
+          video_items: mergePreferLocalPriority(remote.video_items, local.video_items),
+          pdf_items: mergePreferLocalPriority(remote.pdf_items, local.pdf_items)
+        } as CmsStoreSnapshot & { one_minute_items?: unknown }
+
+        if (syncOneMinuteCategories(merged) > 0) {
+          saveLocalStore({
+            ...local,
+            video_items: merged.video_items,
+            audio_items: merged.audio_items,
+          })
         }
+        if (reindexAllContentPools(merged) > 0) {
+          saveLocalStore({
+            ...local,
+            kitabs: merged.kitabs,
+            ders: merged.ders,
+            audio_items: merged.audio_items,
+            video_items: merged.video_items,
+            pdf_items: merged.pdf_items,
+            reminders: merged.reminders,
+          })
+        }
+        return merged
       }
     } catch {
       // fall through
     }
   }
   return local
+}
+
+/** Keep remote content fields; prefer local priority/featured when local was reindexed/edited. */
+function mergePreferLocalPriority<
+  T extends { id: string; priority?: number | null; featured?: boolean | null }
+>(remote: T[], local: T[]): T[] {
+  const localById = new Map(local.map(r => [r.id, r]))
+  const remoteIds = new Set(remote.map(r => r.id))
+  const merged = remote.map(r => {
+    const l = localById.get(r.id)
+    if (!l) return r
+    const lp = typeof l.priority === 'number' ? l.priority : null
+    const rp = typeof r.priority === 'number' ? r.priority : null
+    const preferLocalPri = lp != null && lp >= 1 && (rp == null || rp === 100 || rp !== lp)
+    const preferLocalFeat =
+      typeof l.featured === 'boolean' && l.featured !== Boolean(r.featured)
+    return {
+      ...r,
+      priority: preferLocalPri ? lp : rp ?? lp ?? null,
+      featured: preferLocalFeat ? Boolean(l.featured) : Boolean(r.featured ?? l.featured),
+    }
+  })
+  for (const l of local) {
+    if (!remoteIds.has(l.id)) merged.push(l)
+  }
+  return merged
 }
 
 /** Remote (Supabase) always wins for the same id. Local-only rows (not yet in DB) are kept. */
@@ -163,6 +220,9 @@ export async function GET(
       const cover = coverId ? assets.get(coverId) : undefined
       return {
         ...a,
+        priority: a.priority ?? endPriorityDefault(store.audio_items.length),
+        featured: Boolean(a.featured),
+        scheduled_at: a.scheduled_at ?? null,
         media_url: media?.public_url || null,
         cover_url: cover?.public_url || null,
         object_key: media?.object_key || null,
@@ -186,12 +246,21 @@ export async function GET(
     let rows = sortRecent(store.video_items).map(v => {
       const media = v.video_asset_id ? assets.get(v.video_asset_id) : undefined
       const thumb = v.thumbnail_asset_id ? assets.get(v.thumbnail_asset_id) : undefined
+      const metaCover =
+        typeof v.metadata?.cover_url === 'string' && v.metadata.cover_url
+          ? v.metadata.cover_url
+          : null
+      const cover = thumb?.public_url || metaCover || null
       return {
         ...v,
+        priority: v.priority ?? endPriorityDefault(store.video_items.length),
+        featured: Boolean(v.featured),
+        scheduled_at: v.scheduled_at ?? null,
         media_url: media?.public_url || null,
         object_key: media?.object_key || null,
-        cover_url: thumb?.public_url || null,
-        thumbnail_url: thumb?.public_url || null,
+        cover_url: cover,
+        thumbnail_url: cover,
+        // Real preview: Admin UI falls back to <video src=media_url> when cover is null
         file_size: media?.file_size || null,
         media_health: media?.health_status || 'unknown',
         title: v.title_en || v.title_am || v.legacy_id
@@ -402,6 +471,7 @@ export async function POST(
         title_en: body.title_en,
         media_asset_id: mediaAssetId,
         cover_asset_id: body.cover_asset_id || null,
+        category: body.category || 'pdf',
         status: body.status || 'published'
       })
       return NextResponse.json({ ok: true, row, published: true })
@@ -513,7 +583,12 @@ export async function PATCH(
       cover_url: body.cover_url,
       pdf_url: body.pdf_url,
       sort_order: body.sort_order,
-      speaker_en: body.speaker_en
+      speaker_en: body.speaker_en,
+      priority: body.priority,
+      featured: body.featured,
+      scheduled_at: body.scheduled_at,
+      category: body.category,
+      is_muhadara: body.is_muhadara,
     })
     return NextResponse.json({
       ok: true,

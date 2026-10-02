@@ -31,12 +31,15 @@ export async function POST(request: Request) {
       description_am: body.description_am,
       description_ar: body.description_ar,
       status: body.status || 'published',
+      priority: body.priority,
+      featured: body.featured,
+      scheduled_at: body.scheduled_at ?? null,
       adminEmail: gate.ctx.user.email
     })
     return NextResponse.json({
       ok: true,
       row,
-      message: 'Reminder published. It appears on the home page.'
+      message: 'Published. Appears on home reminders and the 1-Minute text feed.'
     })
   } catch (err) {
     return NextResponse.json(
@@ -57,7 +60,10 @@ export async function PATCH(request: Request) {
       title_am: body.title_am,
       description_en: body.description_en,
       description_am: body.description_am,
-      status: body.status
+      status: body.status,
+      priority: body.priority,
+      featured: body.featured,
+      scheduled_at: body.scheduled_at
     })
     return NextResponse.json({ ok: true, row })
   } catch (err) {

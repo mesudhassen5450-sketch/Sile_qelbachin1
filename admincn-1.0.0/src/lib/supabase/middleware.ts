@@ -19,9 +19,58 @@ function isPublicPath(pathname: string): boolean {
   return false
 }
 
+function publicWebsiteOrigin(): string {
+  const raw =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.PUBLIC_WEBSITE_URL ||
+    'http://localhost:3000'
+  try {
+    const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`
+    return new URL(withProtocol).origin
+  } catch {
+    return 'http://localhost:3000'
+  }
+}
+
+function hasSupabaseAuthCookie(request: NextRequest): boolean {
+  return request.cookies.getAll().some(c => {
+    const n = c.name.toLowerCase()
+    return n.includes('sb-') && (n.includes('auth-token') || n.includes('access-token'))
+  })
+}
+
+async function withTimeout<T>(promise: PromiseLike<T>, ms: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      Promise.resolve(promise),
+      new Promise<null>(resolve => {
+        timer = setTimeout(() => resolve(null), ms)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
   const pathname = request.nextUrl.pathname
+
+  // Public Google OAuth must never finish on Admin — send to website callback.
+  const oauthCode = request.nextUrl.searchParams.get('code')
+  if (oauthCode && pathname.startsWith('/pages/auth/')) {
+    const dest = new URL(`${publicWebsiteOrigin()}/auth/callback`)
+    dest.searchParams.set('code', oauthCode)
+    const next = request.nextUrl.searchParams.get('next') || '/'
+    dest.searchParams.set('next', next.startsWith('/') ? next : '/')
+    return NextResponse.redirect(dest)
+  }
+
+  // Fast path: public pages with no session cookies — do not block on Supabase.
+  if (isPublicPath(pathname) && !hasSupabaseAuthCookie(request)) {
+    return supabaseResponse
+  }
 
   const url = getSupabaseUrl()
   const key = getSupabasePublishableKey()
@@ -63,15 +112,25 @@ export async function updateSession(request: NextRequest) {
     }
   })
 
-  const {
-    data: { user }
-  } = await supabase.auth.getUser()
+  const userResult = await withTimeout(supabase.auth.getUser(), 4000)
+  const user = userResult?.data?.user ?? null
 
   if (isPublicPath(pathname)) {
     if (user && pathname === '/pages/auth/login') {
-      const dest = request.nextUrl.clone()
-      dest.pathname = '/dashboard'
-      return NextResponse.redirect(dest)
+      const staffResult = await withTimeout(
+        supabase.from('staff_profiles').select('id, status').eq('user_id', user.id).maybeSingle(),
+        4000
+      )
+      const staff = staffResult?.data
+      const isActiveStaff = staff?.status === 'active'
+      if (isActiveStaff) {
+        const dest = request.nextUrl.clone()
+        dest.pathname = '/dashboard'
+        return NextResponse.redirect(dest)
+      }
+      // Signed-in visitor (Google) — not staff: return to public site home.
+      await withTimeout(supabase.auth.signOut(), 3000)
+      return NextResponse.redirect(`${publicWebsiteOrigin()}/`)
     }
     return supabaseResponse
   }

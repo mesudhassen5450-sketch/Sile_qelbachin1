@@ -2,12 +2,12 @@ import './globals.css';
 import type { Metadata } from 'next';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import MarqueeBanner from '@/components/MarqueeBanner';
 import { AudioProvider } from '@/context/AudioContext';
 import { LanguageProvider } from '@/context/LanguageContext';
 import { IntroRecitationProvider } from '@/context/IntroRecitationContext';
 import AudioPlayerBar from '@/components/AudioPlayerBar';
 import ThemeProvider from '@/components/ThemeProvider';
+import { AuthProvider } from '@/context/AuthContext';
 import GoogleTranslate from '@/components/GoogleTranslate';
 import AIAssistant from '@/components/AIAssistant';
 import AIErrorBoundary from '@/components/AIErrorBoundary';
@@ -59,7 +59,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="am" dir="ltr" className="dark notranslate" suppressHydrationWarning>
+    <html lang="am" dir="ltr" className="notranslate" suppressHydrationWarning>
       <head>
         <meta name="google" content="notranslate" />
       </head>
@@ -67,27 +67,28 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <SiteJsonLd />
         <ThemeProvider>
           <LanguageProvider>
-            <AudioProvider>
-              <IntroRecitationProvider>
-                <div className="flex flex-col min-h-screen">
-                  <div className="fixed top-0 left-0 right-0 z-40">
-                    <Navbar />
-                    <MarqueeBanner />
+            <AuthProvider>
+              <AudioProvider>
+                <IntroRecitationProvider>
+                  <div className="flex flex-col min-h-screen">
+                    <div className="fixed top-0 left-0 right-0 z-40">
+                      <Navbar />
+                    </div>
+                    <main className="flex-grow max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-10 w-full max-w-[100vw] overflow-x-hidden pb-28 pt-[calc(var(--site-header-height)+1.25rem)] sm:pt-[calc(var(--site-header-height)+2.5rem)]">
+                      <PageSeo />
+                      <AnalyticsBeacon />
+                      {children}
+                    </main>
+                    <Footer />
+                    <AudioPlayerBar />
+                    <GoogleTranslate />
+                    <AIErrorBoundary>
+                      <AIAssistant />
+                    </AIErrorBoundary>
                   </div>
-                  <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full pb-28 pt-[calc(var(--site-header-height)+2.5rem)]">
-                    <PageSeo />
-                    <AnalyticsBeacon />
-                    {children}
-                  </main>
-                  <Footer />
-                  <AudioPlayerBar />
-                  <GoogleTranslate />
-                  <AIErrorBoundary>
-                    <AIAssistant />
-                  </AIErrorBoundary>
-                </div>
-              </IntroRecitationProvider>
-            </AudioProvider>
+                </IntroRecitationProvider>
+              </AudioProvider>
+            </AuthProvider>
           </LanguageProvider>
         </ThemeProvider>
       </body>

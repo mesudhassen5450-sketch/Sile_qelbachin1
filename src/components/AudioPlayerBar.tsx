@@ -58,7 +58,7 @@ export default function AudioPlayerBar() {
   const hasPrev = playlist.length > 0 && playlist.findIndex(t => t.id === currentTrack.id) > 0;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-[60] p-2 sm:p-4 bg-white/95 dark:bg-neutral-900/95 border-t border-neutral-200 dark:border-neutral-800 shadow-2xl backdrop-blur-md transition-all duration-300">
+    <div className="fixed bottom-0 left-0 right-0 z-[60] p-2 sm:p-4 bg-white/95 dark:bg-neutral-900/95 border-t border-[#e3e2e0] dark:border-neutral-800 shadow-[0_-4px_20px_rgba(55,53,47,0.06)] dark:shadow-2xl backdrop-blur-md transition-all duration-300">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-2 md:gap-4">
         
         {/* Track Metadata */}
