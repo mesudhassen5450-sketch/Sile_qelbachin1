@@ -138,6 +138,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { createClient } = await import('@/lib/supabase/client')
       const supabase = createClient()
+      // getUser() revalidates with Supabase (more reliable than getSession alone)
+      const { data: userData } = await supabase.auth.getUser()
+      if (!userData.user) {
+        await applySession(null)
+        return
+      }
       const { data } = await supabase.auth.getSession()
       await applySession(data.session)
     } catch {
@@ -162,9 +168,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const { createClient } = await import('@/lib/supabase/client')
         const supabase = createClient()
-        const { data } = await supabase.auth.getSession()
+        const { data: userData } = await supabase.auth.getUser()
         if (!mounted) return
-        await applySession(data.session)
+        if (!userData.user) {
+          await applySession(null)
+        } else {
+          const { data } = await supabase.auth.getSession()
+          await applySession(data.session)
+        }
         setLoading(false)
 
         const { data: sub } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
@@ -177,11 +188,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     })()
 
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refresh()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+
     return () => {
       mounted = false
       unsubscribe?.()
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
     }
-  }, [configured, applySession])
+  }, [configured, applySession, refresh])
 
   const signOut = useCallback(async () => {
     if (!configured) return

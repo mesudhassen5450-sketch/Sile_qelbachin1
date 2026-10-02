@@ -12,11 +12,16 @@ type Props = {
   trailing?: ReactNode
 }
 
-/** Ask Ustaz: signed-in → form; guest → login then form. */
+/**
+ * Ask Ustaz CTA:
+ * - While auth is loading, still go to /ask-question (page waits / shows Loading).
+ * - Never bounce a signed-in user through /login just because session is still hydrating.
+ */
 export default function AskQuestionNavLink({ className, onClick, trailing }: Props) {
   const { user, loading } = useAuth()
   const { getLocalized } = useLanguage()
-  const href = !loading && user ? ASK_QUESTION.href : '/login?next=/ask-question'
+  const href =
+    loading || user ? ASK_QUESTION.href : '/login?next=/ask-question'
 
   return (
     <Link href={href} onClick={onClick} className={className}>

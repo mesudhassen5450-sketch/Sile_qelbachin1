@@ -286,6 +286,11 @@ export async function updateContentMeta(
       if (input.cover_asset_id !== undefined) {
         nextMeta.cover_asset_id = input.cover_asset_id
       }
+      const nextCategory =
+        input.category !== undefined ? input.category : a.category
+      if (input.category !== undefined) {
+        nextMeta.audio_section = String(input.category).trim().toLowerCase()
+      }
       return {
         ...a,
         title_en: input.title_en !== undefined ? input.title_en : a.title_en,
@@ -296,7 +301,7 @@ export async function updateContentMeta(
           input.description_am !== undefined ? input.description_am : a.description_am,
         media_asset_id:
           input.media_asset_id !== undefined ? input.media_asset_id : a.media_asset_id,
-        category: input.category !== undefined ? input.category : a.category,
+        category: nextCategory,
         is_muhadara:
           input.is_muhadara !== undefined ? Boolean(input.is_muhadara) : a.is_muhadara,
         priority: nextPriority !== undefined ? nextPriority : normalizePriority(a.priority, 1),

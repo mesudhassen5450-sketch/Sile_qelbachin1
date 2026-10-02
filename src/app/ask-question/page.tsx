@@ -9,7 +9,7 @@ import { siteMetadata } from '@/data/channelData'
 
 const QURAN = {
   arabic: 'فَاسْأَلُوا أَهْلَ الذِّكْرِ إِن كُنتُمْ لَا تَعْلَمُونَ',
-  am: '«የማታውቁ ከሆነ የእውቀቱን ባለቤቶች ጠይቁ።» (ሱረቱ አን-ነህል፡ 43)',
+  am: '«የማታውቁም ከሆናችሁ የመጽሐፉን ባለቤቶች ጠይቁ፡፡» (ሱረቱ አን-ነሕል፡ 43)',
   en: '"So ask the people of the message if you do not know." (Surah An-Nahl: 43)',
   ar: '«فاسألوا أهل الذكر إن كنتم لا تعلمون» (سورة النحل: 43)',
 }
@@ -38,7 +38,7 @@ function gmailInboxUrl(email: string): string {
 
 export default function AskQuestionPage() {
   const { getLocalized, language } = useLanguage()
-  const { user, loading: authLoading, configured, displayName } = useAuth()
+  const { user, loading: authLoading, configured, displayName, refresh } = useAuth()
   const router = useRouter()
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -52,10 +52,27 @@ export default function AskQuestionPage() {
   useEffect(() => {
     if (authLoading) return
     if (!configured) return
-    if (!user) {
-      router.replace('/login?next=/ask-question')
+    if (user) return
+    let cancelled = false
+    void (async () => {
+      await refresh()
+      if (cancelled) return
+      // refresh() updates context; re-check via getUser for this tick
+      try {
+        const { createClient } = await import('@/lib/supabase/client')
+        const supabase = createClient()
+        const { data } = await supabase.auth.getUser()
+        if (cancelled) return
+        if (data.user) return
+      } catch {
+        /* fall through */
+      }
+      if (!cancelled) router.replace('/login?next=/ask-question')
+    })()
+    return () => {
+      cancelled = true
     }
-  }, [authLoading, configured, user, router])
+  }, [authLoading, configured, user, router, refresh])
 
   useEffect(() => {
     if (!user?.email) return

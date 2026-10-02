@@ -1,4 +1,11 @@
-import nodemailer from 'nodemailer'
+/**
+ * Send Ustaz answer email via Resend API.
+ * Env (Admin / Render only — never Netlify):
+ *   RESEND_API_KEY=re_...
+ *   EMAIL_FROM=Sile Qelbachin Support <onboarding@resend.dev>
+ *     (or a verified domain address, e.g. Support <noreply@sileqelbachin1.com>)
+ *   EMAIL_FROM_NAME=Sile Qelbachin Support  (optional display override)
+ */
 
 const SALAM_LINE =
   /^\s*(?:as[- ]?salamu?[- ]?alaikum|assalamu[- ]?alaikum|salam(?:u)?[- ]?alaykum|wa[- ]?alaikum(?:u)?[- ]?as[- ]?salam|wealeykum[- ]?selam|w[aä][- ]?alaykum[- ]?as[- ]?salam|አሰላሙ(?:ዓ|ዐ)?ለይኩም|ወዐለይኩሙ(?:ስ|ስሰ)?ላም|ሰላም(?:\s*ዓለይኩም)?)\s*[,.!]?\s*$/i
@@ -28,11 +35,14 @@ function stripLeadingSalams(body: string): string {
   return lines.slice(i).join('\n').trim()
 }
 
-/**
- * Send Ustaz answer via Gmail SMTP (Nodemailer).
- * Credentials: EMAIL_USER + EMAIL_PASS (Google App Password). Never expose to the browser.
- * Display name: EMAIL_FROM_NAME or "Sile Qelbachin Support".
- */
+function resolveFromAddress(): string | null {
+  const fromRaw = process.env.EMAIL_FROM?.trim() || process.env.RESEND_FROM?.trim()
+  if (fromRaw) return fromRaw
+  const name = (process.env.EMAIL_FROM_NAME || 'Sile Qelbachin Support').trim().replace(/"/g, '')
+  // Resend test sender — replace with your verified domain in production
+  return `${name} <onboarding@resend.dev>`
+}
+
 export async function sendUstazAnswerEmail(input: {
   to: string
   question: string
@@ -47,13 +57,18 @@ export async function sendUstazAnswerEmail(input: {
   const to = input.to.trim()
   if (!to || !to.includes('@')) return { ok: false, error: 'Missing recipient email.' }
 
-  const user = process.env.EMAIL_USER?.trim()
-  const pass = process.env.EMAIL_PASS?.trim()?.replace(/\s+/g, '')
-  if (!user || !pass) {
+  const apiKey = process.env.RESEND_API_KEY?.trim()
+  if (!apiKey) {
     return {
       ok: false,
-      error: 'Email not configured. Set EMAIL_USER and EMAIL_PASS (Gmail App Password) on the Admin server.',
+      error:
+        'Email is not set up — set RESEND_API_KEY (and optionally EMAIL_FROM) on the Admin server (Render), then redeploy.',
     }
+  }
+
+  const from = resolveFromAddress()
+  if (!from) {
+    return { ok: false, error: 'EMAIL_FROM is missing.' }
   }
 
   const am = isAmharicDominant(`${input.question}\n${input.answer}\n${input.greeting || ''}`)
@@ -63,7 +78,6 @@ export async function sendUstazAnswerEmail(input: {
     : rawGreeting || 'Assalamu alaikum wa rahmatullahi wa barakatuh,'
 
   let answerBody = stripLeadingSalams(input.answer.trim())
-  // If greeting already carries salam, also drop a matching first line of the body
   if (rawGreeting && answerBody) {
     const first = answerBody.split('\n')[0]?.trim() || ''
     if (first && (SALAM_LINE.test(first) || first.toLowerCase() === rawGreeting.toLowerCase())) {
@@ -71,8 +85,6 @@ export async function sendUstazAnswerEmail(input: {
     }
   }
 
-  const fromName = (process.env.EMAIL_FROM_NAME || 'Sile Qelbachin Support').trim()
-  const from = `"${fromName.replace(/"/g, '')}" <${user}>`
   const subject = am
     ? 'ለጥያቄዎ መልስ — ስለ ቀልባችን'
     : 'Answer to your question — Sile Qelbachin'
@@ -183,15 +195,30 @@ export async function sendUstazAnswerEmail(input: {
 </html>`
 
   try {
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
-      auth: { user, pass },
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from,
+        to: [to],
+        subject,
+        text,
+        html,
+      }),
     })
-
-    await transporter.sendMail({ from, to, subject, text, html })
+    const data = (await res.json().catch(() => ({}))) as { id?: string; message?: string; error?: { message?: string } }
+    if (!res.ok) {
+      return {
+        ok: false,
+        error:
+          data.error?.message ||
+          data.message ||
+          `Resend error (${res.status}). Check RESEND_API_KEY and that EMAIL_FROM is a verified sender.`,
+      }
+    }
     return { ok: true }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Email send failed.' }

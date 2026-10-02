@@ -190,6 +190,11 @@ export async function createAudioItem(input: {
   markAssetLinked(store, input.media_asset_id)
   markAssetLinked(store, input.cover_asset_id)
 
+  const categoryRaw = String(input.category || '')
+    .trim()
+    .toLowerCase()
+  const category =
+    categoryRaw || (input.is_muhadara ? 'dawah' : 'archive')
   const row: AudioItemRecord = {
     id: newId(),
     legacy_id: `admin-audio-${Date.now()}`,
@@ -199,22 +204,23 @@ export async function createAudioItem(input: {
     description_am: input.description_am || null,
     description_ar: input.description_ar || null,
     description_en: input.description_en || null,
-    category: input.category || 'archive',
+    category,
     media_asset_id: input.media_asset_id,
     duration_label: null,
     play_count: 0,
     download_count: 0,
     is_muhadara:
-      String(input.category || '')
-        .trim()
-        .toLowerCase() === 'one_minute'
-        ? false
-        : Boolean(input.is_muhadara),
+      category === 'one_minute' ? false : Boolean(input.is_muhadara ?? category === 'dawah'),
     status,
     priority: 1,
     featured: false,
     scheduled_at: null,
-    metadata: { source: 'admin_ui', cover_asset_id: input.cover_asset_id || null },
+    metadata: {
+      source: 'admin_ui',
+      cover_asset_id: input.cover_asset_id || null,
+      // Pins item to the Admin sidebar section it was created in
+      audio_section: category,
+    },
     created_at: now,
     updated_at: now,
     published_at: status === 'published' ? now : null

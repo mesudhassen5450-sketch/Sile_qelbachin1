@@ -159,7 +159,16 @@ export function matchesAudioSection(
   const isOne = isOneMinuteCategory(cat) || isOneMinuteFeedMeta(row.metadata)
   if (section === 'dawah') {
     if (isOne) return false
-    return Boolean(row.is_muhadara) || cat === 'dawah' || cat === 'muhadara'
+    const metaSection = String(row.metadata?.audio_section || row.metadata?.admin_section || '')
+      .trim()
+      .toLowerCase()
+    // Stay on Da'wah Talks even when "not muhadara" — category or section tag keeps it here
+    return (
+      Boolean(row.is_muhadara) ||
+      cat === 'dawah' ||
+      cat === 'muhadara' ||
+      metaSection === 'dawah'
+    )
   }
   if (section === 'one_minute') {
     return isOne

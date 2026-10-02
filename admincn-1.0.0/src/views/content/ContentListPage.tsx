@@ -685,7 +685,11 @@ const ContentListPage = ({
           onClick={() =>
             void quickPatch(
               String(row.id),
-              { is_muhadara: !row.is_muhadara },
+              {
+                is_muhadara: !row.is_muhadara,
+                // Keep the row in Da'wah Talks regardless of muhadara flag
+                category: 'dawah',
+              },
               row.is_muhadara
                 ? t({ en: 'Marked: not muhadara', am: 'ሙሐደራ አይደለም' })
                 : t({ en: 'Marked as muhadara', am: 'እንደ ሙሐደራ ተመዘገበ' })

@@ -38,13 +38,22 @@ Optional (AI assistant only):
 |-----|--------|
 | `GROQ_API_KEY` | *(your Groq key — server only)* |
 
+Optional (public site auth — same as now if already set):
+
+| Key | Value |
+|-----|--------|
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://lsyyezhsqhzcskjbqmco.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | *(website publishable key)* |
+
 **Do NOT put on Netlify**
 
+- `RESEND_API_KEY` / `EMAIL_FROM` (those belong on **Render Admin** only)
 - `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`
 - `CLOUDFLARE_API_TOKEN`
 - `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_SECRET_KEY`
 - `SUPER_ADMIN_BOOTSTRAP_PASSWORD`
 - Anything with staff login secrets
+- Old Gmail: `EMAIL_USER` / `EMAIL_PASS` (removed — use Resend on Render)
 
 After saving env vars → **Trigger deploy** (or wait for git push).
 
@@ -85,6 +94,18 @@ After saving env vars → **Trigger deploy** (or wait for git push).
 | `R2_ACCOUNT_ID` | `26e435690c62468180455b796d21b3ab` |
 | `R2_ACCESS_KEY_ID` | *(your 32-char Access Key ID)* |
 | `R2_SECRET_ACCESS_KEY` | *(your full ~64-char secret)* |
+
+**Email (Resend) — add these on Render (NOT Netlify)**
+
+| Key | Value |
+|-----|--------|
+| `RESEND_API_KEY` | `re_…` *(your Resend API key)* |
+| `EMAIL_FROM` | `Sile Qelbachin Support <onboarding@resend.dev>` |
+| `EMAIL_FROM_NAME` | `Sile Qelbachin Support` |
+
+Remove if present: `EMAIL_USER`, `EMAIL_PASS` (Gmail App Password — no longer used).
+
+When you verify a custom domain in Resend, change `EMAIL_FROM` to e.g. `Sile Qelbachin Support <noreply@sileqelbachin1.com>`.
 
 **Fix these if they still say `value` on Render**
 

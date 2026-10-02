@@ -266,8 +266,8 @@ export default function QuestionSubmissionsPage() {
       msg.toLowerCase().includes('email not configured')
     ) {
       return t({
-        en: 'Answer saved. Email is not set up — set EMAIL_USER and EMAIL_PASS (Gmail App Password) in Admin .env.local, then restart Admin.',
-        am: 'መልሱ ተቀምጧል። ኢሜይል ገና አልተዘጋጀም — በ Admin .env.local ውስጥ EMAIL_USER እና EMAIL_PASS ያስገቡና Adminን እንደገና ያስጀምሩ።',
+        en: 'Answer saved. Email is not set up — set RESEND_API_KEY (and EMAIL_FROM) on Admin Render env, then redeploy.',
+        am: 'መልሱ ተቀምጧል። ኢሜይል ገና አልተዘጋጀም — በ Render Admin env ውስጥ RESEND_API_KEY (እና EMAIL_FROM) ያስገቡና እንደገና ያሰማሩ።',
       })
     }
     return msg
