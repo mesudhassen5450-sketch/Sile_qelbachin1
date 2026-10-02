@@ -14,6 +14,7 @@ import { useLanguage } from '@/context/LanguageContext'
 import ShareSheet from '@/components/ShareSheet'
 import { formatDuration } from '@/lib/mediaDuration'
 import type { MediaItem } from '@/data/mediaStore'
+import { prepareVideoPastIntro, skipTelegramVideoIntro } from '@/lib/videoIntroSkip'
 
 const MEDIUM_VOLUME = 0.55
 
@@ -125,6 +126,7 @@ export default function ScrollableVideoFeed({ videos, focusId, onActiveIdChange 
       el.volume = MEDIUM_VOLUME
       el.playsInline = true
       el.loop = false
+      await prepareVideoPastIntro(el)
       el.ontimeupdate = () => {
         const total = el.duration || slide.durationSeconds || 0
         const cur = el.currentTime || 0
@@ -290,6 +292,9 @@ export default function ScrollableVideoFeed({ videos, focusId, onActiveIdChange 
                     muted={muted}
                     preload={isActive ? 'auto' : 'metadata'}
                     className="h-full w-full object-contain bg-black"
+                    onLoadedMetadata={e => {
+                      if (!isActive) skipTelegramVideoIntro(e.currentTarget)
+                    }}
                   />
                 ) : (
                   <div className="h-full w-full bg-neutral-950" />

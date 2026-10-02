@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
+import { skipTelegramVideoIntro } from '@/lib/videoIntroSkip'
 
 const LONG_MIN_SECONDS = 60
 
@@ -32,11 +33,12 @@ function VideoThumb({
   src,
   coverSrc,
   className = '',
-  seekTo = 1.2,
+  seekTo,
 }: {
   src: string
   coverSrc?: string | null
   className?: string
+  /** Optional fixed seek; defaults to Telegram-intro skip based on duration */
   seekTo?: number
 }) {
   const ref = React.useRef<HTMLVideoElement>(null)
@@ -68,8 +70,12 @@ function VideoThumb({
     if (!el || !activeSrc) return
     const onMeta = () => {
       try {
-        if (Number.isFinite(el.duration) && el.duration > seekTo) {
-          el.currentTime = seekTo
+        if (typeof seekTo === 'number' && Number.isFinite(seekTo) && seekTo > 0) {
+          if (Number.isFinite(el.duration) && el.duration > seekTo) {
+            el.currentTime = seekTo
+          }
+        } else {
+          skipTelegramVideoIntro(el)
         }
       } catch {
         /* ignore */

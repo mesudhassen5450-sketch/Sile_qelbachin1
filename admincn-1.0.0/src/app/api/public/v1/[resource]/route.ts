@@ -5,6 +5,9 @@ import {
   isScheduleLive,
   matchesAudioSection,
   matchesVideoSection,
+  resolveFeatured,
+  resolvePriority,
+  resolveScheduledAt,
 } from '@/lib/cms/editorial'
 import { loadLocalStore, saveLocalStore } from '@/lib/cms/local-store'
 import { sortKitabsForDisplay } from '@/lib/cms/kitab-order'
@@ -113,7 +116,7 @@ export async function GET(
   if (resource === 'kitabs') {
     const rows = sortKitabsForDisplay(
       [...store.kitabs]
-        .filter(k => k.status === 'published' && isScheduleLive(k.scheduled_at))
+        .filter(k => k.status === 'published' && isScheduleLive(resolveScheduledAt(k)))
         .sort(compareByPriorityThenDate)
     ).map(k => {
         const cover = k.cover_asset_id ? assets.get(k.cover_asset_id) : undefined
@@ -156,8 +159,8 @@ export async function GET(
           pdfUrl: pdfFallback,
           dersCount: dersList.length,
           dersList,
-          featured: Boolean(k.featured),
-          priority: k.priority ?? 100,
+          featured: resolveFeatured(k),
+          priority: resolvePriority(k, 100),
           legacy_source: k.legacy_source,
           created_at: k.created_at,
           updated_at: k.updated_at
@@ -170,7 +173,7 @@ export async function GET(
 
   if (resource === 'audio' || resource === 'muhadara') {
     const rows = [...store.audio_items]
-      .filter(a => a.status === 'published' && isScheduleLive(a.scheduled_at))
+      .filter(a => a.status === 'published' && isScheduleLive(resolveScheduledAt(a)))
       .filter(a =>
         resource === 'muhadara'
           ? a.is_muhadara
@@ -197,8 +200,8 @@ export async function GET(
           type: 'audio',
           category: a.category,
           isMuhadara: a.is_muhadara,
-          featured: Boolean(a.featured),
-          priority: a.priority ?? 100
+          featured: resolveFeatured(a),
+          priority: resolvePriority(a, 100)
         }
       })
     return withCors(
@@ -208,7 +211,7 @@ export async function GET(
 
   if (resource === 'video') {
     const rows = [...store.video_items]
-      .filter(v => v.status === 'published' && isScheduleLive(v.scheduled_at))
+      .filter(v => v.status === 'published' && isScheduleLive(resolveScheduledAt(v)))
       .filter(
         v =>
           !matchesVideoSection({ category: v.category, metadata: v.metadata }, 'one_minute')
@@ -236,7 +239,7 @@ export async function GET(
           coverUrl: cover,
           type: 'video',
           category: v.category,
-          featured: Boolean(v.featured),
+          featured: resolveFeatured(v),
           priority: v.priority ?? 9999
         }
       })
@@ -247,7 +250,7 @@ export async function GET(
 
   if (resource === 'pdfs' || resource === 'pdf') {
     const rows = [...store.pdf_items]
-      .filter(p => p.status === 'published' && isScheduleLive(p.scheduled_at))
+      .filter(p => p.status === 'published' && isScheduleLive(resolveScheduledAt(p)))
       .sort(compareByPriorityThenDate)
       .map(p => {
         const media = p.media_asset_id ? assets.get(p.media_asset_id) : undefined
@@ -260,8 +263,8 @@ export async function GET(
           coverUrl: cover?.public_url || null,
           type: 'pdf',
           category: p.category || null,
-          featured: Boolean(p.featured),
-          priority: p.priority ?? 100
+          featured: resolveFeatured(p),
+          priority: resolvePriority(p, 100)
         }
       })
     return NextResponse.json({ ok: true, source: store.meta.backend, count: rows.length, data: rows })
@@ -297,7 +300,7 @@ export async function GET(
   if (resource === 'reminders') {
     const local = loadLocalStore()
     const rows = [...(local.reminders || [])]
-      .filter(r => r.status === 'published' && isScheduleLive(r.scheduled_at))
+      .filter(r => r.status === 'published' && isScheduleLive(resolveScheduledAt(r)))
       .sort(
         (a, b) =>
           compareByPriorityThenDate(a, b) ||
@@ -312,7 +315,7 @@ export async function GET(
           ar: r.description_ar,
           en: r.description_en
         },
-        featured: Boolean(r.featured),
+        featured: resolveFeatured(r),
         priority: r.priority ?? r.sort_order ?? 100,
         updatedAt: r.updated_at
       }))
@@ -321,7 +324,7 @@ export async function GET(
 
   if (resource === 'one-minute' || resource === 'one_minute') {
     const videoRows = [...store.video_items]
-      .filter(v => v.status === 'published' && isScheduleLive(v.scheduled_at))
+      .filter(v => v.status === 'published' && isScheduleLive(resolveScheduledAt(v)))
       .filter(v =>
         matchesVideoSection({ category: v.category, metadata: v.metadata }, 'one_minute')
       )
@@ -346,7 +349,7 @@ export async function GET(
           mediaUrl: media?.public_url || null,
           coverUrl: thumb?.public_url || metaCover || null,
           soundUrl: null,
-          featured: Boolean(v.featured),
+          featured: resolveFeatured(v),
           priority: v.priority ?? 9999,
           sortOrder: v.priority ?? 9999,
           durationSeconds,
@@ -355,7 +358,7 @@ export async function GET(
       })
 
     const audioRows = [...store.audio_items]
-      .filter(a => a.status === 'published' && isScheduleLive(a.scheduled_at))
+      .filter(a => a.status === 'published' && isScheduleLive(resolveScheduledAt(a)))
       .filter(a =>
         matchesAudioSection(
           { category: a.category, is_muhadara: a.is_muhadara, metadata: a.metadata },
@@ -380,8 +383,8 @@ export async function GET(
           mediaUrl: media?.public_url || null,
           coverUrl: cover?.public_url || null,
           soundUrl: media?.public_url || null,
-          featured: Boolean(a.featured),
-          priority: a.priority ?? 100,
+          featured: resolveFeatured(a),
+          priority: resolvePriority(a, 100),
           sortOrder: a.priority ?? 100,
           durationSeconds,
           updatedAt: a.updated_at
@@ -391,7 +394,7 @@ export async function GET(
     // 1-Minute Text = Admin reminders (same CMS records as Content → 1-Minute → Text)
     const local = loadLocalStore()
     const textRows = [...(local.reminders || store.reminders || [])]
-      .filter(r => r.status === 'published' && isScheduleLive(r.scheduled_at))
+      .filter(r => r.status === 'published' && isScheduleLive(resolveScheduledAt(r)))
       .sort(compareByPriorityThenDate)
       .map(r => ({
         id: r.id,
@@ -405,7 +408,7 @@ export async function GET(
         mediaUrl: null,
         coverUrl: null,
         soundUrl: null,
-        featured: Boolean(r.featured),
+        featured: resolveFeatured(r),
         priority: r.priority ?? r.sort_order ?? 100,
         sortOrder: r.priority ?? r.sort_order ?? 100,
         durationSeconds: null as number | null,
@@ -462,7 +465,7 @@ export async function GET(
 
   if (resource === 'quran-recitations' || resource === 'quran_recitations') {
     const rows = [...store.audio_items]
-      .filter(a => a.status === 'published' && isScheduleLive(a.scheduled_at))
+      .filter(a => a.status === 'published' && isScheduleLive(resolveScheduledAt(a)))
       .filter(a =>
         matchesAudioSection(
           {
@@ -520,8 +523,8 @@ export async function GET(
               : typeof a.priority === 'number'
                 ? a.priority
                 : null,
-          featured: Boolean(a.featured),
-          priority: a.priority ?? 100,
+          featured: resolveFeatured(a),
+          priority: resolvePriority(a, 100),
           publishedAt: a.published_at || a.updated_at || null,
         }
       })

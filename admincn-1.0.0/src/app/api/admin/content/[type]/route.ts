@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { requireApiPermission } from '@/lib/auth/guards'
-import { endPriorityDefault } from '@/lib/cms/editorial'
+import { endPriorityDefault, resolveFeatured, resolvePriority, resolveScheduledAt } from '@/lib/cms/editorial'
 import { sortKitabsForDisplay } from '@/lib/cms/kitab-order'
 import { loadLocalStore, saveLocalStore } from '@/lib/cms/local-store'
 import { reindexAllContentPools } from '@/lib/cms/priority-cascade'
@@ -220,9 +220,9 @@ export async function GET(
       const cover = coverId ? assets.get(coverId) : undefined
       return {
         ...a,
-        priority: a.priority ?? endPriorityDefault(store.audio_items.length),
-        featured: Boolean(a.featured),
-        scheduled_at: a.scheduled_at ?? null,
+        priority: resolvePriority(a, endPriorityDefault(store.audio_items.length)),
+        featured: resolveFeatured(a),
+        scheduled_at: resolveScheduledAt(a),
         media_url: media?.public_url || null,
         cover_url: cover?.public_url || null,
         object_key: media?.object_key || null,
@@ -253,9 +253,9 @@ export async function GET(
       const cover = thumb?.public_url || metaCover || null
       return {
         ...v,
-        priority: v.priority ?? endPriorityDefault(store.video_items.length),
-        featured: Boolean(v.featured),
-        scheduled_at: v.scheduled_at ?? null,
+        priority: resolvePriority(v, endPriorityDefault(store.video_items.length)),
+        featured: resolveFeatured(v),
+        scheduled_at: resolveScheduledAt(v),
         media_url: media?.public_url || null,
         object_key: media?.object_key || null,
         cover_url: cover,

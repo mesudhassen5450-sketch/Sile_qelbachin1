@@ -18,6 +18,7 @@ import {
 import { useLanguage } from '@/context/LanguageContext'
 import { pickCmsLoc, type CmsOneMinute } from '@/lib/cmsClient'
 import { formatDuration } from '@/lib/mediaDuration'
+import { prepareVideoPastIntro, skipTelegramVideoIntro } from '@/lib/videoIntroSkip'
 
 export type FeedFilter = 'all' | 'video' | 'audio' | 'text'
 
@@ -116,6 +117,7 @@ export default function OneMinuteFeed({ slides, filter, onFilterChange }: Props)
         el.muted = muted
         el.playsInline = true
         el.loop = false
+        await prepareVideoPastIntro(el)
         el.ontimeupdate = () => {
           const total = el.duration || known || 0
           const cur = el.currentTime || 0
@@ -376,12 +378,8 @@ export default function OneMinuteFeed({ slides, filter, onFilterChange }: Props)
                         preload={isActive || nearActive ? 'auto' : 'metadata'}
                         className="h-full w-full object-contain bg-black"
                         onLoadedMetadata={e => {
-                          const el = e.currentTarget
-                          if (isActive) return
                           try {
-                            if (Number.isFinite(el.duration) && el.duration > 0.4) {
-                              el.currentTime = 0.35
-                            }
+                            skipTelegramVideoIntro(e.currentTarget)
                           } catch {
                             /* ignore */
                           }

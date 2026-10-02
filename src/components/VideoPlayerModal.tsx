@@ -15,6 +15,7 @@ import {
 import ShareSheet from '@/components/ShareSheet'
 import { formatDuration } from '@/lib/mediaDuration'
 import { useLanguage } from '@/context/LanguageContext'
+import { prepareVideoPastIntro } from '@/lib/videoIntroSkip'
 
 const MEDIUM_VOLUME = 0.55
 
@@ -66,8 +67,16 @@ export default function VideoPlayerModal({
     setMuted(false)
     setCurrent(0)
     onPlayStart?.()
-    void el.play().then(() => setPlaying(true)).catch(() => setPlaying(false))
-    bumpControls()
+    void (async () => {
+      await prepareVideoPastIntro(el)
+      try {
+        await el.play()
+        setPlaying(true)
+      } catch {
+        setPlaying(false)
+      }
+      bumpControls()
+    })()
     return () => {
       if (hideTimer.current) clearTimeout(hideTimer.current)
     }

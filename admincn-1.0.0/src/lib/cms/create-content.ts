@@ -18,7 +18,29 @@ import type {
   VideoItemRecord
 } from '@/lib/cms/types'
 
-/** Fail loudly so Admin never reports success for an item that only lived on ephemeral disk. */
+/** Fail loudly so Admin never reports success for an item that only lived on ephemeral disk.
+ * If production Supabase is missing migration 004 (featured/priority/scheduled_at),
+ * stash those fields in metadata and retry — same strategy as Edit/PATCH.
+ */
+function stashEditorialInMetadata(row: Record<string, unknown>): Record<string, unknown> {
+  const {
+    featured,
+    priority,
+    scheduled_at,
+    metadata,
+    ...rest
+  } = row
+  return {
+    ...rest,
+    metadata: {
+      ...((metadata as Record<string, unknown>) || {}),
+      ...(priority !== undefined ? { priority } : {}),
+      ...(featured !== undefined ? { featured } : {}),
+      ...(scheduled_at !== undefined ? { scheduled_at } : {}),
+    },
+  }
+}
+
 async function requireUpsert(
   table: string,
   row: Record<string, unknown>,
@@ -27,9 +49,21 @@ async function requireUpsert(
   const sb = getServiceSupabase()
   if (!sb) throw new Error('Database is not configured on Admin (Supabase).')
   const { error } = await sb.from(table).upsert(row, { onConflict })
-  if (error) {
-    throw new Error(`Could not save to ${table}: ${error.message}`)
+  if (!error) return
+
+  if (
+    /column|schema cache/i.test(error.message) &&
+    /featured|priority|scheduled_at/i.test(error.message)
+  ) {
+    const safe = stashEditorialInMetadata(row)
+    const retry = await sb.from(table).upsert(safe, { onConflict })
+    if (retry.error) {
+      throw new Error(`Could not save to ${table}: ${retry.error.message}`)
+    }
+    return
   }
+
+  throw new Error(`Could not save to ${table}: ${error.message}`)
 }
 
 async function syncLinkedMedia(store: ReturnType<typeof loadLocalStore>, ids: Array<string | null | undefined>) {

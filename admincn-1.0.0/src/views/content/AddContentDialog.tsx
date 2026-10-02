@@ -263,6 +263,27 @@ const AddContentDialog = ({
 
         <form onSubmit={e => void onSubmit(e)} className='space-y-4'>
           <FieldGroup className='gap-3'>
+            {showFeatured ? (
+              <label className='flex items-start gap-2 text-sm rounded-lg border border-border bg-muted/30 px-3 py-2.5'>
+                <input
+                  type='checkbox'
+                  className='mt-0.5 size-4 rounded border'
+                  checked={featured}
+                  onChange={e => setFeatured(e.target.checked)}
+                />
+                <span>
+                  Featured on home page
+                  {kind === 'audio'
+                    ? ' — home popular audio (top 3 featured)'
+                    : kind === 'kitabs'
+                      ? ' — home shows top 3 featured kitabs'
+                      : kind === 'video'
+                        ? ' — highlighted video lists'
+                        : ''}
+                </span>
+              </label>
+            ) : null}
+
             <Field>
               <FieldLabel>Title (EN){kind === 'kitabs' || kind === 'audio' || kind === 'video' ? '' : '*'}</FieldLabel>
               <Input
@@ -318,27 +339,6 @@ const AddContentDialog = ({
               </Field>
             ) : null}
 
-            {showFeatured ? (
-              <label className='flex items-start gap-2 text-sm'>
-                <input
-                  type='checkbox'
-                  className='mt-0.5 size-4 rounded border'
-                  checked={featured}
-                  onChange={e => setFeatured(e.target.checked)}
-                />
-                <span>
-                  Featured on home page
-                  {kind === 'audio'
-                    ? ' — home popular audio (top 3 featured)'
-                    : kind === 'kitabs'
-                      ? ' — home shows top 3 featured kitabs'
-                      : kind === 'video'
-                        ? ' — highlighted video lists'
-                        : ''}
-                </span>
-              </label>
-            ) : null}
-
             {showMuhadara ? (
               <label className='flex items-center gap-2 text-sm'>
                 <input
@@ -347,7 +347,7 @@ const AddContentDialog = ({
                   checked={isMuhadara}
                   onChange={e => setIsMuhadara(e.target.checked)}
                 />
-                Mark as Muhadara
+                Mark as muhadara (uncheck = not muhadara)
               </label>
             ) : null}
 

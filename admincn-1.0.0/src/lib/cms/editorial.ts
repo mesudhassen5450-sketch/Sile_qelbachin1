@@ -128,6 +128,44 @@ export function isScheduleLive(scheduled_at: string | null | undefined, now = Da
   return t <= now
 }
 
+/** Prefer real columns; fall back to metadata when migration 004 is not applied. */
+export function resolveFeatured(row: {
+  featured?: boolean | null
+  metadata?: Record<string, unknown> | null
+}): boolean {
+  if (typeof row.featured === 'boolean') return row.featured
+  const m = row.metadata?.featured
+  if (typeof m === 'boolean') return m
+  if (m === 'true' || m === 1 || m === '1') return true
+  if (m === 'false' || m === 0 || m === '0') return false
+  return false
+}
+
+export function resolvePriority(
+  row: {
+    priority?: number | null
+    metadata?: Record<string, unknown> | null
+  },
+  fallback = 9999
+): number {
+  if (typeof row.priority === 'number' && Number.isFinite(row.priority) && row.priority >= 1) {
+    return Math.floor(row.priority)
+  }
+  const m = row.metadata?.priority
+  const n = typeof m === 'number' ? m : Number(m)
+  if (Number.isFinite(n) && n >= 1) return Math.floor(n)
+  return fallback
+}
+
+export function resolveScheduledAt(row: {
+  scheduled_at?: string | null
+  metadata?: Record<string, unknown> | null
+}): string | null {
+  if (row.scheduled_at) return row.scheduled_at
+  const m = row.metadata?.scheduled_at
+  return typeof m === 'string' && m.trim() ? m : null
+}
+
 export type AudioSection = 'quran' | 'dawah' | 'one_minute'
 export type VideoSection = 'one_minute' | 'long'
 export type PdfSection = 'pdfs' | 'notes'
