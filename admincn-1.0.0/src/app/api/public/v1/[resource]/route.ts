@@ -551,13 +551,26 @@ export async function POST(
       const { createQuestionSubmission } = await import('@/lib/cms/question-submissions')
       const authEmail = String(body.auth_email || body.contact || body.email || '').trim()
       const question = String(body.question || body.question_text || '').trim()
+      const category =
+        typeof body.category === 'string' ? body.category : 'General Islamic Question'
       const row = createQuestionSubmission({
         user_id: typeof body.user_id === 'string' ? body.user_id : null,
         auth_email: authEmail,
         name: typeof body.name === 'string' ? body.name : authEmail,
-        category: typeof body.category === 'string' ? body.category : 'General Islamic Question',
+        category,
         question,
       })
+      // Best-effort receipt email (requires verified EMAIL_FROM domain on Resend)
+      try {
+        const { sendQuestionReceivedEmail } = await import('@/lib/cms/send-answer-email')
+        void sendQuestionReceivedEmail({
+          to: authEmail,
+          question,
+          category,
+        })
+      } catch {
+        /* never block intake on mail */
+      }
       return withCors(
         NextResponse.json({
           ok: true,

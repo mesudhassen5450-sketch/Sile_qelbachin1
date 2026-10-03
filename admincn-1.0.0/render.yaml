@@ -9,6 +9,7 @@ services:
     region: oregon
     rootDir: admincn-1.0.0
     buildCommand: npm install && npm run build
+    # build uses next build --webpack (Turbopack + next/font google fails on Render)
     startCommand: npm run start
     healthCheckPath: /pages/auth/login
     envVars:

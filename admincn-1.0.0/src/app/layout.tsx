@@ -22,19 +22,23 @@ import ScrollToTop from '@/components/layout/ScrollToTop'
 
 const notoSansEthiopic = Noto_Sans_Ethiopic({
   variable: '--font-noto-ethiopic',
-  subsets: ['ethiopic', 'latin'],
-  weight: ['300', '400', '500', '600', '700']
+  subsets: ['latin', 'ethiopic'],
+  weight: ['400', '500', '600', '700'],
+  display: 'swap',
+  adjustFontFallback: true,
 })
 
 const amiri = Amiri({
   variable: '--font-amiri',
-  subsets: ['arabic', 'latin'],
-  weight: ['400', '700']
+  subsets: ['latin', 'arabic'],
+  weight: ['400', '700'],
+  display: 'swap',
 })
 
 const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
-  subsets: ['latin']
+  subsets: ['latin'],
+  display: 'swap',
 })
 
 const appOrigin = getAppOrigin()

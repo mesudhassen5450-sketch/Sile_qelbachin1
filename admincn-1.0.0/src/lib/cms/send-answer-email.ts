@@ -2,8 +2,9 @@
  * Send Ustaz answer email via Resend API.
  * Env (Admin / Render only — never Netlify):
  *   RESEND_API_KEY=re_...
- *   EMAIL_FROM=Sile Qelbachin Support <onboarding@resend.dev>
- *     (or a verified domain address, e.g. Support <noreply@sileqelbachin1.com>)
+ *   EMAIL_FROM=Sile Qelbachin Support <noreply@sileqelbachin1.com>
+ *     MUST be a verified domain on Resend — onboarding@resend.dev only delivers
+ *     to your own Resend login email, not to askers.
  *   EMAIL_FROM_NAME=Sile Qelbachin Support  (optional display override)
  */
 
@@ -39,8 +40,75 @@ function resolveFromAddress(): string | null {
   const fromRaw = process.env.EMAIL_FROM?.trim() || process.env.RESEND_FROM?.trim()
   if (fromRaw) return fromRaw
   const name = (process.env.EMAIL_FROM_NAME || 'Sile Qelbachin Support').trim().replace(/"/g, '')
-  // Resend test sender — replace with your verified domain in production
   return `${name} <onboarding@resend.dev>`
+}
+
+function isResendTestSender(from: string): boolean {
+  return /onboarding@resend\.dev/i.test(from)
+}
+
+async function resendSend(input: {
+  from: string
+  to: string
+  subject: string
+  text: string
+  html: string
+}): Promise<{ ok: boolean; error?: string }> {
+  const apiKey = process.env.RESEND_API_KEY?.trim()
+  if (!apiKey) {
+    return {
+      ok: false,
+      error:
+        'Email is not set up — set RESEND_API_KEY (and EMAIL_FROM with a verified domain) on Admin Render, then redeploy.',
+    }
+  }
+
+  if (isResendTestSender(input.from)) {
+    return {
+      ok: false,
+      error:
+        'EMAIL_FROM still uses onboarding@resend.dev (test only). In Resend, verify sileqelbachin1.com, then set EMAIL_FROM=Sile Qelbachin Support <noreply@sileqelbachin1.com> on Render and redeploy. Until then emails are not sent to users.',
+    }
+  }
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: input.from,
+        to: [input.to],
+        subject: input.subject,
+        text: input.text,
+        html: input.html,
+      }),
+    })
+    const data = (await res.json().catch(() => ({}))) as {
+      id?: string
+      message?: string
+      error?: { message?: string }
+    }
+    if (!res.ok) {
+      const msg =
+        data.error?.message ||
+        data.message ||
+        `Resend error (${res.status}). Check RESEND_API_KEY and that EMAIL_FROM is a verified sender.`
+      if (/only send testing emails|verify a domain/i.test(msg)) {
+        return {
+          ok: false,
+          error:
+            'Resend blocked delivery: verify your domain (sileqelbachin1.com) in Resend, set EMAIL_FROM to that domain on Render, then redeploy.',
+        }
+      }
+      return { ok: false, error: msg }
+    }
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Email send failed.' }
+  }
 }
 
 export async function sendUstazAnswerEmail(input: {
@@ -56,15 +124,6 @@ export async function sendUstazAnswerEmail(input: {
 }): Promise<{ ok: boolean; error?: string }> {
   const to = input.to.trim()
   if (!to || !to.includes('@')) return { ok: false, error: 'Missing recipient email.' }
-
-  const apiKey = process.env.RESEND_API_KEY?.trim()
-  if (!apiKey) {
-    return {
-      ok: false,
-      error:
-        'Email is not set up — set RESEND_API_KEY (and optionally EMAIL_FROM) on the Admin server (Render), then redeploy.',
-    }
-  }
 
   const from = resolveFromAddress()
   if (!from) {
@@ -189,35 +248,67 @@ export async function sendUstazAnswerEmail(input: {
 </body>
 </html>`
 
-  try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from,
-        to: [to],
-        subject,
-        text,
-        html,
-      }),
-    })
-    const data = (await res.json().catch(() => ({}))) as { id?: string; message?: string; error?: { message?: string } }
-    if (!res.ok) {
-      return {
-        ok: false,
-        error:
-          data.error?.message ||
-          data.message ||
-          `Resend error (${res.status}). Check RESEND_API_KEY and that EMAIL_FROM is a verified sender.`,
-      }
-    }
-    return { ok: true }
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'Email send failed.' }
-  }
+  return resendSend({ from, to, subject, text, html })
+}
+
+/** Confirmation that the asker’s question was received (inbox). */
+export async function sendQuestionReceivedEmail(input: {
+  to: string
+  question: string
+  category?: string
+}): Promise<{ ok: boolean; error?: string }> {
+  const to = input.to.trim()
+  if (!to || !to.includes('@')) return { ok: false, error: 'Missing recipient email.' }
+
+  const from = resolveFromAddress()
+  if (!from) return { ok: false, error: 'EMAIL_FROM is missing.' }
+
+  const am = isAmharicDominant(input.question)
+  const subject = am
+    ? 'ጥያቄዎ ደርሶናል — ስለ ቀልባችን'
+    : 'We received your question — Sile Qelbachin'
+  const greeting = am
+    ? 'አሰላሙዓለይኩም ወረሕመቱላሂ ወበረካቱሁ፣'
+    : 'Assalamu alaikum wa rahmatullahi wa barakatuh,'
+  const body = am
+    ? [
+        greeting,
+        '',
+        'ጥያቄዎ በስኬት ተቀብለናል። ኡስታዝ መልስ ሲሰጥ ወደዚህ ኢሜይል እንልካለን — እባክዎ ኢሜይልዎን ይከታተሉ።',
+        input.category ? `\nምድብ፦ ${input.category}` : '',
+        '',
+        'ጥያቄዎ፦',
+        input.question,
+        '',
+        '— ስለ ቀልባችን ድጋፍ',
+      ].join('\n')
+    : [
+        greeting,
+        '',
+        'We received your question. An Ustaz will reply to this email — please watch your inbox.',
+        input.category ? `\nCategory: ${input.category}` : '',
+        '',
+        'Your question:',
+        input.question,
+        '',
+        '— Sile Qelbachin Support',
+      ].join('\n')
+
+  const html = `
+<!DOCTYPE html>
+<html lang="${am ? 'am' : 'en'}">
+<body style="margin:0;padding:0;background:#f4f4f5">
+  <div style="font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;line-height:1.6;color:#1a1a1a;max-width:600px;margin:24px auto;background:#ffffff;border:1px solid #e5e5e5;border-radius:8px;overflow:hidden">
+    <div style="background:#1b5e20;color:#ffffff;padding:18px 24px">
+      <div style="font-size:18px;font-weight:700">ስለ ቀልባችን</div>
+      <div style="font-size:12px;opacity:0.9;margin-top:2px">Sile Qelbachin · Ask an Ustaz</div>
+    </div>
+    <div style="padding:24px;white-space:pre-wrap;font-size:15px">${escapeHtml(body).replace(/\n/g, '<br/>')}</div>
+  </div>
+</body>
+</html>`
+
+  return resendSend({ from, to, subject, text: body, html })
 }
 
 function escapeHtml(s: string) {
