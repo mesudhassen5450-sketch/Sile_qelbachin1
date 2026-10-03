@@ -220,14 +220,7 @@ export default function DawahPage() {
 
       {tab === 'reminders' ? (
         <section role="tabpanel">
-          <RemindersFeed
-            showHeading
-            emptyHint={{
-              en: 'No reminders yet. Add them in Admin → Da’wah → Reminders.',
-              am: 'እስካሁን ማስታወሻ የለም። በአድሚን → ዳዕዋ → ማስታወሻዎች ያክሉ።',
-              ar: 'لا تذكيرات بعد. أضفها من الإدارة → الدعوة → التذكيرات.',
-            }}
-          />
+          <RemindersFeed showHeading />
         </section>
       ) : (
         <section className="space-y-5" role="tabpanel">

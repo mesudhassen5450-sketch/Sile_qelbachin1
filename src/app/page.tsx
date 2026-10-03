@@ -15,6 +15,7 @@ import {
 import FeaturedAudioBlock from '@/components/FeaturedAudioBlock'
 import CompactAudioRow from '@/components/CompactAudioRow'
 import HomeHero from '@/components/HomeHero'
+import HomeReminders from '@/components/HomeReminders'
 import AskQuestionNavLink from '@/components/AskQuestionNavLink'
 import HomeQuranIntro from '@/components/HomeQuranIntro'
 import KitabCard from '@/components/KitabCard'
@@ -704,6 +705,9 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+
+      {/* Featured reminder titles → /articles?id= (same CMS as Da’wah / Library) */}
+      <HomeReminders />
 
       {/* Home FAQ (image 3) — not the full Q&A feed */}
       <section className="portfolio-card p-8 sm:p-10 space-y-6 bg-red-50/40 dark:bg-red-950/20 border-red-200/50 dark:border-red-900/40">

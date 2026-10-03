@@ -57,7 +57,7 @@ const RemindersPage = ({
     description ||
     (isOneMinute
       ? 'Short text slides for the public 1-Minute feed. Priority, featured, publish, schedule, archive.'
-      : 'Add reminders for Da’wah and Library (same list on both). Not shown on the home page.')
+      : 'Appears on Articles, Da’wah → Reminders, and Library → Reminders. Mark Featured for the home title box (top 4).')
 
   const [rows, setRows] = useState<ReminderRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -237,7 +237,7 @@ const RemindersPage = ({
       <Card>
         <CardHeader className='p-4 pb-2'>
           <CardTitle className='text-base'>
-            {isOneMinute ? '1-Minute text slides' : 'Da’wah & Library reminders'}
+            {isOneMinute ? '1-Minute text slides' : 'Articles + Da’wah + Library'}
           </CardTitle>
           <CardDescription>
             {loading ? 'Loading…' : `${rows.length} item${rows.length === 1 ? '' : 's'}`}
@@ -356,7 +356,7 @@ const RemindersPage = ({
             <DialogDescription>
               {isOneMinute
                 ? 'Appears as a text slide in the public 1-Minute Message feed.'
-                : 'Shows on the website under Da’wah → Reminders and Library → Reminders (not on the home page).'}
+                : 'Shows on Articles, Da’wah → Reminders, and Library → Reminders. Featured items (top 4) show as titles only on the home page.'}
             </DialogDescription>
           </DialogHeader>
           <div className='min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pe-1'>
@@ -425,7 +425,9 @@ const RemindersPage = ({
                 checked={featured}
                 onChange={e => setFeatured(e.target.checked)}
               />
-              Featured
+              {isOneMinute
+                ? 'Featured'
+                : 'Featured on home (title only — up to 4)'}
             </label>
           </div>
           <DialogFooter className='shrink-0 gap-2 border-t border-border pt-3'>

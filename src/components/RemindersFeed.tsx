@@ -16,14 +16,13 @@ function truncate(s: string, max = PREVIEW_MAX): string {
 type Props = {
   /** Optional section chrome — omit when parent already has a heading */
   showHeading?: boolean
-  emptyHint?: { en: string; am: string; ar: string }
 }
 
 /**
- * Admin CMS reminders — same list on Da’wah and Library.
+ * Admin CMS reminders — shared for now by Da’wah, Library, and Articles.
  * Cards preview short text; tap opens a scrollable full view (mobile-friendly).
  */
-export default function RemindersFeed({ showHeading = true, emptyHint }: Props) {
+export default function RemindersFeed({ showHeading = true }: Props) {
   const { getLocalized } = useLanguage()
   const [items, setItems] = useState<CmsReminder[]>([])
   const [loading, setLoading] = useState(true)
@@ -80,18 +79,6 @@ export default function RemindersFeed({ showHeading = true, emptyHint }: Props) 
         <p className="text-sm text-neutral-500 text-center py-8">
           {getLocalized({ en: 'Loading…', am: 'በመጫን ላይ…', ar: 'جاري التحميل…' })}
         </p>
-      ) : null}
-
-      {!loading && items.length === 0 ? (
-        <div className="portfolio-card p-8 text-center text-sm text-neutral-500">
-          {getLocalized(
-            emptyHint || {
-              en: 'No reminders yet. Add them in Admin → Da’wah → Reminders.',
-              am: 'እስካሁን ማስታወሻ የለም። በአድሚን → ዳዕዋ → ማስታወሻዎች ያክሉ።',
-              ar: 'لا تذكيرات بعد. أضفها من الإدارة → الدعوة → التذكيرات.',
-            }
-          )}
-        </div>
       ) : null}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">

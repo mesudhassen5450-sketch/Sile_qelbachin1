@@ -4,10 +4,11 @@
  */
 export function telegramIntroSkipSeconds(duration: number): number {
   if (!Number.isFinite(duration) || duration <= 0) return 0
-  if (duration <= 8) return Math.min(0.55, duration * 0.1)
-  if (duration <= 20) return Math.min(1.5, Math.max(0.9, duration * 0.1))
-  if (duration <= 60) return Math.min(2.4, Math.max(1.2, duration * 0.09))
-  return Math.min(3, Math.max(1.5, duration * 0.07))
+  // Stickers / logos are often longer on short Telegram clips — skip a bit more.
+  if (duration <= 8) return Math.min(1.1, duration * 0.18)
+  if (duration <= 20) return Math.min(2.2, Math.max(1.2, duration * 0.14))
+  if (duration <= 60) return Math.min(3.2, Math.max(1.8, duration * 0.11))
+  return Math.min(4, Math.max(2.2, duration * 0.08))
 }
 
 /** Apply skip when metadata is ready. Returns the seek time used. */

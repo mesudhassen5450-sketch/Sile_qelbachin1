@@ -95,6 +95,8 @@ export type CmsReminder = {
   id: string
   title: CmsLoc
   description: CmsLoc
+  featured?: boolean
+  priority?: number
   updatedAt?: string
 }
 
