@@ -3,32 +3,11 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useLanguage } from '@/context/LanguageContext'
-import { fetchPublishedReminders, type CmsLoc, type CmsReminder } from '@/lib/cmsClient'
+import { featuredHeartFirst, fetchHeartReadings } from '@/lib/heartReadings'
 
-function asLoc(v?: CmsLoc | null): { en: string; am: string; ar: string } {
-  return {
-    en: v?.en || v?.am || '',
-    am: v?.am || v?.en || '',
-    ar: v?.ar || v?.en || v?.am || '',
-  }
-}
-
-function featuredFirst(rows: CmsReminder[], limit: number): CmsReminder[] {
-  const scored = [...rows].sort((a, b) => {
-    const fa = a.featured ? 1 : 0
-    const fb = b.featured ? 1 : 0
-    if (fa !== fb) return fb - fa
-    const pa = typeof a.priority === 'number' && a.priority >= 1 ? a.priority : 9999
-    const pb = typeof b.priority === 'number' && b.priority >= 1 ? b.priority : 9999
-    if (pa !== pb) return pa - pb
-    return 0
-  })
-  const featured = scored.filter(r => r.featured)
-  if (featured.length >= limit) return featured.slice(0, limit)
-  return scored.slice(0, limit)
-}
-
-/** Compact home strip: up to 4 reminder titles only → /articles?id= */
+/**
+ * Compact strip under Marriage: 4 article/reminder titles → /articles?id=
+ */
 export default function HomeReminders() {
   const { getLocalized } = useLanguage()
   const [items, setItems] = useState<Array<{ id: string; title: { en: string; am: string; ar: string } }>>(
@@ -38,15 +17,20 @@ export default function HomeReminders() {
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      const rows = await fetchPublishedReminders()
-      if (cancelled || !rows?.length) return
-      const picked = featuredFirst(rows, 4)
-        .map(r => {
-          const title = asLoc(r.title)
-          if (!title.en && !title.am) return null
-          return { id: r.id, title }
-        })
-        .filter((x): x is { id: string; title: { en: string; am: string; ar: string } } => Boolean(x))
+      const rows = await fetchHeartReadings()
+      if (cancelled) return
+      if (!rows.length) {
+        setItems([])
+        return
+      }
+      const picked = featuredHeartFirst(rows, 4).map(r => ({
+        id: r.id,
+        title: {
+          en: r.title.en || r.title.am || '',
+          am: r.title.am || r.title.en || '',
+          ar: r.title.ar || r.title.en || r.title.am || '',
+        },
+      }))
       setItems(picked)
     })()
     return () => {
@@ -57,34 +41,36 @@ export default function HomeReminders() {
   if (!items.length) return null
 
   return (
-    <section className="rounded-xl border border-neutral-200/80 dark:border-neutral-800 px-3 py-2.5 sm:px-4 space-y-1.5">
+    <section
+      aria-label="Featured articles and reminders"
+      className="rounded-xl border border-red-500/30 bg-gradient-to-r from-red-950/25 via-red-900/10 to-transparent dark:from-red-950/35 px-3 py-2.5 sm:px-4 space-y-1.5"
+    >
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-red-600">
+        <p className="text-[10px] font-bold uppercase tracking-wider text-red-400">
           {getLocalized({
-            en: 'Reminders',
-            am: 'ማስታወሻዎች',
-            ar: 'تذكيرات',
+            en: 'Featured · Articles & reminders',
+            am: 'ተለይተው · ጽሑፎች እና ማስታወሻዎች',
+            ar: 'مميز · مقالات وتذكيرات',
           })}
         </p>
         <Link
           href="/articles"
-          className="text-[11px] font-semibold text-red-600 hover:underline shrink-0"
+          className="text-[10px] font-semibold text-red-400 hover:underline shrink-0"
         >
           {getLocalized({ en: 'All →', am: 'ሁሉም →', ar: 'الكل →' })}
         </Link>
       </div>
-      <ul className="divide-y divide-neutral-100 dark:divide-neutral-800/80">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-0.5">
         {items.map(item => (
-          <li key={item.id}>
-            <Link
-              href={`/articles?id=${encodeURIComponent(item.id)}`}
-              className="block py-1.5 text-[13px] font-medium leading-snug text-neutral-800 dark:text-neutral-200 hover:text-red-600 dark:hover:text-red-400 transition line-clamp-1"
-            >
-              {getLocalized(item.title)}
-            </Link>
-          </li>
+          <Link
+            key={item.id}
+            href={`/articles?id=${encodeURIComponent(item.id)}`}
+            className="block rounded-md px-1.5 py-1.5 text-[12.5px] sm:text-[13px] font-semibold leading-snug text-neutral-100 hover:bg-red-500/10 hover:text-red-300 transition line-clamp-1"
+          >
+            {getLocalized(item.title)}
+          </Link>
         ))}
-      </ul>
+      </div>
     </section>
   )
 }

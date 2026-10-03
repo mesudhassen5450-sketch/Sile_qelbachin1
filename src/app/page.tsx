@@ -312,6 +312,9 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Compact article titles — between Marriage and Educational Archive */}
+      <HomeReminders />
+
       {/* Educational Archive section cards (image 7) */}
       <section id="archive" className="space-y-6 scroll-mt-28">
         <div>
@@ -705,9 +708,6 @@ export default function HomePage() {
           ))}
         </div>
       </section>
-
-      {/* Featured reminder titles → /articles?id= (same CMS as Da’wah / Library) */}
-      <HomeReminders />
 
       {/* Home FAQ (image 3) — not the full Q&A feed */}
       <section className="portfolio-card p-8 sm:p-10 space-y-6 bg-red-50/40 dark:bg-red-950/20 border-red-200/50 dark:border-red-900/40">

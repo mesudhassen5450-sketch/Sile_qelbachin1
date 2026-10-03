@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { X } from 'lucide-react'
 import CategoryPageHero from '@/components/CategoryPageHero'
 import { useLanguage } from '@/context/LanguageContext'
-import { fetchPublishedReminders, type CmsReminder } from '@/lib/cmsClient'
+import { fetchHeartReadings, type HeartReading } from '@/lib/heartReadings'
 
 const PREVIEW_MAX = 140
 
@@ -15,7 +15,7 @@ function truncate(s: string, max = PREVIEW_MAX): string {
   return `${t.slice(0, max).replace(/\s+\S*$/, '').trimEnd()}…`
 }
 
-function titleOf(r: CmsReminder, getLocalized: (v: { en: string; am: string; ar: string }) => string) {
+function titleOf(r: HeartReading, getLocalized: (v: { en: string; am: string; ar: string }) => string) {
   return getLocalized({
     en: r.title?.en || r.title?.am || '',
     am: r.title?.am || r.title?.en || '',
@@ -23,24 +23,21 @@ function titleOf(r: CmsReminder, getLocalized: (v: { en: string; am: string; ar:
   })
 }
 
-function bodyOf(r: CmsReminder, getLocalized: (v: { en: string; am: string; ar: string }) => string) {
+function bodyOf(r: HeartReading, getLocalized: (v: { en: string; am: string; ar: string }) => string) {
   return getLocalized({
-    en: r.description?.en || r.description?.am || '',
-    am: r.description?.am || r.description?.en || '',
-    ar: r.description?.ar || r.description?.en || r.description?.am || '',
+    en: r.body?.en || r.body?.am || '',
+    am: r.body?.am || r.body?.en || '',
+    ar: r.body?.ar || r.body?.en || r.body?.am || '',
   })
 }
 
-/**
- * Articles page — for now uses Admin Reminders (same CMS list as Da’wah & Library).
- * Later Articles can be a separate Admin section; deep-link ?id= still works.
- */
+/** Public articles — sourced from Admin Youth → Articles (same feed as home titles). */
 function ArticlesPageInner() {
   const { getLocalized } = useLanguage()
   const router = useRouter()
   const searchParams = useSearchParams()
   const focusId = searchParams.get('id')
-  const [items, setItems] = useState<CmsReminder[]>([])
+  const [items, setItems] = useState<HeartReading[]>([])
   const [loading, setLoading] = useState(true)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [highlightId, setHighlightId] = useState<string | null>(null)
@@ -51,9 +48,9 @@ function ArticlesPageInner() {
     let cancelled = false
     void (async () => {
       setLoading(true)
-      const rows = await fetchPublishedReminders()
+      const rows = await fetchHeartReadings()
       if (cancelled) return
-      setItems(rows || [])
+      setItems(rows)
       setLoading(false)
     })()
     return () => {
@@ -67,8 +64,7 @@ function ArticlesPageInner() {
 
   useEffect(() => {
     if (loading || !focusId || deepLinkDone.current || !items.length) return
-    const found = items.some(i => i.id === focusId)
-    if (!found) return
+    if (!items.some(i => i.id === focusId)) return
     deepLinkDone.current = true
     setActiveId(focusId)
     setHighlightId(focusId)
@@ -82,12 +78,14 @@ function ArticlesPageInner() {
   useEffect(() => {
     if (!activeId) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeDetail()
+      if (e.key === 'Escape') {
+        setActiveId(null)
+        router.replace('/articles', { scroll: false })
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- closeDetail stable enough
-  }, [activeId])
+  }, [activeId, router])
 
   const active = useMemo(() => items.find(i => i.id === activeId) || null, [items, activeId])
 

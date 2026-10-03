@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { useLanguage } from '@/context/LanguageContext'
-import { fetchPublishedReminders, type CmsReminder } from '@/lib/cmsClient'
+import { fetchHeartReadings, type HeartReading } from '@/lib/heartReadings'
 
 const PREVIEW_MAX = 160
 
@@ -14,17 +14,13 @@ function truncate(s: string, max = PREVIEW_MAX): string {
 }
 
 type Props = {
-  /** Optional section chrome — omit when parent already has a heading */
   showHeading?: boolean
 }
 
-/**
- * Admin CMS reminders — shared for now by Da’wah, Library, and Articles.
- * Cards preview short text; tap opens a scrollable full view (mobile-friendly).
- */
+/** Da’wah / Library reminders — for now same as Admin Youth → Articles. */
 export default function RemindersFeed({ showHeading = true }: Props) {
   const { getLocalized } = useLanguage()
-  const [items, setItems] = useState<CmsReminder[]>([])
+  const [items, setItems] = useState<HeartReading[]>([])
   const [loading, setLoading] = useState(true)
   const [activeId, setActiveId] = useState<string | null>(null)
 
@@ -32,9 +28,9 @@ export default function RemindersFeed({ showHeading = true }: Props) {
     let cancelled = false
     void (async () => {
       setLoading(true)
-      const rows = await fetchPublishedReminders()
+      const rows = await fetchHeartReadings()
       if (!cancelled) {
-        setItems(rows || [])
+        setItems(rows)
         setLoading(false)
       }
     })()
@@ -53,6 +49,19 @@ export default function RemindersFeed({ showHeading = true }: Props) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [activeId])
+
+  const titleOf = (r: HeartReading) =>
+    getLocalized({
+      en: r.title?.en || r.title?.am || '',
+      am: r.title?.am || r.title?.en || '',
+      ar: r.title?.ar || r.title?.en || r.title?.am || '',
+    })
+  const bodyOf = (r: HeartReading) =>
+    getLocalized({
+      en: r.body?.en || r.body?.am || '',
+      am: r.body?.am || r.body?.en || '',
+      ar: r.body?.ar || r.body?.en || r.body?.am || '',
+    })
 
   return (
     <div className="space-y-5">
@@ -83,16 +92,8 @@ export default function RemindersFeed({ showHeading = true }: Props) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
         {items.map(r => {
-          const title = getLocalized({
-            en: r.title?.en || r.title?.am || '',
-            am: r.title?.am || r.title?.en || '',
-            ar: r.title?.ar || r.title?.en || r.title?.am || '',
-          })
-          const body = getLocalized({
-            en: r.description?.en || r.description?.am || '',
-            am: r.description?.am || r.description?.en || '',
-            ar: r.description?.ar || r.description?.en || r.description?.am || '',
-          })
+          const title = titleOf(r)
+          const body = bodyOf(r)
           if (!title && !body) return null
           return (
             <button
@@ -152,22 +153,10 @@ export default function RemindersFeed({ showHeading = true }: Props) {
             </div>
             <div className="overflow-y-auto overscroll-contain px-4 sm:px-6 py-5 space-y-4 flex-1 min-h-0">
               <h2 className="text-xl sm:text-2xl font-semibold text-neutral-900 dark:text-white leading-snug">
-                {getLocalized({
-                  en: active.title?.en || active.title?.am || '',
-                  am: active.title?.am || active.title?.en || '',
-                  ar: active.title?.ar || active.title?.en || active.title?.am || '',
-                })}
+                {titleOf(active)}
               </h2>
               <p className="text-base text-neutral-700 dark:text-neutral-200 leading-relaxed whitespace-pre-wrap pb-8">
-                {getLocalized({
-                  en: active.description?.en || active.description?.am || '',
-                  am: active.description?.am || active.description?.en || '',
-                  ar:
-                    active.description?.ar ||
-                    active.description?.en ||
-                    active.description?.am ||
-                    '',
-                })}
+                {bodyOf(active)}
               </p>
             </div>
           </div>
