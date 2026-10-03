@@ -106,8 +106,7 @@ export const navItems: NavItem[] = [
             label: 'Reminders',
             href: '/content/dawah/reminders',
             activePath: '/content/dawah/reminders'
-          },
-          { label: 'Notes', href: '/content/library/notes', activePath: '/content/library/notes' }
+          }
         ]
       },
       {

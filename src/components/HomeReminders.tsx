@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { BookOpen } from 'lucide-react'
 import { useLanguage } from '@/context/LanguageContext'
 import { fetchPublishedReminders, type CmsLoc, type CmsReminder } from '@/lib/cmsClient'
 
@@ -29,10 +28,7 @@ function featuredFirst(rows: CmsReminder[], limit: number): CmsReminder[] {
   return scored.slice(0, limit)
 }
 
-/**
- * Home: up to 4 featured reminder titles only (no body).
- * Tap → /articles?id=… (same content as Da’wah / Library reminders for now).
- */
+/** Compact home strip: up to 4 reminder titles only → /articles?id= */
 export default function HomeReminders() {
   const { getLocalized } = useLanguage()
   const [items, setItems] = useState<Array<{ id: string; title: { en: string; am: string; ar: string } }>>(
@@ -61,50 +57,34 @@ export default function HomeReminders() {
   if (!items.length) return null
 
   return (
-    <section className="portfolio-card p-6 sm:p-8 space-y-5 border-red-200/40 dark:border-red-900/30">
-      <div className="space-y-1.5">
-        <div className="inline-flex items-center gap-2 text-red-600 text-xs font-bold uppercase tracking-wider">
-          <BookOpen className="w-4 h-4" />
+    <section className="rounded-xl border border-neutral-200/80 dark:border-neutral-800 px-3 py-2.5 sm:px-4 space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-red-600">
           {getLocalized({
-            en: 'Heart reminders',
-            am: 'የልብ ማስታወሻዎች',
-            ar: 'تذكيرات القلب',
+            en: 'Reminders',
+            am: 'ማስታወሻዎች',
+            ar: 'تذكيرات',
           })}
-        </div>
-        <h2 className="text-xl sm:text-2xl font-bold text-[#111827] dark:text-white">
-          {getLocalized({
-            en: 'Read this week',
-            am: 'በዚህ ሳምንት ያንብቡ',
-            ar: 'اقرأ هذا الأسبوع',
-          })}
-        </h2>
+        </p>
+        <Link
+          href="/articles"
+          className="text-[11px] font-semibold text-red-600 hover:underline shrink-0"
+        >
+          {getLocalized({ en: 'All →', am: 'ሁሉም →', ar: 'الكل →' })}
+        </Link>
       </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <ul className="divide-y divide-neutral-100 dark:divide-neutral-800/80">
         {items.map(item => (
-          <Link
-            key={item.id}
-            href={`/articles?id=${encodeURIComponent(item.id)}`}
-            className="group flex items-start gap-3 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white/70 dark:bg-neutral-950/50 px-4 py-3.5 hover:border-red-500/60 hover:bg-red-50/60 dark:hover:bg-red-950/30 hover:ring-2 hover:ring-red-500/20 transition"
-          >
-            <span className="mt-0.5 text-red-600 font-bold text-sm shrink-0">◆</span>
-            <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-200 group-hover:text-red-700 dark:group-hover:text-red-400 transition leading-snug line-clamp-3">
+          <li key={item.id}>
+            <Link
+              href={`/articles?id=${encodeURIComponent(item.id)}`}
+              className="block py-1.5 text-[13px] font-medium leading-snug text-neutral-800 dark:text-neutral-200 hover:text-red-600 dark:hover:text-red-400 transition line-clamp-1"
+            >
               {getLocalized(item.title)}
-            </span>
-          </Link>
+            </Link>
+          </li>
         ))}
-      </div>
-
-      <Link
-        href="/articles"
-        className="inline-flex items-center text-sm font-bold text-red-600 hover:underline"
-      >
-        {getLocalized({
-          en: 'All articles & reminders →',
-          am: 'ሁሉም ጽሑፎች እና ማስታወሻዎች →',
-          ar: 'كل المقالات والتذكيرات →',
-        })}
-      </Link>
+      </ul>
     </section>
   )
 }

@@ -36,6 +36,7 @@ const nextConfig: NextConfig = {
       { source: '/content/audio', destination: '/content/dawah/talks', permanent: false },
       { source: '/content/muhadara', destination: '/content/dawah/talks', permanent: false },
       { source: '/content/reminders', destination: '/content/dawah/reminders', permanent: false },
+      { source: '/content/library/notes', destination: '/content/dawah/reminders', permanent: false },
     ]
   }
 }

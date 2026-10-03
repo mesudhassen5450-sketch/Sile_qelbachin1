@@ -57,7 +57,7 @@ const RemindersPage = ({
     description ||
     (isOneMinute
       ? 'Short text slides for the public 1-Minute feed. Priority, featured, publish, schedule, archive.'
-      : 'Appears on Articles, Da’wah → Reminders, and Library → Reminders. Mark Featured for the home title box (top 4).')
+      : 'Appears on Articles, Da’wah → Reminders, and Library → Reminders. Mark Featured for the compact home title list (top 4). Saves permanently to Supabase/R2 — run migration 006 once.')
 
   const [rows, setRows] = useState<ReminderRow[]>([])
   const [loading, setLoading] = useState(true)

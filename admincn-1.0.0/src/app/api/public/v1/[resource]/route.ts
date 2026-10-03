@@ -298,8 +298,9 @@ export async function GET(
   }
 
   if (resource === 'reminders') {
-    const local = loadLocalStore()
-    const rows = [...(local.reminders || [])]
+    const { listReminders } = await import('@/lib/cms/reminders')
+    const all = await listReminders()
+    const rows = all
       .filter(r => r.status === 'published' && isScheduleLive(resolveScheduledAt(r)))
       .sort(
         (a, b) =>
@@ -391,9 +392,10 @@ export async function GET(
         }
       })
 
-    // 1-Minute Text = Admin reminders (same CMS records as Content → 1-Minute → Text)
-    const local = loadLocalStore()
-    const textRows = [...(local.reminders || store.reminders || [])]
+    // 1-Minute Text = Admin reminders (durable list)
+    const { listReminders } = await import('@/lib/cms/reminders')
+    const reminderRows = await listReminders()
+    const textRows = reminderRows
       .filter(r => r.status === 'published' && isScheduleLive(resolveScheduledAt(r)))
       .sort(compareByPriorityThenDate)
       .map(r => ({

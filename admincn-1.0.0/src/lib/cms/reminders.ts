@@ -7,10 +7,172 @@ import {
 } from '@/lib/cms/local-store'
 import { compareByPriorityThenDate } from '@/lib/cms/editorial'
 import { claimPriorityInStore, insertNewAtFront } from '@/lib/cms/priority-cascade'
+import { getObjectTextFromR2, putObjectToR2 } from '@/lib/cms/r2'
+import { getServiceSupabase } from '@/lib/cms/supabase'
 import { listQuestionSubmissions } from '@/lib/cms/question-submissions'
 import type { AnalyticsEvent, ContentStatus, ReminderRecord } from '@/lib/cms/types'
 
+const R2_KEY = 'cms-backups/reminders.json'
+
+function normalizeReminder(r: Partial<ReminderRecord> & { id: string }): ReminderRecord {
+  return {
+    id: r.id,
+    title_en: r.title_en ?? null,
+    title_am: r.title_am ?? null,
+    title_ar: r.title_ar ?? null,
+    description_en: r.description_en ?? null,
+    description_am: r.description_am ?? null,
+    description_ar: r.description_ar ?? null,
+    status: (r.status as ContentStatus) || 'published',
+    sort_order: typeof r.sort_order === 'number' ? r.sort_order : 100,
+    priority: typeof r.priority === 'number' && r.priority >= 1 ? r.priority : 100,
+    featured: Boolean(r.featured),
+    scheduled_at: r.scheduled_at || null,
+    metadata: (r.metadata as Record<string, unknown>) || {},
+    created_at: r.created_at || nowIso(),
+    updated_at: r.updated_at || nowIso(),
+    published_at: r.published_at ?? null,
+  }
+}
+
+function rowToDb(r: ReminderRecord) {
+  return {
+    id: r.id,
+    title_en: r.title_en,
+    title_am: r.title_am,
+    title_ar: r.title_ar,
+    description_en: r.description_en,
+    description_am: r.description_am,
+    description_ar: r.description_ar,
+    status: r.status,
+    sort_order: r.sort_order,
+    priority: r.priority,
+    featured: r.featured,
+    scheduled_at: r.scheduled_at,
+    metadata: r.metadata || {},
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+    published_at: r.published_at,
+  }
+}
+
+async function loadFromSupabase(): Promise<ReminderRecord[] | null> {
+  const sb = getServiceSupabase()
+  if (!sb) return null
+  const { data, error } = await sb.from('cms_reminders').select('*')
+  if (error) {
+    if (/relation|does not exist|schema cache/i.test(error.message)) return null
+    throw new Error(`Could not load reminders: ${error.message}`)
+  }
+  return (data || []).map(r => normalizeReminder(r as ReminderRecord))
+}
+
+async function loadFromR2(): Promise<ReminderRecord[] | null> {
+  try {
+    const text = await getObjectTextFromR2(R2_KEY)
+    if (!text) return null
+    const raw = JSON.parse(text)
+    if (!Array.isArray(raw)) return null
+    return raw.map(r => normalizeReminder(r))
+  } catch {
+    return null
+  }
+}
+
+function mirrorLocal(rows: ReminderRecord[]) {
+  const store = loadLocalStore()
+  store.reminders = rows
+  saveLocalStore(store)
+}
+
+async function persistDurable(rows: ReminderRecord[]): Promise<{ backend: string }> {
+  mirrorLocal(rows)
+
+  let r2Ok = false
+  try {
+    await putObjectToR2({
+      objectKey: R2_KEY,
+      body: Buffer.from(JSON.stringify(rows, null, 2), 'utf8'),
+      contentType: 'application/json',
+      cacheControl: 'no-cache',
+    })
+    r2Ok = true
+  } catch (err) {
+    console.warn('[reminders] R2 backup failed:', err instanceof Error ? err.message : err)
+  }
+
+  const sb = getServiceSupabase()
+  if (!sb) {
+    if (r2Ok) return { backend: 'r2' }
+    if (process.env.NODE_ENV === 'production' || process.env.RENDER) {
+      throw new Error(
+        'Could not save reminders permanently (Supabase + R2 unavailable). Check Admin env on Render.'
+      )
+    }
+    return { backend: 'local' }
+  }
+
+  const payload = rows.map(rowToDb)
+  if (payload.length) {
+    const { error } = await sb.from('cms_reminders').upsert(payload, { onConflict: 'id' })
+    if (error) {
+      if (/relation|does not exist|schema cache/i.test(error.message)) {
+        if (r2Ok) {
+          console.warn('[reminders] cms_reminders table missing — saved to R2 only. Apply migration 006.')
+          return { backend: 'r2' }
+        }
+        throw new Error(
+          'Supabase table cms_reminders is missing. Run migration 006_cms_reminders.sql in the Supabase SQL Editor, then save again.'
+        )
+      }
+      throw new Error(`Could not save reminders: ${error.message}`)
+    }
+  } else {
+    const { error } = await sb.from('cms_reminders').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    if (error && !/relation|does not exist|schema cache/i.test(error.message)) {
+      throw new Error(`Could not clear reminders: ${error.message}`)
+    }
+  }
+
+  const { data: existing, error: listErr } = await sb.from('cms_reminders').select('id')
+  if (!listErr && existing) {
+    const keep = new Set(rows.map(r => r.id))
+    const toDelete = existing.map(r => String(r.id)).filter(id => !keep.has(id))
+    if (toDelete.length) {
+      await sb.from('cms_reminders').delete().in('id', toDelete)
+    }
+  }
+
+  return { backend: 'supabase' }
+}
+
+/**
+ * Load reminders: Supabase → R2 → local disk.
+ * Local alone is ephemeral on Render.
+ */
 export async function listReminders() {
+  const fromDb = await loadFromSupabase()
+  if (fromDb && fromDb.length) {
+    mirrorLocal(fromDb)
+    return [...fromDb].sort(compareByPriorityThenDate)
+  }
+
+  const fromR2 = await loadFromR2()
+  if (fromR2 && fromR2.length) {
+    mirrorLocal(fromR2)
+    try {
+      await persistDurable(fromR2)
+    } catch {
+      /* migration may still be missing */
+    }
+    return [...fromR2].sort(compareByPriorityThenDate)
+  }
+
+  if (fromDb) {
+    mirrorLocal([])
+    return []
+  }
+
   const store = loadLocalStore()
   return [...(store.reminders || [])].sort(compareByPriorityThenDate)
 }
@@ -28,6 +190,7 @@ export async function createReminder(input: {
   scheduled_at?: string | null
   adminEmail?: string | null
 }): Promise<ReminderRecord> {
+  const rows = await listReminders()
   const store = loadLocalStore()
   const now = nowIso()
   const status: ContentStatus = input.status || 'published'
@@ -47,14 +210,14 @@ export async function createReminder(input: {
     priority: 1,
     featured: Boolean(input.featured),
     scheduled_at: input.scheduled_at || null,
-    metadata: { source: 'admin_ui', feed: 'one-minute' },
+    metadata: { source: 'admin_ui', feed: 'reminders' },
     created_at: now,
     updated_at: now,
     published_at: status === 'published' ? now : null
   }
-  store.reminders = [row, ...(store.reminders || [])]
+
+  store.reminders = [row, ...rows]
   await insertNewAtFront(store, 'reminders', row.id, now, { persist: false })
-  // Keep sort_order aligned with priority for legacy home consumers
   store.reminders = (store.reminders || []).map(r => ({
     ...r,
     sort_order: r.priority ?? r.sort_order,
@@ -69,6 +232,7 @@ export async function createReminder(input: {
     after_data: { title: row.title_en || row.title_am }
   })
   saveLocalStore(store)
+  await persistDurable(store.reminders || [])
   return store.reminders.find(r => r.id === row.id) || row
 }
 
@@ -83,6 +247,7 @@ export async function updateReminder(input: {
   featured?: boolean | null
   scheduled_at?: string | null
 }): Promise<ReminderRecord> {
+  await listReminders()
   const store = loadLocalStore()
   const idx = (store.reminders || []).findIndex(r => r.id === input.id)
   if (idx < 0) throw new Error('Reminder not found.')
@@ -119,13 +284,16 @@ export async function updateReminder(input: {
     sort_order: r.priority ?? r.sort_order,
   }))
   saveLocalStore(store)
+  await persistDurable(store.reminders || [])
   return store.reminders.find(r => r.id === next.id) || next
 }
 
 export async function deleteReminder(id: string): Promise<void> {
+  await listReminders()
   const store = loadLocalStore()
   store.reminders = (store.reminders || []).filter(r => r.id !== id)
   saveLocalStore(store)
+  await persistDurable(store.reminders || [])
 }
 
 export function recordAnalyticsEvent(input: {
