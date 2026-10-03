@@ -1,9 +1,17 @@
+/**
+ * Ask-an-Ustaz inbox — durable on Supabase + R2 (local disk alone vanishes on Render).
+ * Run migration 007_question_submissions.sql once in Supabase SQL Editor.
+ */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
 
+import { getObjectTextFromR2, putObjectToR2 } from '@/lib/cms/r2'
+import { getServiceSupabase } from '@/lib/cms/supabase'
+
 const DATA_DIR = join(process.cwd(), '.data')
 const PATH = join(DATA_DIR, 'question-submissions.json')
+const R2_KEY = 'cms-backups/question-submissions.json'
 
 /** Private Ask-an-Ustaz workflow statuses (never public by default). */
 export type QuestionStatus =
@@ -52,7 +60,6 @@ export type QuestionSubmission = {
   question: string
   status: QuestionStatus
   assigned_to: string | null
-  /** Optional greeting the Ustaz chooses (e.g. As-salamu alaykum) */
   greeting: string | null
   answer: string | null
   description: string | null
@@ -108,11 +115,38 @@ function normalize(row: Partial<QuestionSubmission> & { id: string }): QuestionS
   }
 }
 
-function loadAll(): QuestionSubmission[] {
+function rowToDb(r: QuestionSubmission) {
+  return {
+    id: r.id,
+    user_id: r.user_id,
+    auth_email: r.auth_email,
+    name: r.name,
+    category: r.category,
+    question: r.question,
+    status: r.status,
+    assigned_to: r.assigned_to,
+    greeting: r.greeting,
+    answer: r.answer,
+    description: r.description,
+    cover_url: r.cover_url,
+    audio_url: r.audio_url,
+    video_url: r.video_url,
+    published_public: r.published_public,
+    answered_at: r.answered_at,
+    answered_by: r.answered_by,
+    closed_at: r.closed_at,
+    email_sent: r.email_sent,
+    email_error: r.email_error,
+    admin_seen_at: r.admin_seen_at,
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+  }
+}
+
+function loadLocal(): QuestionSubmission[] {
   ensureDir()
   const paths = [
     PATH,
-    // Website monorepo root store (written by /api/ask-question)
     join(process.cwd(), '..', '.data', 'question-submissions.json'),
   ]
   const byId = new Map<string, QuestionSubmission>()
@@ -131,26 +165,94 @@ function loadAll(): QuestionSubmission[] {
   return [...byId.values()]
 }
 
-function saveAll(rows: QuestionSubmission[]) {
+function saveLocal(rows: QuestionSubmission[]) {
   ensureDir()
   writeFileSync(PATH, JSON.stringify(rows, null, 2), 'utf8')
-  // Mirror to website monorepo store when present
   const mirror = join(process.cwd(), '..', '.data', 'question-submissions.json')
   try {
     const parent = join(process.cwd(), '..', '.data')
     if (!existsSync(parent)) mkdirSync(parent, { recursive: true })
     writeFileSync(mirror, JSON.stringify(rows, null, 2), 'utf8')
   } catch {
-    /* ignore mirror errors */
+    /* ignore */
   }
 }
 
-export function listQuestionSubmissions(): QuestionSubmission[] {
-  const rows = loadAll()
-  // Collapse accidental duplicates (same asker + same text within 2 minutes)
+async function loadFromSupabase(): Promise<QuestionSubmission[] | null> {
+  const sb = getServiceSupabase()
+  if (!sb) return null
+  const { data, error } = await sb.from('question_submissions').select('*')
+  if (error) {
+    if (/relation|does not exist|schema cache/i.test(error.message)) return null
+    throw new Error(`Could not load questions: ${error.message}`)
+  }
+  return (data || []).map(r => normalize(r as QuestionSubmission))
+}
+
+async function loadFromR2(): Promise<QuestionSubmission[] | null> {
+  try {
+    const text = await getObjectTextFromR2(R2_KEY)
+    if (!text) return null
+    const raw = JSON.parse(text)
+    if (!Array.isArray(raw)) return null
+    return raw.map(r => normalize(r))
+  } catch {
+    return null
+  }
+}
+
+async function persistDurable(rows: QuestionSubmission[]): Promise<void> {
+  saveLocal(rows)
+  try {
+    await putObjectToR2({
+      key: R2_KEY,
+      body: Buffer.from(JSON.stringify(rows, null, 2), 'utf8'),
+      contentType: 'application/json',
+    })
+  } catch (err) {
+    console.warn('[questions] R2 backup failed:', err instanceof Error ? err.message : err)
+  }
+
+  const sb = getServiceSupabase()
+  if (!sb) {
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY && !process.env.SUPABASE_SECRET_KEY) {
+      console.warn(
+        '[questions] No Supabase service key — questions only on local disk (ephemeral on Render).'
+      )
+    }
+    return
+  }
+
+  const payload = rows.map(rowToDb)
+  if (payload.length) {
+    const { error } = await sb.from('question_submissions').upsert(payload, { onConflict: 'id' })
+    if (error) {
+      if (/relation|does not exist|schema cache/i.test(error.message)) {
+        console.warn(
+          '[questions] question_submissions table missing — saved to R2 only. Apply migration 007.'
+        )
+        throw new Error(
+          'Supabase table question_submissions is missing. Run migration 007_question_submissions.sql in the Supabase SQL Editor, then save again.'
+        )
+      }
+      throw new Error(`Could not save questions: ${error.message}`)
+    }
+  }
+
+  const { data: existing, error: listErr } = await sb.from('question_submissions').select('id')
+  if (!listErr && existing) {
+    const keep = new Set(rows.map(r => r.id))
+    const toDelete = existing.map(r => String(r.id)).filter(id => !keep.has(id))
+    if (toDelete.length) {
+      await sb.from('question_submissions').delete().in('id', toDelete)
+    }
+  }
+}
+
+function dedupe(rows: QuestionSubmission[]): QuestionSubmission[] {
   const seen = new Set<string>()
   const deduped: QuestionSubmission[] = []
-  const sorted = rows.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+  const sorted = [...rows].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
   for (const row of sorted) {
     const key = `${row.auth_email}|${row.question.trim().toLowerCase()}`
     if (seen.has(key)) {
@@ -172,29 +274,70 @@ export function listQuestionSubmissions(): QuestionSubmission[] {
   return deduped
 }
 
-export function findOpenQuestionByEmail(email: string): QuestionSubmission | undefined {
+/** Sync local-only list (analytics). Prefer listQuestionSubmissions() for Admin UI. */
+export function listQuestionSubmissionsLocal(): QuestionSubmission[] {
+  return dedupe(loadLocal())
+}
+
+/**
+ * Load questions: Supabase → R2 → local disk.
+ * Survives Render redeploys once migration 007 is applied.
+ */
+export async function listQuestionSubmissions(): Promise<QuestionSubmission[]> {
+  const fromDb = await loadFromSupabase()
+  if (fromDb && fromDb.length) {
+    saveLocal(fromDb)
+    return dedupe(fromDb)
+  }
+
+  const fromR2 = await loadFromR2()
+  if (fromR2 && fromR2.length) {
+    saveLocal(fromR2)
+    try {
+      await persistDurable(fromR2)
+    } catch {
+      /* migration may still be missing */
+    }
+    return dedupe(fromR2)
+  }
+
+  // Empty DB is authoritative once the table exists
+  if (fromDb) {
+    saveLocal([])
+    return []
+  }
+
+  return dedupe(loadLocal())
+}
+
+export async function findOpenQuestionByEmail(
+  email: string
+): Promise<QuestionSubmission | undefined> {
   const e = String(email || '')
     .trim()
     .toLowerCase()
   if (!e.includes('@')) return undefined
-  return listQuestionSubmissions()
+  const rows = await listQuestionSubmissions()
+  return rows
     .filter(r => r.auth_email?.toLowerCase() === e && OPEN_QUESTION_STATUSES.includes(r.status))
     .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0]
 }
 
-export function createQuestionSubmission(input: {
+export async function createQuestionSubmission(input: {
   user_id?: string | null
   auth_email: string
   name?: string | null
   category?: string
   question: string
-}): QuestionSubmission {
-  const email = String(input.auth_email || '').trim().toLowerCase()
+}): Promise<QuestionSubmission> {
+  const email = String(input.auth_email || '')
+    .trim()
+    .toLowerCase()
   const question = String(input.question || '').trim()
   if (!email || !email.includes('@')) throw new Error('Authenticated email is required.')
   if (question.length < 5) throw new Error('Question is too short.')
 
-  const pending = findOpenQuestionByEmail(email)
+  const pending = await findOpenQuestionByEmail(email)
   if (pending) {
     const err = new Error(
       'You already have a question waiting for an answer. Please check your email before asking another.'
@@ -205,7 +348,7 @@ export function createQuestionSubmission(input: {
     throw err
   }
 
-  const rows = loadAll()
+  const rows = await listQuestionSubmissions()
   const nowMs = Date.now()
   const existing = rows.find(
     r =>
@@ -241,32 +384,31 @@ export function createQuestionSubmission(input: {
     created_at: now,
     updated_at: now,
   }
-  rows.unshift(row)
-  saveAll(rows)
+  const next = [row, ...rows]
+  await persistDurable(next)
   return row
 }
 
-/** Unseen = open/new workflow and never opened by admin */
-export function countUnseenInbox(): number {
-  return listQuestionSubmissions().filter(
-    r => OPEN_QUESTION_STATUSES.includes(r.status) && !r.admin_seen_at
-  ).length
+/** Unseen = open workflow and never opened by admin (drives red sidebar badge). */
+export async function countUnseenInbox(): Promise<number> {
+  const rows = await listQuestionSubmissions()
+  return rows.filter(r => OPEN_QUESTION_STATUSES.includes(r.status) && !r.admin_seen_at).length
 }
 
-export function markQuestionSeen(id: string): QuestionSubmission | null {
-  const rows = loadAll()
+export async function markQuestionSeen(id: string): Promise<QuestionSubmission | null> {
+  const rows = await listQuestionSubmissions()
   const idx = rows.findIndex(r => r.id === id)
   if (idx < 0) return null
   if (rows[idx].admin_seen_at) return normalize(rows[idx])
   const now = new Date().toISOString()
   rows[idx] = { ...rows[idx], admin_seen_at: now, updated_at: now }
-  saveAll(rows)
+  await persistDurable(rows)
   return normalize(rows[idx])
 }
 
 /** Mark all current open questions as seen (admin opened the inbox). */
-export function markAllNewSeen(): number {
-  const rows = loadAll()
+export async function markAllNewSeen(): Promise<number> {
+  const rows = await listQuestionSubmissions()
   const now = new Date().toISOString()
   let n = 0
   for (let i = 0; i < rows.length; i++) {
@@ -275,22 +417,23 @@ export function markAllNewSeen(): number {
       n++
     }
   }
-  if (n) saveAll(rows)
+  if (n) await persistDurable(rows)
   return n
 }
 
-export function getQuestionSubmission(id: string): QuestionSubmission | null {
-  return loadAll().find(r => r.id === id) || null
+export async function getQuestionSubmission(id: string): Promise<QuestionSubmission | null> {
+  const rows = await listQuestionSubmissions()
+  return rows.find(r => r.id === id) || null
 }
 
-export function updateQuestionStatus(input: {
+export async function updateQuestionStatus(input: {
   id: string
   status: QuestionStatus
   assigned_to?: string | null
-}): QuestionSubmission {
+}): Promise<QuestionSubmission> {
   const status = coerceStatus(input.status)
   if (!QUESTION_STATUSES.includes(status)) throw new Error('Invalid status.')
-  const rows = loadAll()
+  const rows = await listQuestionSubmissions()
   const idx = rows.findIndex(r => r.id === input.id)
   if (idx < 0) throw new Error('Question not found.')
   const now = new Date().toISOString()
@@ -306,11 +449,11 @@ export function updateQuestionStatus(input: {
     updated_at: now,
   }
   rows[idx] = next
-  saveAll(rows)
+  await persistDurable(rows)
   return normalize(next)
 }
 
-export function answerQuestionSubmission(input: {
+export async function answerQuestionSubmission(input: {
   id: string
   greeting?: string | null
   answer: string
@@ -322,8 +465,8 @@ export function answerQuestionSubmission(input: {
   answered_by?: string | null
   email_sent?: boolean
   email_error?: string | null
-}): QuestionSubmission {
-  const rows = loadAll()
+}): Promise<QuestionSubmission> {
+  const rows = await listQuestionSubmissions()
   const idx = rows.findIndex(r => r.id === input.id)
   if (idx < 0) throw new Error('Question not found.')
   const answer = String(input.answer || '').trim()
@@ -346,18 +489,18 @@ export function answerQuestionSubmission(input: {
     updated_at: now,
   }
   rows[idx] = next
-  saveAll(rows)
+  await persistDurable(rows)
   return next
 }
 
-export function archiveQuestionSubmission(id: string): QuestionSubmission {
+export async function archiveQuestionSubmission(id: string): Promise<QuestionSubmission> {
   return updateQuestionStatus({ id, status: 'archived' })
 }
 
-export function deleteQuestionSubmission(id: string): boolean {
-  const rows = loadAll()
+export async function deleteQuestionSubmission(id: string): Promise<boolean> {
+  const rows = await listQuestionSubmissions()
   const next = rows.filter(r => r.id !== id)
   if (next.length === rows.length) return false
-  saveAll(next)
+  await persistDurable(next)
   return true
 }

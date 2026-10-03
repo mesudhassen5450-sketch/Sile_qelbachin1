@@ -62,6 +62,7 @@ type Row = {
   published_public: boolean
   email_sent: boolean
   email_error: string | null
+  admin_seen_at?: string | null
   created_at: string
   answered_at: string | null
 }
@@ -105,7 +106,7 @@ export default function QuestionSubmissionsPage() {
   const [busy, setBusy] = useState(false)
   const [info, setInfo] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { markSeen?: boolean }) => {
     setLoading(true)
     setError(null)
     try {
@@ -115,11 +116,14 @@ export default function QuestionSubmissionsPage() {
       const list = (data.rows || []) as Row[]
       list.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
       setRows(list)
-      void fetch('/api/admin/questions', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'mark_seen_all' }),
-      }).catch(() => {})
+      // Only clear the red sidebar badge when opening the inbox — not on every poll
+      if (opts?.markSeen) {
+        void fetch('/api/admin/questions', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'mark_seen_all' }),
+        }).catch(() => {})
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -128,8 +132,8 @@ export default function QuestionSubmissionsPage() {
   }, [])
 
   useEffect(() => {
-    void load()
-    const timer = window.setInterval(() => void load(), 30000)
+    void load({ markSeen: true })
+    const timer = window.setInterval(() => void load(), 15000)
     return () => window.clearInterval(timer)
   }, [load])
 
@@ -167,7 +171,9 @@ export default function QuestionSubmissionsPage() {
   }
 
   const openCount = rows.filter(r => OPEN.has(r.status)).length
+  const newUnseen = rows.filter(r => OPEN.has(r.status) && !r.admin_seen_at).length
   const isOpen = (row: Row) => OPEN.has(row.status)
+  const isNewUnseen = (row: Row) => OPEN.has(row.status) && !row.admin_seen_at
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -281,7 +287,11 @@ export default function QuestionSubmissionsPage() {
           <h1 className="text-lg font-semibold tracking-tight sm:text-xl">
             {t({ en: 'Question inbox', am: 'የጥያቄ ማስገቢያ' })}
           </h1>
-          {openCount > 0 ? (
+          {newUnseen > 0 ? (
+            <Badge className="bg-red-600 text-white hover:bg-red-600 animate-pulse">
+              {newUnseen} {t({ en: 'NEW', am: 'አዲስ' })}
+            </Badge>
+          ) : openCount > 0 ? (
             <Badge className="bg-red-600 text-white hover:bg-red-600">
               {openCount} {t({ en: 'OPEN', am: 'ክፍት' })}
             </Badge>
@@ -289,8 +299,8 @@ export default function QuestionSubmissionsPage() {
         </div>
         <p className="text-muted-foreground text-sm leading-relaxed">
           {t({
-            en: 'Private submissions only. Search, filter, assign, reply, close — never public by default.',
-            am: 'የግል ጥያቄዎች ብቻ። ፈልጉ፣ ያጣሩ፣ ይመድቡ፣ ይመልሱ፣ ይዝጉ — በነባሪ አይታተሙም።',
+            en: 'Private submissions stay until you delete them (Supabase + R2 — run migration 007 once). Red NEW badge when a user asks.',
+            am: 'የግል ጥያቄዎች እስከሚሰርዙ ድረስ ይቆያሉ (Supabase + R2 — migration 007 አንድ ጊዜ ያሂዱ)። ተጠቃሚ ሲጠይቅ ቀይ NEW።',
           })}
         </p>
       </div>
@@ -339,14 +349,16 @@ export default function QuestionSubmissionsPage() {
             <li key={row.id}>
               <Card
                 className={`overflow-hidden ${
-                  row.status === 'new' ? 'border-red-600/50 bg-red-950/20' : ''
+                  isNewUnseen(row) || row.status === 'new'
+                    ? 'border-red-600/60 bg-red-950/25 ring-1 ring-red-600/30'
+                    : ''
                 }`}
               >
                 <CardHeader className="space-y-2 p-4 pb-2">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        {row.status === 'new' ? (
+                        {isNewUnseen(row) || row.status === 'new' ? (
                           <Badge className="bg-red-600 text-white hover:bg-red-600">NEW</Badge>
                         ) : (
                           <Badge variant="secondary">{statusLabel(row.status, t)}</Badge>

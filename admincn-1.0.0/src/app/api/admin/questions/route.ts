@@ -24,14 +24,14 @@ export async function GET(request: Request) {
   if ('response' in gate) return gate.response
   const url = new URL(request.url)
   if (url.searchParams.get('unseen') === '1') {
-    return NextResponse.json({ ok: true, unseen: countUnseenInbox() })
+    return NextResponse.json({ ok: true, unseen: await countUnseenInbox() })
   }
-  const rows = listQuestionSubmissions()
+  const rows = await listQuestionSubmissions()
   return NextResponse.json({
     ok: true,
     count: rows.length,
     rows,
-    unseen: countUnseenInbox(),
+    unseen: await countUnseenInbox(),
     statuses: QUESTION_STATUSES,
   })
 }
@@ -43,17 +43,17 @@ export async function PATCH(request: Request) {
   const action = String(body.action || '')
 
   if (action === 'mark_seen_all') {
-    const n = markAllNewSeen()
-    return NextResponse.json({ ok: true, marked: n, unseen: countUnseenInbox() })
+    const n = await markAllNewSeen()
+    return NextResponse.json({ ok: true, marked: n, unseen: await countUnseenInbox() })
   }
 
   const id = String(body.id || '')
   if (!id) return NextResponse.json({ ok: false, error: 'id required.' }, { status: 400 })
 
   if (action === 'mark_seen') {
-    const row = markQuestionSeen(id)
+    const row = await markQuestionSeen(id)
     if (!row) return NextResponse.json({ ok: false, error: 'Not found.' }, { status: 404 })
-    return NextResponse.json({ ok: true, row, unseen: countUnseenInbox() })
+    return NextResponse.json({ ok: true, row, unseen: await countUnseenInbox() })
   }
 
   if (action === 'set_status') {
@@ -62,12 +62,12 @@ export async function PATCH(request: Request) {
       if (!QUESTION_STATUSES.includes(status)) {
         return NextResponse.json({ ok: false, error: 'Invalid status.' }, { status: 400 })
       }
-      const row = updateQuestionStatus({
+      const row = await updateQuestionStatus({
         id,
         status,
         assigned_to: body.assigned_to !== undefined ? body.assigned_to : undefined,
       })
-      return NextResponse.json({ ok: true, row, unseen: countUnseenInbox() })
+      return NextResponse.json({ ok: true, row, unseen: await countUnseenInbox() })
     } catch (err) {
       return NextResponse.json(
         { ok: false, error: err instanceof Error ? err.message : 'Status update failed.' },
@@ -79,7 +79,7 @@ export async function PATCH(request: Request) {
   if (action === 'assign') {
     try {
       const assigned_to = String(body.assigned_to || '').trim() || null
-      const existing = listQuestionSubmissions().find(r => r.id === id)
+      const existing = (await listQuestionSubmissions()).find(r => r.id === id)
       if (!existing) {
         return NextResponse.json({ ok: false, error: 'Not found.' }, { status: 404 })
       }
@@ -87,12 +87,12 @@ export async function PATCH(request: Request) {
         existing.status === 'new' || existing.status === 'assigned'
           ? 'assigned'
           : existing.status
-      const row = updateQuestionStatus({
+      const row = await updateQuestionStatus({
         id,
         status: nextStatus,
         assigned_to,
       })
-      return NextResponse.json({ ok: true, row, unseen: countUnseenInbox() })
+      return NextResponse.json({ ok: true, row, unseen: await countUnseenInbox() })
     } catch (err) {
       return NextResponse.json(
         { ok: false, error: err instanceof Error ? err.message : 'Assign failed.' },
@@ -103,7 +103,7 @@ export async function PATCH(request: Request) {
 
   if (action === 'close') {
     try {
-      const row = updateQuestionStatus({ id, status: 'closed' })
+      const row = await updateQuestionStatus({ id, status: 'closed' })
       return NextResponse.json({ ok: true, row })
     } catch (err) {
       return NextResponse.json(
@@ -115,7 +115,7 @@ export async function PATCH(request: Request) {
 
   if (action === 'archive') {
     try {
-      const row = archiveQuestionSubmission(id)
+      const row = await archiveQuestionSubmission(id)
       return NextResponse.json({ ok: true, row })
     } catch (err) {
       return NextResponse.json(
@@ -126,7 +126,7 @@ export async function PATCH(request: Request) {
   }
 
   if (action === 'delete') {
-    const ok = deleteQuestionSubmission(id)
+    const ok = await deleteQuestionSubmission(id)
     if (!ok) return NextResponse.json({ ok: false, error: 'Not found.' }, { status: 404 })
     return NextResponse.json({ ok: true })
   }
@@ -144,7 +144,7 @@ export async function PATCH(request: Request) {
   const publishPublic = Boolean(body.publish_public)
 
   try {
-    const existing = listQuestionSubmissions().find(r => r.id === id)
+    const existing = (await listQuestionSubmissions()).find(r => r.id === id)
     if (!existing) {
       return NextResponse.json({ ok: false, error: 'Question not found.' }, { status: 404 })
     }
@@ -161,7 +161,7 @@ export async function PATCH(request: Request) {
       videoUrl: video_url,
     })
 
-    const row = answerQuestionSubmission({
+    const row = await answerQuestionSubmission({
       id,
       greeting: greeting || null,
       answer,

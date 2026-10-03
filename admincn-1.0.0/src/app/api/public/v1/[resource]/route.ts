@@ -443,7 +443,7 @@ export async function GET(
       const email = new URL(_request.url).searchParams.get('email')
       if (email) {
         const { findOpenQuestionByEmail } = await import('@/lib/cms/question-submissions')
-        const pending = findOpenQuestionByEmail(email)
+        const pending = await findOpenQuestionByEmail(email)
         if (!pending) {
           return withCors(NextResponse.json({ ok: true, pending: false }))
         }
@@ -553,7 +553,7 @@ export async function POST(
       const question = String(body.question || body.question_text || '').trim()
       const category =
         typeof body.category === 'string' ? body.category : 'General Islamic Question'
-      const row = createQuestionSubmission({
+      const row = await createQuestionSubmission({
         user_id: typeof body.user_id === 'string' ? body.user_id : null,
         auth_email: authEmail,
         name: typeof body.name === 'string' ? body.name : authEmail,

@@ -505,7 +505,7 @@ const SidebarLayout = () => {
       }
     }
     void poll()
-    const timer = window.setInterval(() => void poll(), 20000)
+    const timer = window.setInterval(() => void poll(), 10000)
     return () => {
       mounted = false
       window.clearInterval(timer)

@@ -9,7 +9,7 @@ import { compareByPriorityThenDate } from '@/lib/cms/editorial'
 import { claimPriorityInStore, insertNewAtFront } from '@/lib/cms/priority-cascade'
 import { getObjectTextFromR2, putObjectToR2 } from '@/lib/cms/r2'
 import { getServiceSupabase } from '@/lib/cms/supabase'
-import { listQuestionSubmissions } from '@/lib/cms/question-submissions'
+import { listQuestionSubmissionsLocal } from '@/lib/cms/question-submissions'
 import type { AnalyticsEvent, ContentStatus, ReminderRecord } from '@/lib/cms/types'
 
 const R2_KEY = 'cms-backups/reminders.json'
@@ -382,7 +382,7 @@ export function aggregateAnalytics(days = 7) {
   let responseTimeSum = 0
   let responseTimeN = 0
   try {
-    const qs = listQuestionSubmissions()
+    const qs = listQuestionSubmissionsLocal()
     questionsSubmitted = qs.filter(r => Date.parse(r.created_at) >= since).length
     questionsAnswered = qs.filter(
       r => r.status === 'answered' && r.answered_at && Date.parse(r.answered_at) >= since
