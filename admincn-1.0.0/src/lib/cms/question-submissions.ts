@@ -205,9 +205,10 @@ async function persistDurable(rows: QuestionSubmission[]): Promise<void> {
   saveLocal(rows)
   try {
     await putObjectToR2({
-      key: R2_KEY,
+      objectKey: R2_KEY,
       body: Buffer.from(JSON.stringify(rows, null, 2), 'utf8'),
       contentType: 'application/json',
+      cacheControl: 'no-cache',
     })
   } catch (err) {
     console.warn('[questions] R2 backup failed:', err instanceof Error ? err.message : err)
