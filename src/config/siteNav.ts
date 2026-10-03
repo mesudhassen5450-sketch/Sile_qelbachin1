@@ -190,7 +190,7 @@ export const ASK_QUESTION = {
   emoji: '📩',
   label: {
     en: 'Ask a Question',
-    am: 'ጥያቄ ይጠይቁ',
+    am: 'ጥያቄዎን ያቅርቡ',
     ar: 'اطرح سؤالاً',
   },
 }

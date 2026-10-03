@@ -102,6 +102,11 @@ export const navItems: NavItem[] = [
         childItems: [
           { label: 'Kitabs', href: '/content/library/kitabs', activePath: '/content/library/kitabs' },
           { label: 'PDFs', href: '/content/library/pdfs', activePath: '/content/library/pdfs' },
+          {
+            label: 'Reminders',
+            href: '/content/dawah/reminders',
+            activePath: '/content/dawah/reminders'
+          },
           { label: 'Notes', href: '/content/library/notes', activePath: '/content/library/notes' }
         ]
       },

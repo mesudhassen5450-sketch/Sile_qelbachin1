@@ -88,11 +88,14 @@ function cmsAudioToPopular(a: CmsAudio): PopularTrack | null {
     descBlob === titleBlob ||
     (title.am && norm(desc.am) === norm(title.am)) ||
     (title.en && norm(desc.en) === norm(title.en)) ||
-    (title.am && desc.am && (norm(desc.am).startsWith(norm(title.am)) || norm(title.am).startsWith(norm(desc.am))))
-  // Do not copy description into speaker — that duplicated the same text on the card
+    (title.am &&
+      desc.am &&
+      (norm(desc.am).startsWith(norm(title.am)) || norm(title.am).startsWith(norm(desc.am))))
+  // Admin Description = byline / speaker name on home (e.g. "By Ustaz …").
+  // Do not replace it with "Muhadara" — that hid the name the admin entered.
   return {
     title,
-    speaker: a.isMuhadara ? 'Muhadara' : cat || 'Da’wah',
+    speaker: '',
     description: descIsDup ? { am: '', ar: '', en: '' } : desc,
     category: { am: cat, ar: cat, en: cat },
     audioUrl: a.fileUrl,
@@ -210,7 +213,7 @@ export default function HomePage() {
               return {
                 id: row.id,
                 q: { en: en || am, am: am || en, ar: ar || en || am },
-                href: '/questions',
+                href: `/questions?id=${encodeURIComponent(row.id)}`,
               } satisfies HomeGuideQ
             })
             .filter((x): x is HomeGuideQ => Boolean(x))
@@ -566,7 +569,7 @@ export default function HomePage() {
                   >
                     <FeaturedAudioBlock
                       title={track.title}
-                      speaker={track.speaker}
+                      speaker={getLocalized(track.description) || track.speaker}
                       audioUrl={track.audioUrl}
                       category={track.category}
                       duration={track.duration}
@@ -579,7 +582,7 @@ export default function HomePage() {
                   <FeaturedAudioBlock
                     key={track.audioUrl}
                     title={track.title}
-                    speaker={track.speaker}
+                    speaker={getLocalized(track.description) || track.speaker}
                     audioUrl={track.audioUrl}
                     category={track.category}
                     duration={track.duration}
@@ -718,9 +721,9 @@ export default function HomePage() {
           </h2>
           <p className="text-sm sm:text-base text-neutral-600 dark:text-neutral-400 max-w-2xl leading-relaxed">
             {getLocalized({
-              en: 'These common questions show what you can find here — tap one to open the right section, or send your own.',
-              am: 'እነዚህ ተደጋጋሚ ጥያቄዎች በጣቢያው ላይ ምን እንደሚገኝ ያሳያሉ — ክፍሉን ለመክፈት ይጫኑ ወይም የራስዎን ይላኩ።',
-              ar: 'هذه الأسئلة الشائعة تُعرّف بما في الموقع — اضغط لفتح القسم المناسب أو أرسل سؤالك.',
+              en: 'These common questions show what you can find here — tap one to open that Q&A with its answer, or send your own.',
+              am: 'እነዚህ ተደጋጋሚ ጥያቄዎች በጣቢያው ላይ ምን እንደሚገኝ ያሳያሉ — አንዱን ይጫኑ ያን ጥያቄና መልሱን ለመክፈት፣ ወይም የራስዎን ይላኩ።',
+              ar: 'هذه الأسئلة الشائعة تُعرّف بما في الموقع — اضغط لفتح ذلك السؤال وجوابه، أو أرسل سؤالك.',
             })}
           </p>
         </div>
@@ -731,10 +734,10 @@ export default function HomePage() {
                 <Link
                   key={item.id}
                   href={item.href}
-                  className="group flex items-start gap-3 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white/70 dark:bg-neutral-950/50 px-4 py-3.5 hover:border-red-500/50 transition"
+                  className="group flex items-start gap-3 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white/70 dark:bg-neutral-950/50 px-4 py-3.5 hover:border-red-500/60 hover:bg-red-50/60 dark:hover:bg-red-950/30 hover:ring-2 hover:ring-red-500/20 transition"
                 >
-                  <span className="mt-0.5 text-red-600 font-bold text-sm">?</span>
-                  <span className="text-sm font-medium text-neutral-800 dark:text-neutral-200 group-hover:text-red-600 transition leading-snug">
+                  <span className="mt-0.5 text-red-600 font-bold text-sm group-hover:scale-110 transition">?</span>
+                  <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-200 group-hover:text-red-700 dark:group-hover:text-red-400 transition leading-snug line-clamp-3">
                     {getLocalized(item.q)}
                   </span>
                 </Link>

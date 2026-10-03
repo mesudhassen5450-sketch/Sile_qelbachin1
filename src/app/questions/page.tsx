@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import CategoryPageHero from '@/components/CategoryPageHero'
 import { useLanguage } from '@/context/LanguageContext'
@@ -23,10 +24,13 @@ type CmsQa = {
   answerAudioUrl?: string | null
   answerVideoUrl?: string | null
   featured?: boolean
+  createdAt?: string | null
+  updatedAt?: string | null
 }
 
 type DisplayQa = {
   id: string
+  displayId: string
   category: { en: string; am: string; ar: string }
   question: { en: string; am: string; ar: string }
   answer: { en: string; am: string; ar: string }
@@ -34,7 +38,11 @@ type DisplayQa = {
   coverUrl?: string | null
   audioUrl?: string | null
   videoUrl?: string | null
+  createdAt?: string | null
+  readMinutes: number
 }
+
+const TITLE_MAX = 110
 
 function loc(v?: CmsLoc | null, fallback = '') {
   return {
@@ -44,12 +52,45 @@ function loc(v?: CmsLoc | null, fallback = '') {
   }
 }
 
+function stableQuestionCode(id: string): string {
+  let n = 0
+  for (let i = 0; i < id.length; i++) n = (n * 31 + id.charCodeAt(i)) >>> 0
+  return `Q-${1000 + (n % 9000)}`
+}
+
+function estimateReadMinutes(text: string): number {
+  const words = text.trim().split(/\s+/).filter(Boolean).length
+  return Math.max(1, Math.ceil(words / 180))
+}
+
+function truncateText(s: string, max = TITLE_MAX): string {
+  const t = s.replace(/\s+/g, ' ').trim()
+  if (t.length <= max) return t
+  return `${t.slice(0, max).replace(/\s+\S*$/, '').trimEnd()}…`
+}
+
+function formatPublishedMonth(iso: string | null | undefined, language: string): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  try {
+    return new Intl.DateTimeFormat(language === 'am' ? 'am-ET' : language === 'ar' ? 'ar' : 'en', {
+      month: 'short',
+      year: 'numeric',
+    }).format(d)
+  } catch {
+    return d.toLocaleDateString('en', { month: 'short', year: 'numeric' })
+  }
+}
+
 function toDisplay(r: CmsQa): DisplayQa {
   const question = r.question || r.title
   const answer = r.answer || r.body
   const description = r.excerpt
+  const answerBlob = `${answer?.en || ''} ${answer?.am || ''} ${answer?.ar || ''}`
   return {
     id: r.id,
+    displayId: stableQuestionCode(r.id),
     category: {
       en: (r.category || 'General').toUpperCase(),
       am: r.category || 'አጠቃላይ',
@@ -61,6 +102,8 @@ function toDisplay(r: CmsQa): DisplayQa {
     coverUrl: r.coverUrl || null,
     audioUrl: r.audioUrl || r.answerAudioUrl || null,
     videoUrl: r.videoUrl || r.answerVideoUrl || null,
+    createdAt: r.createdAt || r.updatedAt || null,
+    readMinutes: estimateReadMinutes(answerBlob),
   }
 }
 
@@ -72,22 +115,32 @@ function matchesTelegramSearch(
 ): boolean {
   const raw = needle.trim().toLowerCase()
   if (!raw) return true
-  const blob = [getLocalized(item.question), getLocalized(item.answer), getLocalized(item.description), getLocalized(item.category)]
+  const blob = [
+    getLocalized(item.question),
+    getLocalized(item.answer),
+    getLocalized(item.description),
+    getLocalized(item.category),
+    item.displayId,
+  ]
     .join(' ')
     .toLowerCase()
   const tokens = raw.split(/\s+/).filter(Boolean)
   if (tokens.length === 0) return true
-  // Single token: match if that word appears anywhere
-  // Multiple tokens: all must appear (Telegram AND style)
   return tokens.every(t => blob.includes(t))
 }
 
-export default function QuestionsPage() {
-  const { getLocalized } = useLanguage()
+function QuestionsPageInner() {
+  const { getLocalized, language } = useLanguage()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const focusId = searchParams.get('id')
   const [q, setQ] = useState('')
   const [cmsItems, setCmsItems] = useState<DisplayQa[]>([])
   const [loading, setLoading] = useState(true)
   const [detailIndex, setDetailIndex] = useState<number | null>(null)
+  const [highlightId, setHighlightId] = useState<string | null>(null)
+  const cardRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
+  const deepLinkDone = useRef(false)
 
   useEffect(() => {
     let cancelled = false
@@ -111,11 +164,36 @@ export default function QuestionsPage() {
   const detail = detailIndex != null ? filtered[detailIndex] : null
 
   useEffect(() => {
-    // Keep detail in range when filter changes
     if (detailIndex != null && detailIndex >= filtered.length) {
       setDetailIndex(filtered.length ? filtered.length - 1 : null)
     }
   }, [filtered.length, detailIndex])
+
+  // Deep-link from home: /questions?id=… → highlight card + open answer
+  useEffect(() => {
+    deepLinkDone.current = false
+  }, [focusId])
+
+  useEffect(() => {
+    if (loading || !focusId || deepLinkDone.current || cmsItems.length === 0) return
+    const idx = filtered.findIndex(i => i.id === focusId)
+    if (idx < 0) {
+      // Prefer unfiltered list if search is hiding the target
+      const rawIdx = cmsItems.findIndex(i => i.id === focusId)
+      if (rawIdx < 0) return
+      setQ('')
+      return
+    }
+    deepLinkDone.current = true
+    setHighlightId(focusId)
+    setDetailIndex(idx)
+    window.requestAnimationFrame(() => {
+      const el = cardRefs.current.get(focusId)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+    const clear = window.setTimeout(() => setHighlightId(null), 4500)
+    return () => window.clearTimeout(clear)
+  }, [loading, focusId, cmsItems, filtered])
 
   useEffect(() => {
     if (detailIndex == null) return
@@ -136,16 +214,31 @@ export default function QuestionsPage() {
 
   const openDetail = (id: string) => {
     const idx = filtered.findIndex(i => i.id === id)
-    if (idx >= 0) setDetailIndex(idx)
+    if (idx < 0) return
+    setDetailIndex(idx)
+    setHighlightId(id)
+    router.replace(`/questions?id=${encodeURIComponent(id)}`, { scroll: false })
+    window.setTimeout(() => setHighlightId(null), 2500)
+  }
+
+  const closeDetail = () => {
+    setDetailIndex(null)
+    router.replace('/questions', { scroll: false })
   }
 
   const goPrev = () => {
-    if (detailIndex == null) return
-    setDetailIndex(Math.max(0, detailIndex - 1))
+    if (detailIndex == null || detailIndex <= 0) return
+    const next = detailIndex - 1
+    setDetailIndex(next)
+    const id = filtered[next]?.id
+    if (id) router.replace(`/questions?id=${encodeURIComponent(id)}`, { scroll: false })
   }
   const goNext = () => {
-    if (detailIndex == null) return
-    setDetailIndex(Math.min(filtered.length - 1, detailIndex + 1))
+    if (detailIndex == null || detailIndex >= filtered.length - 1) return
+    const next = detailIndex + 1
+    setDetailIndex(next)
+    const id = filtered[next]?.id
+    if (id) router.replace(`/questions?id=${encodeURIComponent(id)}`, { scroll: false })
   }
 
   return (
@@ -187,7 +280,7 @@ export default function QuestionsPage() {
             <span>{ASK_QUESTION.emoji}</span>
             {getLocalized({
               en: 'Ask a Question',
-              am: 'ጥያቄ ይጠይቁ',
+              am: 'ጥያቄዎን ያቅርቡ',
               ar: 'اطرح سؤالاً',
             })}
           </Link>
@@ -202,34 +295,74 @@ export default function QuestionsPage() {
         ) : null}
 
         {!loading &&
-          filtered.map(item => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => openDetail(item.id)}
-              className="w-full text-start portfolio-card p-6 sm:p-7 space-y-2.5 hover:-translate-y-0.5 transition"
-            >
-              <span className="text-xs font-bold uppercase tracking-wide text-[#A91F24] dark:text-red-400">
-                {getLocalized(item.category)}
-              </span>
-              <h2 className="text-lg sm:text-xl font-bold text-[#37352f] dark:text-white leading-snug">
-                {getLocalized(item.question)}
-              </h2>
-              <p className="text-sm text-[#787774] dark:text-neutral-400 leading-relaxed line-clamp-2">
-                <span className="font-semibold text-[#286247] dark:text-emerald-400">
-                  {getLocalized({ en: 'Answer: ', am: 'መልስ፦ ', ar: 'الجواب: ' })}
-                </span>
-                {getLocalized(item.answer)}
-              </p>
-              <p className="text-xs font-semibold text-[#A91F24] dark:text-red-400 pt-1">
-                {getLocalized({
-                  en: 'Open details →',
-                  am: 'ዝርዝር ክፈት →',
-                  ar: 'افتح التفاصيل ←',
-                })}
-              </p>
-            </button>
-          ))}
+          filtered.map(item => {
+            const fullQuestion = getLocalized(item.question)
+            const published = formatPublishedMonth(item.createdAt, language)
+            const isFocus = highlightId === item.id
+            return (
+              <button
+                key={item.id}
+                id={`qa-${item.id}`}
+                type="button"
+                ref={el => {
+                  if (el) cardRefs.current.set(item.id, el)
+                  else cardRefs.current.delete(item.id)
+                }}
+                onClick={() => openDetail(item.id)}
+                className={`w-full text-start portfolio-card p-6 sm:p-7 space-y-3 transition duration-300 hover:-translate-y-0.5 hover:border-[#A91F24]/45 hover:ring-2 hover:ring-[#A91F24]/25 ${
+                  isFocus
+                    ? 'border-[#A91F24] ring-2 ring-[#A91F24]/40 shadow-lg shadow-red-900/10'
+                    : ''
+                }`}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center rounded-full bg-[#7f1d1d] text-white text-[11px] font-semibold tracking-wide px-2.5 py-1 border border-[#A91F24]/60">
+                    {getLocalized(item.category)}
+                  </span>
+                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
+                    <span className="tabular-nums">#{item.displayId}</span>
+                    {published ? (
+                      <>
+                        <span aria-hidden className="text-neutral-300 dark:text-neutral-600">
+                          ·
+                        </span>
+                        <span>{published}</span>
+                      </>
+                    ) : null}
+                    <span aria-hidden className="text-neutral-300 dark:text-neutral-600">
+                      ·
+                    </span>
+                    <span>
+                      {getLocalized({
+                        en: `${item.readMinutes} min read`,
+                        am: `${item.readMinutes} ደቂቃ ንባብ`,
+                        ar: `${item.readMinutes} د قراءة`,
+                      })}
+                    </span>
+                  </div>
+                </div>
+
+                <h2 className="text-lg sm:text-xl font-semibold text-[#111827] dark:text-white leading-snug">
+                  {truncateText(fullQuestion)}
+                </h2>
+
+                <p className="text-sm leading-relaxed line-clamp-2 text-[#9CA3AF]">
+                  <span className="font-medium text-[#9CA3AF]/90">
+                    {getLocalized({ en: 'Answer: ', am: 'መልስ፦ ', ar: 'الجواب: ' })}
+                  </span>
+                  {getLocalized(item.answer)}
+                </p>
+
+                <p className="text-xs font-semibold text-[#A91F24] dark:text-red-400 pt-0.5">
+                  {getLocalized({
+                    en: 'Open full Q&A →',
+                    am: 'ሙሉ ጥያቄና መልስ ክፈት →',
+                    ar: 'افتح السؤال والجواب ←',
+                  })}
+                </p>
+              </button>
+            )
+          })}
 
         {!loading && filtered.length === 0 ? (
           <div className="text-center py-12 space-y-3">
@@ -256,13 +389,12 @@ export default function QuestionsPage() {
         ) : null}
       </div>
 
-      {/* Detail overlay with prev / next */}
       {detail && detailIndex != null ? (
         <div
           className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/45 backdrop-blur-[2px]"
           role="dialog"
           aria-modal="true"
-          onClick={() => setDetailIndex(null)}
+          onClick={closeDetail}
         >
           <div
             className="relative w-full max-w-2xl max-h-[88vh] overflow-y-auto rounded-2xl border border-[#e3e2e0] dark:border-neutral-700 bg-white dark:bg-neutral-950 shadow-2xl"
@@ -299,7 +431,7 @@ export default function QuestionsPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setDetailIndex(null)}
+                  onClick={closeDetail}
                   className="rounded-xl p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800"
                   aria-label="Close"
                 >
@@ -309,10 +441,28 @@ export default function QuestionsPage() {
             </div>
 
             <div className="p-5 sm:p-7 space-y-5">
-              <span className="text-xs font-bold uppercase tracking-wide text-[#A91F24]">
-                {getLocalized(detail.category)}
-              </span>
-              <h2 className="text-xl sm:text-2xl font-bold text-[#37352f] dark:text-white leading-snug">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center rounded-full bg-[#7f1d1d] text-white text-[11px] font-semibold tracking-wide px-2.5 py-1 border border-[#A91F24]/60">
+                  {getLocalized(detail.category)}
+                </span>
+                <span className="text-[11px] font-medium text-neutral-500 tabular-nums">
+                  #{detail.displayId}
+                </span>
+                {formatPublishedMonth(detail.createdAt, language) ? (
+                  <span className="text-[11px] font-medium text-neutral-500">
+                    {formatPublishedMonth(detail.createdAt, language)}
+                  </span>
+                ) : null}
+                <span className="text-[11px] font-medium text-neutral-500">
+                  {getLocalized({
+                    en: `${detail.readMinutes} min read`,
+                    am: `${detail.readMinutes} ደቂቃ ንባብ`,
+                    ar: `${detail.readMinutes} د قراءة`,
+                  })}
+                </span>
+              </div>
+
+              <h2 className="text-xl sm:text-2xl font-semibold text-[#111827] dark:text-white leading-snug">
                 {getLocalized(detail.question)}
               </h2>
 
@@ -325,8 +475,8 @@ export default function QuestionsPage() {
                 />
               ) : null}
 
-              <div className="space-y-2">
-                <p className="text-xs font-bold uppercase tracking-wide text-[#286247] dark:text-emerald-400">
+              <div className="space-y-2 rounded-xl border border-[#e3e2e0] dark:border-neutral-800 bg-[#fafafa] dark:bg-neutral-900/50 p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-[#A91F24]">
                   {getLocalized({ en: 'Answer', am: 'መልስ', ar: 'الجواب' })}
                 </p>
                 <p className="text-base font-medium text-[#37352f] dark:text-neutral-100 leading-relaxed whitespace-pre-wrap">
@@ -335,7 +485,7 @@ export default function QuestionsPage() {
               </div>
 
               {getLocalized(detail.description).trim() ? (
-                <p className="text-sm text-[#787774] dark:text-neutral-400 leading-relaxed whitespace-pre-wrap border-t border-[#e3e2e0] dark:border-neutral-800 pt-4">
+                <p className="text-sm text-[#9CA3AF] leading-relaxed whitespace-pre-wrap border-t border-[#e3e2e0] dark:border-neutral-800 pt-4">
                   {getLocalized(detail.description)}
                 </p>
               ) : null}
@@ -354,5 +504,19 @@ export default function QuestionsPage() {
         </div>
       ) : null}
     </div>
+  )
+}
+
+export default function QuestionsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="max-w-4xl mx-auto px-4 py-16 text-center text-sm text-neutral-500">
+          Loading…
+        </div>
+      }
+    >
+      <QuestionsPageInner />
+    </Suspense>
   )
 }

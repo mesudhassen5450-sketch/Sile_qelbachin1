@@ -1061,11 +1061,26 @@ const ContentListPage = ({
               </>
             ) : null}
             <Field>
-              <FieldLabel>Description (English)</FieldLabel>
-              <Textarea value={editDescEn} onChange={e => setEditDescEn(e.target.value)} rows={3} />
+              <FieldLabel>
+                {type === 'audio'
+                  ? 'Speaker / name (English) — shows under title on home'
+                  : 'Description (English)'}
+              </FieldLabel>
+              <Textarea
+                value={editDescEn}
+                onChange={e => setEditDescEn(e.target.value)}
+                rows={3}
+                placeholder={
+                  type === 'audio' ? 'e.g. By Ustaz …' : undefined
+                }
+              />
             </Field>
             <Field>
-              <FieldLabel>Description (Amharic)</FieldLabel>
+              <FieldLabel>
+                {type === 'audio'
+                  ? 'Speaker / name (Amharic) — shows under title on home'
+                  : 'Description (Amharic)'}
+              </FieldLabel>
               <Textarea value={editDescAm} onChange={e => setEditDescAm(e.target.value)} rows={3} />
             </Field>
             <div className='grid grid-cols-2 gap-3'>

@@ -2,13 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { BookMarked, Download, ExternalLink, FileText, Heart, NotebookPen, Share2 } from 'lucide-react'
+import { BookMarked, Download, ExternalLink, FileText, NotebookPen, Share2 } from 'lucide-react'
 import CategoryPageHero from '@/components/CategoryPageHero'
 import KitabCard from '@/components/KitabCard'
+import RemindersFeed from '@/components/RemindersFeed'
 import SectionHeading from '@/components/SectionHeading'
 import ShareSheet from '@/components/ShareSheet'
 import { useLanguage } from '@/context/LanguageContext'
-import { articleItems } from '@/data/youthCorner'
 import { kitabsData, type Kitab } from '@/data/channelData'
 import { getPdfs, type MediaItem } from '@/data/mediaStore'
 import {
@@ -141,7 +141,7 @@ export default function LibraryPage() {
       },
       icon: FileText,
     },
-    { id: 'notes', label: { en: 'Notes', am: 'ማስታወሻ', ar: 'مذكرات' }, icon: NotebookPen },
+    { id: 'notes', label: { en: 'Reminders', am: 'ማስታወሻዎች', ar: 'تذكيرات' }, icon: NotebookPen },
   ]
 
   return (
@@ -299,48 +299,27 @@ export default function LibraryPage() {
       {tab === 'notes' ? (
         <section className="space-y-6" role="tabpanel">
           <SectionHeading
-            label={getLocalized({ en: 'Heart notes', am: 'የልብ ማስታወሻ', ar: 'مذكرات القلب' })}
-            title={getLocalized({ en: 'Written notes', am: 'የተጻፉ ማስታወሻዎች', ar: 'مذكرات مكتوبة' })}
+            label={getLocalized({ en: 'Heart', am: 'ልብ', ar: 'القلب' })}
+            title={getLocalized({
+              en: 'Library reminders',
+              am: 'የቤተ-መጻሕፍት ማስታወሻዎች',
+              ar: 'تذكيرات المكتبة',
+            })}
             description={getLocalized({
-              en: 'Short articles and reflections — reading only, separate from audio kitabs.',
-              am: 'አጫጭር ጽሑፎችና አስተያየቶች — ንባብ ብቻ፣ ከድምጽ ኪታብ የተለየ።',
-              ar: 'مقالات وتأملات قصيرة — للقراءة فقط، منفصلة عن الكتب الصوتية.',
+              en: 'Same reminders as Da’wah — add once in Admin, they appear here too.',
+              am: 'ከዳዕዋ ጋር ተመሳሳይ ማስታወሻዎች — በአድሚን አንድ ጊዜ ያክሉ፣ እዚህም ይታያሉ።',
+              ar: 'نفس تذكيرات الدعوة — أضفها مرة في الإدارة وتظهر هنا أيضاً.',
             })}
             action={
               <Link
-                href="/articles"
+                href="/dawah"
                 className="btn-interactive text-sm font-bold text-rose-500 hover:text-rose-400"
               >
-                {getLocalized({ en: 'All articles →', am: 'ሁሉም ጽሑፎች →', ar: 'كل المقالات →' })}
+                {getLocalized({ en: 'Da’wah reminders →', am: 'የዳዕዋ ማስታወሻዎች →', ar: 'تذكيرات الدعوة →' })}
               </Link>
             }
           />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {articleItems.map(note => (
-              <article
-                key={note.id}
-                className="portfolio-card p-6 space-y-3 border-s-4 border-s-rose-500"
-              >
-                <span className="label-heart !normal-case !tracking-normal !text-[10px]">
-                  <Heart className="w-3 h-3 fill-current" aria-hidden />
-                  {getLocalized(note.tag)}
-                </span>
-                <h3 className="text-lg font-bold text-neutral-900 dark:text-white">
-                  {getLocalized(note.title)}
-                </h3>
-                <p className="text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed">
-                  {getLocalized(note.excerpt)}
-                </p>
-                <Link
-                  href="/articles"
-                  className="btn-interactive inline-flex text-sm font-bold text-rose-500 hover:underline"
-                >
-                  {getLocalized({ en: 'Read note →', am: 'ማስታወሻ አንብብ →', ar: 'اقرأ المذكرة →' })}
-                </Link>
-              </article>
-            ))}
-          </div>
+          <RemindersFeed showHeading={false} />
         </section>
       ) : null}
 

@@ -310,16 +310,26 @@ const AddContentDialog = ({
             ) : null}
 
             <Field>
-              <FieldLabel>Description</FieldLabel>
+              <FieldLabel>
+                {kind === 'audio'
+                  ? 'Speaker / name (EN) — shows under title on home'
+                  : 'Description'}
+              </FieldLabel>
               <Textarea
                 value={descriptionEn}
                 onChange={e => setDescriptionEn(e.target.value)}
                 rows={3}
-                placeholder='Short description (EN)'
+                placeholder={
+                  kind === 'audio' ? 'e.g. By Ustaz …' : 'Short description (EN)'
+                }
               />
             </Field>
             <Field>
-              <FieldLabel>Description (AM)</FieldLabel>
+              <FieldLabel>
+                {kind === 'audio'
+                  ? 'Speaker / name (AM) — shows under title on home'
+                  : 'Description (AM)'}
+              </FieldLabel>
               <Textarea
                 value={descriptionAm}
                 onChange={e => setDescriptionAm(e.target.value)}

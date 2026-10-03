@@ -167,28 +167,8 @@ export const muhadarasData: Muhadara[] = [
 ];
 
 export const videosData: VideoItem[] = [];
-export const remindersData: Reminder[] = [
-  {
-    id: 'rem-1',
-    title: {
-      am: 'የቀልብ ተቅዋና ሰላም',
-      ar: 'تقوى القلوب',
-      en: 'Piety of the Hearts'
-    },
-    content: {
-      am: '«አላህ ሆይ! ለነፍሴ ተቅዋዋን ስጣት፣ አጽዳትም፤ አንተ ከሚያጸዷት ሁሉ በላጭ ነህ።»',
-      ar: '«اللَّهُمَّ آتِ نَفْسِي تَقْوَاهَا، وَزَكِّهَا أَنْتَ خَيْرُ مَنْ زَكَّاهَا»',
-      en: '“O Allah, grant my soul its piety and purify it; You are the best to purify it.”'
-    },
-    source: {
-      am: 'ሶሒሕ ሙስሊም',
-      ar: 'صحيح مسلم',
-      en: 'Sahih Muslim'
-    },
-    category: 'የቀልብ ዱዓ',
-    type: 'hadith'
-  }
-];
+/** Mock reminders removed — live list comes from Admin CMS (`fetchPublishedReminders`). */
+export const remindersData: Reminder[] = [];
 
 export const knowledgeData: KnowledgeItem[] = [
   {

@@ -1,12 +1,11 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
-import { ArrowRight, Heart, Headphones, Pause, Play, Search } from 'lucide-react'
+import { Heart, Headphones, Pause, Play, Search } from 'lucide-react'
 import CategoryPageHero from '@/components/CategoryPageHero'
+import RemindersFeed from '@/components/RemindersFeed'
 import { useLanguage } from '@/context/LanguageContext'
 import { useAudio } from '@/context/AudioContext'
-import { remindersData } from '@/data/channelData'
 import { getAudios, type MediaItem } from '@/data/mediaStore'
 import { getMediaDurationSeconds } from '@/data/mediaDurations'
 import { fetchPublishedAudio, pickCmsLoc, type CmsAudio } from '@/lib/cmsClient'
@@ -167,8 +166,6 @@ export default function DawahPage() {
     })
   }, [allAudio, query])
 
-  const reminders = remindersData
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       <CategoryPageHero
@@ -180,25 +177,11 @@ export default function DawahPage() {
         }}
         title={{ en: 'Da’wah', am: 'ዳዕዋ', ar: 'الدعوة' }}
         description={{
-          en: 'Reminders and audio explanations longer than 1 minute.',
-          am: 'ማስታወሻዎች እና ከ1 ደቂቃ በላይ የሆኑ የድምፅ ማብራሪያዎች።',
-          ar: 'تذكيرات وشروح صوتية أطول من دقيقة.',
+          en: 'Heart reminders and Da’wah audio lessons.',
+          am: 'የልብ ማስታወሻዎች እና የዳዕዋ የድምፅ ትምህርቶች።',
+          ar: 'تذكيرات القلب ودروس صوتية للدعوة.',
         }}
-      >
-        <div className="flex flex-wrap gap-3 pt-1">
-          <Link
-            href="/one-minute"
-            className="btn-interactive inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-[#D4AF37]/15 border border-[#D4AF37]/50 text-neutral-900 dark:text-white hover:bg-[#D4AF37]/25"
-          >
-            {getLocalized({
-              en: 'Under 1 min → 1-Minute Messages',
-              am: 'ከ1 ደቂቃ በታች → የ1 ደቂቃ መልእክቶች',
-              ar: 'أقل من دقيقة → رسائل الدقيقة',
-            })}
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-      </CategoryPageHero>
+      />
 
       <div
         role="tablist"
@@ -217,7 +200,6 @@ export default function DawahPage() {
         >
           <Heart className="w-4 h-4" />
           {getLocalized({ en: 'Reminders', am: 'ማስታወሻዎች', ar: 'تذكيرات' })}
-          <span className="text-[10px] font-mono opacity-60">{reminders.length}</span>
         </button>
         <button
           type="button"
@@ -237,36 +219,15 @@ export default function DawahPage() {
       </div>
 
       {tab === 'reminders' ? (
-        <section className="space-y-5" role="tabpanel">
-          <div>
-            <h2 className="text-2xl font-bold text-neutral-900 dark:text-white">
-              {getLocalized({
-                en: 'Heart reminders',
-                am: 'የልብ ማስታወሻዎች',
-                ar: 'تذكيرات القلب',
-              })}
-            </h2>
-            <p className="text-sm text-neutral-500 mt-1">
-              {getLocalized({
-                en: 'Short reflections to soften the heart — tap a card to read.',
-                am: 'ልብን የሚያለስልሱ አጫጭር ማስታወሻዎች — ለማንበብ ካርዱን ይንኩ።',
-                ar: 'تأملات قصيرة لترقيق القلب — المس البطاقة للقراءة.',
-              })}
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {reminders.map(r => (
-              <article key={r.id} className="portfolio-card p-6 space-y-3 cursor-default">
-                <span className="text-xs font-bold text-[#B8860B]">{r.category}</span>
-                <h3 className="font-bold text-neutral-900 dark:text-white text-lg">
-                  {getLocalized(r.title)}
-                </h3>
-                <p className="text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed">
-                  {getLocalized(r.content)}
-                </p>
-              </article>
-            ))}
-          </div>
+        <section role="tabpanel">
+          <RemindersFeed
+            showHeading
+            emptyHint={{
+              en: 'No reminders yet. Add them in Admin → Da’wah → Reminders.',
+              am: 'እስካሁን ማስታወሻ የለም። በአድሚን → ዳዕዋ → ማስታወሻዎች ያክሉ።',
+              ar: 'لا تذكيرات بعد. أضفها من الإدارة → الدعوة → التذكيرات.',
+            }}
+          />
         </section>
       ) : (
         <section className="space-y-5" role="tabpanel">
@@ -274,9 +235,9 @@ export default function DawahPage() {
             <div>
               <h2 className="text-2xl font-bold text-neutral-900 dark:text-white">
                 {getLocalized({
-                  en: 'Da’wah audio (over 1 minute)',
-                  am: 'የዳዕዋ ድምፆች (ከ1 ደቂቃ በላይ)',
-                  ar: 'أصوات الدعوة (أكثر من دقيقة)',
+                  en: 'Da’wah audio',
+                  am: 'የዳዕዋ ድምፆች',
+                  ar: 'أصوات الدعوة',
                 })}
               </h2>
               <p className="text-sm text-neutral-500 mt-1">

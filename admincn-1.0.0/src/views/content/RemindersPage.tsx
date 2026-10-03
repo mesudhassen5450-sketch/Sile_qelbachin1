@@ -57,7 +57,7 @@ const RemindersPage = ({
     description ||
     (isOneMinute
       ? 'Short text slides for the public 1-Minute feed. Priority, featured, publish, schedule, archive.'
-      : 'Add a title and description for the home page reminder section (under About Our Hearts).')
+      : 'Add reminders for Da’wah and Library (same list on both). Not shown on the home page.')
 
   const [rows, setRows] = useState<ReminderRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -189,7 +189,7 @@ const RemindersPage = ({
     const label = row.title_en || row.title_am || 'this item'
     if (
       !window.confirm(
-        `Delete "${label}"?\n\nIt will disappear from the ${isOneMinute ? '1-Minute text feed' : 'home page'}.`
+        `Delete "${label}"?\n\nIt will disappear from Da’wah and Library reminders.`
       )
     )
       return
@@ -237,7 +237,7 @@ const RemindersPage = ({
       <Card>
         <CardHeader className='p-4 pb-2'>
           <CardTitle className='text-base'>
-            {isOneMinute ? '1-Minute text slides' : 'Home page reminders'}
+            {isOneMinute ? '1-Minute text slides' : 'Da’wah & Library reminders'}
           </CardTitle>
           <CardDescription>
             {loading ? 'Loading…' : `${rows.length} item${rows.length === 1 ? '' : 's'}`}
@@ -342,8 +342,8 @@ const RemindersPage = ({
           if (!o) resetForm()
         }}
       >
-        <DialogContent className='sm:max-w-lg'>
-          <DialogHeader>
+        <DialogContent className='flex max-h-[92dvh] w-[calc(100%-1rem)] flex-col gap-4 overflow-hidden p-4 sm:max-w-lg sm:p-6'>
+          <DialogHeader className='shrink-0 pr-8'>
             <DialogTitle>
               {editId
                 ? isOneMinute
@@ -356,10 +356,10 @@ const RemindersPage = ({
             <DialogDescription>
               {isOneMinute
                 ? 'Appears as a text slide in the public 1-Minute Message feed.'
-                : 'Title and description appear on the website home page under About Our Hearts.'}
+                : 'Shows on the website under Da’wah → Reminders and Library → Reminders (not on the home page).'}
             </DialogDescription>
           </DialogHeader>
-          <div className='space-y-3'>
+          <div className='min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pe-1'>
             <Field>
               <FieldLabel>Title (EN)</FieldLabel>
               <Input value={titleEn} onChange={e => setTitleEn(e.target.value)} />
@@ -370,13 +370,23 @@ const RemindersPage = ({
             </Field>
             <Field>
               <FieldLabel>Description (EN)</FieldLabel>
-              <Textarea value={descEn} onChange={e => setDescEn(e.target.value)} rows={3} />
+              <Textarea
+                value={descEn}
+                onChange={e => setDescEn(e.target.value)}
+                rows={8}
+                className='max-h-[40vh] min-h-[8rem] overflow-y-auto'
+              />
             </Field>
             <Field>
               <FieldLabel>Description (AM)</FieldLabel>
-              <Textarea value={descAm} onChange={e => setDescAm(e.target.value)} rows={3} />
+              <Textarea
+                value={descAm}
+                onChange={e => setDescAm(e.target.value)}
+                rows={8}
+                className='max-h-[40vh] min-h-[8rem] overflow-y-auto'
+              />
             </Field>
-            <div className='grid grid-cols-2 gap-3'>
+            <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
               <Field>
                 <FieldLabel>Priority (1 = highest)</FieldLabel>
                 <Input
@@ -418,7 +428,7 @@ const RemindersPage = ({
               Featured
             </label>
           </div>
-          <DialogFooter className='gap-2'>
+          <DialogFooter className='shrink-0 gap-2 border-t border-border pt-3'>
             <Button type='button' variant='outline' onClick={() => setOpen(false)}>
               Cancel
             </Button>

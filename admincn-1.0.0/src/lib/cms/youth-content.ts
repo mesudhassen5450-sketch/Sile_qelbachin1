@@ -105,6 +105,8 @@ export function listPublishedYouthContent(kind: YouthKind) {
       videoUrl: r.video_url || null,
       featured: r.featured,
       priority: r.priority || 1,
+      createdAt: r.created_at || null,
+      updatedAt: r.updated_at || null,
     }))
 }
 
