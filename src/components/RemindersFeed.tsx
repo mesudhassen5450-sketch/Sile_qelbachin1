@@ -1,28 +1,24 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { useLanguage } from '@/context/LanguageContext'
-import { fetchHeartReadings, type HeartReading } from '@/lib/heartReadings'
+import { featuredHeartFirst, fetchHeartReadings, type HeartReading } from '@/lib/heartReadings'
 
-const PREVIEW_MAX = 160
-
-function truncate(s: string, max = PREVIEW_MAX): string {
-  const t = s.replace(/\s+/g, ' ').trim()
-  if (t.length <= max) return t
-  return `${t.slice(0, max).replace(/\s+\S*$/, '').trimEnd()}…`
-}
+const PREVIEW_MAX = 120
 
 type Props = {
   showHeading?: boolean
 }
 
-/** Da’wah / Library reminders — for now same as Admin Youth → Articles. */
+/** Da’wah / Library — for now same as Admin Youth → Articles. */
 export default function RemindersFeed({ showHeading = true }: Props) {
   const { getLocalized } = useLanguage()
   const [items, setItems] = useState<HeartReading[]>([])
   const [loading, setLoading] = useState(true)
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const stripRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -30,7 +26,7 @@ export default function RemindersFeed({ showHeading = true }: Props) {
       setLoading(true)
       const rows = await fetchHeartReadings()
       if (!cancelled) {
-        setItems(rows)
+        setItems(featuredHeartFirst(rows, Math.max(rows.length, 1)))
         setLoading(false)
       }
     })()
@@ -63,24 +59,52 @@ export default function RemindersFeed({ showHeading = true }: Props) {
       ar: r.body?.ar || r.body?.en || r.body?.am || '',
     })
 
+  const scrollStrip = (dir: -1 | 1) => {
+    const el = stripRef.current
+    if (!el) return
+    el.scrollBy({ left: dir * Math.min(340, el.clientWidth * 0.8), behavior: 'smooth' })
+  }
+
   return (
     <div className="space-y-5">
       {showHeading ? (
-        <div>
-          <h2 className="text-2xl font-bold text-neutral-900 dark:text-white">
-            {getLocalized({
-              en: 'Heart reminders',
-              am: 'የልብ ማስታወሻዎች',
-              ar: 'تذكيرات القلب',
-            })}
-          </h2>
-          <p className="text-sm text-neutral-500 mt-1">
-            {getLocalized({
-              en: 'Short reflections to soften the heart — tap a card to read the full text.',
-              am: 'ልብን የሚያለስልሱ አጫጭር ማስታወሻዎች — ሙሉ ጽሑፍ ለማንበብ ካርዱን ይንኩ።',
-              ar: 'تأملات قصيرة لترقيق القلب — المس البطاقة لقراءة النص كاملاً.',
-            })}
-          </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-neutral-900 dark:text-white">
+              {getLocalized({
+                en: 'Heart reminders',
+                am: 'የልብ ማስታወሻዎች',
+                ar: 'تذكيرات القلب',
+              })}
+            </h2>
+            <p className="text-sm text-neutral-500 mt-1">
+              {getLocalized({
+                en: 'From Articles — Featured first. Scroll or use the arrows.',
+                am: 'ከጽሑፎች — ተለይተው መጀመሪያ። ይሸብልሉ ወይም ቀስቶቹን ይጠቀሙ።',
+                ar: 'من المقالات — المميز أولاً. مرّر أو استخدم الأسهم.',
+              })}
+            </p>
+          </div>
+          {!loading && items.length > 0 ? (
+            <div className="flex items-center gap-1.5 self-end">
+              <button
+                type="button"
+                onClick={() => scrollStrip(-1)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-200 hover:border-amber-500/60 hover:text-amber-600 transition"
+                aria-label="Scroll left"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollStrip(1)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-200 hover:border-amber-500/60 hover:text-amber-600 transition"
+                aria-label="Scroll right"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -90,39 +114,82 @@ export default function RemindersFeed({ showHeading = true }: Props) {
         </p>
       ) : null}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+      <div
+        ref={stripRef}
+        className="flex gap-4 overflow-x-auto scroll-smooth pb-2 snap-x snap-mandatory [scrollbar-width:thin] [scrollbar-color:rgba(185,28,28,0.55)_transparent]"
+      >
         {items.map(r => {
           const title = titleOf(r)
           const body = bodyOf(r)
           if (!title && !body) return null
+          const featured = Boolean(r.featured)
+          const open = Boolean(expanded[r.id])
+          const long = body.length > PREVIEW_MAX
+          const preview =
+            !long || open
+              ? body
+              : `${body.slice(0, PREVIEW_MAX).replace(/\s+\S*$/, '').trimEnd()}…`
+
           return (
-            <button
+            <article
               key={r.id}
-              type="button"
-              onClick={() => setActiveId(r.id)}
-              className="portfolio-card p-5 sm:p-6 space-y-2.5 text-start hover:border-red-500/40 hover:ring-2 hover:ring-red-500/20 transition w-full"
+              className={`snap-start shrink-0 w-[min(88vw,20rem)] sm:w-[19rem] portfolio-card p-5 space-y-2.5 text-start transition ${
+                featured
+                  ? 'border-amber-500/45 ring-1 ring-amber-500/20 bg-gradient-to-br from-amber-950/25 via-transparent to-transparent'
+                  : 'hover:border-red-500/40'
+              }`}
             >
-              <span className="inline-flex items-center rounded-full bg-[#7f1d1d] text-white text-[10px] font-semibold tracking-wide px-2.5 py-1 border border-[#A91F24]/50">
-                {getLocalized({ en: 'Reminder', am: 'ማስታወሻ', ar: 'تذكير' })}
-              </span>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {featured ? (
+                  <span className="inline-flex items-center rounded-full bg-amber-600 text-white text-[10px] font-bold tracking-wide px-2.5 py-1">
+                    {getLocalized({ en: 'Featured', am: 'ተለይቶ', ar: 'مميز' })}
+                  </span>
+                ) : null}
+                <span className="inline-flex items-center rounded-full bg-[#7f1d1d] text-white text-[10px] font-semibold tracking-wide px-2.5 py-1 border border-[#A91F24]/50">
+                  {getLocalized({ en: 'Article', am: 'ጽሑፍ', ar: 'مقال' })}
+                </span>
+              </div>
               {title ? (
                 <h3 className="font-semibold text-neutral-900 dark:text-white text-base sm:text-lg leading-snug line-clamp-2">
                   {title}
                 </h3>
               ) : null}
               {body ? (
-                <p className="text-sm text-[#9CA3AF] leading-relaxed line-clamp-4 whitespace-pre-line">
-                  {truncate(body)}
+                <p className="text-sm text-[#9CA3AF] leading-relaxed whitespace-pre-line">
+                  {preview}
                 </p>
               ) : null}
-              <p className="text-xs font-semibold text-[#A91F24] pt-1">
-                {getLocalized({
-                  en: 'Read full reminder →',
-                  am: 'ሙሉ ማስታወሻ አንብብ →',
-                  ar: 'اقرأ التذكير كاملاً ←',
-                })}
-              </p>
-            </button>
+              <div className="flex items-center justify-between gap-2 pt-1">
+                {long ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExpanded(prev => ({ ...prev, [r.id]: !prev[r.id] }))
+                    }
+                    className="text-xs font-semibold text-neutral-400 hover:text-neutral-200"
+                  >
+                    {open
+                      ? getLocalized({ en: 'Show less', am: 'አሳንስ', ar: 'أقل' })
+                      : getLocalized({ en: 'Show more', am: 'ተጨማሪ አሳይ', ar: 'عرض المزيد' })}
+                  </button>
+                ) : (
+                  <span />
+                )}
+                <button
+                  type="button"
+                  onClick={() => setActiveId(r.id)}
+                  className={`text-xs font-semibold ${
+                    featured ? 'text-amber-500 hover:underline' : 'text-[#A91F24] hover:underline'
+                  }`}
+                >
+                  {getLocalized({
+                    en: 'Read full →',
+                    am: 'ሙሉ አንብብ →',
+                    ar: 'اقرأ كاملاً ←',
+                  })}
+                </button>
+              </div>
+            </article>
           )
         })}
       </div>
@@ -139,9 +206,16 @@ export default function RemindersFeed({ showHeading = true }: Props) {
             onClick={e => e.stopPropagation()}
           >
             <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-[#e3e2e0] dark:border-neutral-800 bg-white/95 dark:bg-neutral-950/95 px-4 py-3 backdrop-blur shrink-0">
-              <span className="inline-flex items-center rounded-full bg-[#7f1d1d] text-white text-[10px] font-semibold px-2.5 py-1">
-                {getLocalized({ en: 'Reminder', am: 'ማስታወሻ', ar: 'تذكير' })}
-              </span>
+              <div className="flex items-center gap-2">
+                {active.featured ? (
+                  <span className="inline-flex items-center rounded-full bg-amber-600 text-white text-[10px] font-bold px-2.5 py-1">
+                    {getLocalized({ en: 'Featured', am: 'ተለይቶ', ar: 'مميز' })}
+                  </span>
+                ) : null}
+                <span className="inline-flex items-center rounded-full bg-[#7f1d1d] text-white text-[10px] font-semibold px-2.5 py-1">
+                  {getLocalized({ en: 'Article', am: 'ጽሑፍ', ar: 'مقال' })}
+                </span>
+              </div>
               <button
                 type="button"
                 onClick={() => setActiveId(null)}

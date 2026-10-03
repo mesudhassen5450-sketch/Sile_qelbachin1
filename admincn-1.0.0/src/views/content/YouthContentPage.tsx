@@ -48,8 +48,21 @@ const LABELS: Record<YouthKind, { title: string; desc: string }> = {
   },
 }
 
-export default function YouthContentPage({ kind }: { kind: YouthKind }) {
-  const meta = LABELS[kind]
+export default function YouthContentPage({
+  kind,
+  titleOverride,
+  descOverride,
+}: {
+  kind: YouthKind
+  /** Temporary: Da’wah/Library Reminders reuse Articles until independent reminders ship. */
+  titleOverride?: string
+  descOverride?: string
+}) {
+  const base = LABELS[kind]
+  const meta = {
+    title: titleOverride || base.title,
+    desc: descOverride || base.desc,
+  }
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

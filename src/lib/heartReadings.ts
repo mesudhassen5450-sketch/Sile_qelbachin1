@@ -1,10 +1,9 @@
 /**
  * Shared heart readings for home / articles / Da’wah+Library reminders.
  *
- * - Articles (Youth → Articles) are the main source (enter once).
- * - Reminders (cms_reminders via Admin Reminders) merge in when present —
- *   they survive refresh from Supabase/R2 (migration 006).
- * - Home strip: Featured first, then priority — top 4 titles.
+ * For now: Youth → Articles is the source of truth (Admin Reminders reuses Articles).
+ * Independent cms_reminders can merge later when that list is populated.
+ * Home / feeds: Featured first, then priority.
  */
 import {
   fetchPublishedArticles,
