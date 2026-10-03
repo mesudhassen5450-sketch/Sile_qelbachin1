@@ -44,7 +44,7 @@ const LABELS: Record<YouthKind, { title: string; desc: string }> = {
   },
   questions: {
     title: 'Q & A (published)',
-    desc: 'Public Q&A on /questions. Private Ask-an-Ustaz stays under Community.',
+    desc: 'Public Q&A on the website (/questions + home featured). Private Ask-an-Ustaz inbox is under Community → Question Submissions. Saves go to Supabase (durable).',
   },
 }
 
@@ -167,7 +167,12 @@ export default function YouthContentPage({ kind }: { kind: YouthKind }) {
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : rows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No items yet.</p>
+            <p className="text-sm text-muted-foreground">
+              No items yet. Click <strong>Add</strong> — published items appear on{' '}
+              <code className="text-xs">/questions</code>
+              {kind === 'questions' ? ' (and home if Featured).' : '.'} Older items may have been
+              lost before durable storage; re-add them once after applying migration 005.
+            </p>
           ) : (
             <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {rows.map(row => (

@@ -1,5 +1,6 @@
 import {
   DeleteObjectCommand,
+  GetObjectCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
@@ -286,6 +287,29 @@ export async function putObjectToR2(input: {
       etag: res.ETag?.replace(/"/g, '') ?? null
     }
   } catch (err) {
+    throw formatR2SdkError(err)
+  }
+}
+
+/** Read a small text/json object from R2 (CMS backups). Returns null if missing. */
+export async function getObjectTextFromR2(objectKey: string): Promise<string | null> {
+  const env = getR2Env()
+  if (!hasR2ApiCredentials(env) || !objectKey?.trim()) return null
+  const client = createS3Client(env)
+  try {
+    const res = await client.send(
+      new GetObjectCommand({ Bucket: env.bucket, Key: objectKey })
+    )
+    const body = res.Body
+    if (!body) return null
+    return await body.transformToString()
+  } catch (err) {
+    const name = err && typeof err === 'object' && 'name' in err ? String((err as { name: string }).name) : ''
+    const status =
+      err && typeof err === 'object' && '$metadata' in err
+        ? (err as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode
+        : undefined
+    if (name === 'NoSuchKey' || status === 404) return null
     throw formatR2SdkError(err)
   }
 }

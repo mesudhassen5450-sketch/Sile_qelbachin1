@@ -459,7 +459,7 @@ export async function GET(
     }
     const { listPublishedYouthContent } = await import('@/lib/cms/youth-content')
     const kind = resource as 'marriage' | 'articles' | 'questions'
-    const rows = listPublishedYouthContent(kind)
+    const rows = await listPublishedYouthContent(kind)
     return withCors(NextResponse.json({ ok: true, count: rows.length, data: rows }))
   }
 

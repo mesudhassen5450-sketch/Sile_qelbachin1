@@ -176,7 +176,7 @@ export async function PATCH(request: Request) {
     })
 
     if (publishPublic) {
-      upsertYouthContent('questions', {
+      await upsertYouthContent('questions', {
         title_en: existing.question.slice(0, 200),
         title_am: existing.question.slice(0, 200),
         title_ar: existing.question.slice(0, 200),
