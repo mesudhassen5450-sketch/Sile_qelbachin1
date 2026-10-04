@@ -319,7 +319,7 @@ function QuestionsPageInner() {
                   <span className="inline-flex items-center rounded-full bg-[#7f1d1d] text-white text-[11px] font-semibold tracking-wide px-2.5 py-1 border border-[#A91F24]/60">
                     {getLocalized(item.category)}
                   </span>
-                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
+                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
                     <span className="tabular-nums">#{item.displayId}</span>
                     {published ? (
                       <>
@@ -346,8 +346,8 @@ function QuestionsPageInner() {
                   {truncateText(fullQuestion)}
                 </h2>
 
-                <p className="text-sm leading-relaxed line-clamp-2 text-[#9CA3AF]">
-                  <span className="font-medium text-[#9CA3AF]/90">
+                <p className="text-sm leading-relaxed line-clamp-2 text-[#4b5563] dark:text-neutral-400">
+                  <span className="font-semibold text-[#374151] dark:text-neutral-300">
                     {getLocalized({ en: 'Answer: ', am: 'መልስ፦ ', ar: 'الجواب: ' })}
                   </span>
                   {getLocalized(item.answer)}
@@ -413,7 +413,7 @@ function QuestionsPageInner() {
                   {getLocalized({ en: 'Prev', am: 'ቀዳሚ', ar: 'السابق' })}
                 </span>
               </button>
-              <p className="text-xs font-semibold text-neutral-500 tabular-nums">
+              <p className="text-xs font-semibold text-neutral-600 dark:text-neutral-400 tabular-nums">
                 {detailIndex + 1} / {filtered.length}
               </p>
               <div className="flex items-center gap-2">
@@ -445,7 +445,7 @@ function QuestionsPageInner() {
                 <span className="inline-flex items-center rounded-full bg-[#7f1d1d] text-white text-[11px] font-semibold tracking-wide px-2.5 py-1 border border-[#A91F24]/60">
                   {getLocalized(detail.category)}
                 </span>
-                <span className="text-[11px] font-medium text-neutral-500 tabular-nums">
+                <span className="text-[11px] font-medium text-neutral-600 dark:text-neutral-400 tabular-nums">
                   #{detail.displayId}
                 </span>
                 {formatPublishedMonth(detail.createdAt, language) ? (
@@ -485,7 +485,7 @@ function QuestionsPageInner() {
               </div>
 
               {getLocalized(detail.description).trim() ? (
-                <p className="text-sm text-[#9CA3AF] leading-relaxed whitespace-pre-wrap border-t border-[#e3e2e0] dark:border-neutral-800 pt-4">
+                <p className="text-sm text-[#4b5563] dark:text-neutral-400 leading-relaxed whitespace-pre-wrap border-t border-[#e3e2e0] dark:border-neutral-800 pt-4">
                   {getLocalized(detail.description)}
                 </p>
               ) : null}

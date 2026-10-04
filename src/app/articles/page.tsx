@@ -153,7 +153,7 @@ function ArticlesPageInner() {
                   {title}
                 </h2>
                 {body ? (
-                  <p className="text-sm text-[#9CA3AF] leading-relaxed line-clamp-2">{truncate(body)}</p>
+                  <p className="text-sm text-[#4b5563] dark:text-neutral-400 leading-relaxed line-clamp-2">{truncate(body)}</p>
                 ) : null}
               </button>
             )

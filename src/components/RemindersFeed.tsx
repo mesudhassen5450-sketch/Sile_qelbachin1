@@ -77,7 +77,7 @@ export default function RemindersFeed({ showHeading = true }: Props) {
                 ar: 'تذكيرات القلب',
               })}
             </h2>
-            <p className="text-sm text-neutral-500 mt-1">
+            <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
               {getLocalized({
                 en: 'From Articles — Featured first. Scroll or use the arrows.',
                 am: 'ከጽሑፎች — ተለይተው መጀመሪያ። ይሸብልሉ ወይም ቀስቶቹን ይጠቀሙ።',
@@ -155,7 +155,7 @@ export default function RemindersFeed({ showHeading = true }: Props) {
                 </h3>
               ) : null}
               {body ? (
-                <p className="text-sm text-[#9CA3AF] leading-relaxed whitespace-pre-line">
+                <p className="text-sm text-[#4b5563] dark:text-neutral-400 leading-relaxed whitespace-pre-line">
                   {preview}
                 </p>
               ) : null}
@@ -166,7 +166,7 @@ export default function RemindersFeed({ showHeading = true }: Props) {
                     onClick={() =>
                       setExpanded(prev => ({ ...prev, [r.id]: !prev[r.id] }))
                     }
-                    className="text-xs font-semibold text-neutral-400 hover:text-neutral-200"
+                    className="text-xs font-semibold text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
                   >
                     {open
                       ? getLocalized({ en: 'Show less', am: 'አሳንስ', ar: 'أقل' })
