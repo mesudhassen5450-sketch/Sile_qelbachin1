@@ -4,9 +4,11 @@ const nextConfig = {
     unoptimized: true,
   },
   async rewrites() {
-    // Same-origin proxy → local Admin CMS (avoids browser CORS on :3001)
+    // Same-origin proxy → Admin CMS (local :3001 or production Admin)
     const cms =
-      process.env.CMS_REWRITE_TARGET || 'http://127.0.0.1:3001/api/public/v1'
+      process.env.CMS_REWRITE_TARGET ||
+      process.env.NEXT_PUBLIC_CMS_API_BASE ||
+      'https://admin.sileqelbachin1.com/api/public/v1'
     return [
       {
         source: '/api/cms/:path*',

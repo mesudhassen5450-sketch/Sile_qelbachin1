@@ -1,39 +1,58 @@
 /**
  * Published CMS client for the public website.
- * Admin (Render) is the source of truth — website always prefers live API data.
+ * Prefer same-origin `/api/cms` (Netlify → Admin) so home works on every computer,
+ * even when Admin on Render is cold-starting. Falls back to Admin public URL.
  *
  * Override with NEXT_PUBLIC_CMS_API_BASE in Netlify / .env.local if needed.
  */
-const DEFAULT_CMS_BASE = 'https://admin.sileqelbachin1.com/api/public/v1'
-const CMS_BASE = (process.env.NEXT_PUBLIC_CMS_API_BASE || DEFAULT_CMS_BASE).replace(/\/+$/, '')
+const DEFAULT_ADMIN_CMS = 'https://admin.sileqelbachin1.com/api/public/v1'
+const ENV_CMS = (process.env.NEXT_PUBLIC_CMS_API_BASE || '').replace(/\/+$/, '')
 
 export function getCmsApiBase(): string {
-  return CMS_BASE
+  if (typeof window !== 'undefined') return '/api/cms'
+  return ENV_CMS || DEFAULT_ADMIN_CMS
 }
 
 export function isCmsApiEnabled(): boolean {
-  return Boolean(CMS_BASE)
+  return true
 }
 
 function cmsBasesToTry(): string[] {
-  const bases = [CMS_BASE, DEFAULT_CMS_BASE]
+  const bases: string[] = []
+  // Browser: same-origin proxy first (reliable for all visitors)
+  if (typeof window !== 'undefined') {
+    bases.push('/api/cms')
+  }
+  if (ENV_CMS) bases.push(ENV_CMS)
+  bases.push(DEFAULT_ADMIN_CMS)
+  // Local rewrite target used in .env.local
+  if (ENV_CMS && ENV_CMS.includes('/api/cms') && typeof window === 'undefined') {
+    bases.push(DEFAULT_ADMIN_CMS)
+  }
   return [...new Set(bases.filter(Boolean))]
 }
 
 async function getJson<T>(resource: string): Promise<T | null> {
-  for (const base of cmsBasesToTry()) {
-    try {
-      const res = await fetch(`${base}/${resource}?t=${Date.now()}`, {
-        cache: 'no-store',
-        headers: { Accept: 'application/json' },
-        signal: AbortSignal.timeout(8000),
-      })
-      if (!res.ok) continue
-      const body = await res.json()
-      if (!body?.ok) continue
-      return body.data as T
-    } catch {
-      /* try next base */
+  const bases = cmsBasesToTry()
+  for (const base of bases) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const url = `${base.replace(/\/+$/, '')}/${resource}?t=${Date.now()}`
+        const res = await fetch(url, {
+          cache: 'no-store',
+          headers: { Accept: 'application/json' },
+          signal: AbortSignal.timeout(typeof window !== 'undefined' ? 18000 : 22000),
+        })
+        if (!res.ok) break
+        const body = await res.json()
+        if (!body?.ok) break
+        return body.data as T
+      } catch {
+        if (attempt === 0) {
+          await new Promise(r => setTimeout(r, 600))
+          continue
+        }
+      }
     }
   }
   return null
@@ -186,7 +205,7 @@ export async function fetchHomeCmsBundle() {
       fetchPublishedOneMinute(),
       fetchPublishedArticles(),
       fetchPublishedMarriage(),
-      fetchPublishedQuestions()
+      fetchPublishedQuestions(),
     ])
   return {
     kitabs: kitabs || [],
@@ -198,13 +217,5 @@ export async function fetchHomeCmsBundle() {
     articles: articles || [],
     marriage: marriage || [],
     questions: questions || [],
-    ok: Boolean(kitabs || audio || video || pdfs || reminders || oneMinute || articles || marriage || questions)
   }
-}
-
-export function pickCmsLoc(loc: CmsLoc | undefined, language: string): string {
-  if (!loc) return ''
-  if (language === 'am') return loc.am || loc.en || loc.ar || ''
-  if (language === 'ar') return loc.ar || loc.en || loc.am || ''
-  return loc.en || loc.am || loc.ar || ''
 }
