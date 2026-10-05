@@ -219,3 +219,11 @@ export async function fetchHomeCmsBundle() {
     questions: questions || [],
   }
 }
+
+/** Pick localized string for current UI language. */
+export function pickCmsLoc(loc: CmsLoc | undefined, language: string): string {
+  if (!loc) return ''
+  if (language === 'am') return loc.am || loc.en || loc.ar || ''
+  if (language === 'ar') return loc.ar || loc.en || loc.am || ''
+  return loc.en || loc.am || loc.ar || ''
+}
