@@ -3,7 +3,14 @@
 import React, { useState } from 'react';
 import { useAudio } from '@/context/AudioContext';
 import { useLanguage } from '@/context/LanguageContext';
+import type { LocalizedString } from '@/context/LanguageContext';
 import TranslatedText from '@/components/TranslatedText';
+
+function hasDisplayText(value: string | LocalizedString | undefined): boolean {
+  if (!value) return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  return [value.am, value.en, value.ar].some(v => (v || '').trim().length > 0);
+}
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Gauge, X } from 'lucide-react';
 
 export default function AudioPlayerBar() {
@@ -71,13 +78,17 @@ export default function AudioPlayerBar() {
               <h4 className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">
                 <TranslatedText text={currentTrack.title} targetLang={language} />
               </h4>
-              {(currentTrack.speaker?.trim() || currentTrack.kitabTitle) ? (
+              {hasDisplayText(currentTrack.speaker) || hasDisplayText(currentTrack.kitabTitle) ? (
                 <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
-                  {currentTrack.speaker?.trim() ? (
+                  {hasDisplayText(currentTrack.speaker) ? (
                     <TranslatedText text={currentTrack.speaker} targetLang={language} />
                   ) : null}
-                  {currentTrack.speaker?.trim() && currentTrack.kitabTitle ? ' • ' : ''}
-                  {currentTrack.kitabTitle || ''}
+                  {hasDisplayText(currentTrack.speaker) && hasDisplayText(currentTrack.kitabTitle)
+                    ? ' • '
+                    : ''}
+                  {hasDisplayText(currentTrack.kitabTitle) ? (
+                    <TranslatedText text={currentTrack.kitabTitle!} targetLang={language} />
+                  ) : null}
                 </p>
               ) : null}
             </div>
