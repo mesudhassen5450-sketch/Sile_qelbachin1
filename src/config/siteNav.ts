@@ -4,13 +4,16 @@
  * Old routes (/kitab, /dawah, /reminders, …) stay live as aliases.
  */
 
+import type { SiteIconName } from '@/components/icons/SiteIcons'
+
 export type NavLink = {
   href: string
   label: { en: string; am: string; ar: string }
   description: { en: string; am: string; ar: string }
   /** Optional dedicated CTA line for home archive cards */
   cta?: { en: string; am: string; ar: string }
-  emoji: string
+  /** Hand-coded SVG icon key (header / footer / home) */
+  icon: SiteIconName
 }
 
 export type NavSection = {
@@ -23,7 +26,7 @@ export type NavSection = {
 export const EDUCATIONAL_ARCHIVE: NavLink[] = [
   {
     href: '/quran-recitation',
-    emoji: '📖',
+    icon: 'quran',
     label: {
       en: 'Qur’an Tilawah & Tafsir',
       am: 'የቁርኣን ተላዋ እና ተፍሲር',
@@ -42,7 +45,7 @@ export const EDUCATIONAL_ARCHIVE: NavLink[] = [
   },
   {
     href: '/dawah',
-    emoji: '🎙️',
+    icon: 'audio',
     label: {
       en: 'Audio Lessons',
       am: 'የድምፅ ትምህርቶች',
@@ -61,7 +64,7 @@ export const EDUCATIONAL_ARCHIVE: NavLink[] = [
   },
   {
     href: '/one-minute',
-    emoji: '⏱️',
+    icon: 'oneMinute',
     label: {
       en: '1-Minute Messages',
       am: 'የ1 ደቂቃ መልእክቶች',
@@ -80,7 +83,7 @@ export const EDUCATIONAL_ARCHIVE: NavLink[] = [
   },
   {
     href: '/videos',
-    emoji: '🎬',
+    icon: 'videos',
     label: {
       en: 'Video Lessons',
       am: 'የቪዲዮ ትምህርቶች',
@@ -99,7 +102,7 @@ export const EDUCATIONAL_ARCHIVE: NavLink[] = [
   },
   {
     href: '/library',
-    emoji: '📚',
+    icon: 'library',
     label: {
       en: 'Library',
       am: 'ቤተ-መጽሐፍት',
@@ -122,7 +125,7 @@ export const EDUCATIONAL_ARCHIVE: NavLink[] = [
 export const YOUTH_HEART_CORNER: NavLink[] = [
   {
     href: '/questions',
-    emoji: '💬',
+    icon: 'questions',
     label: {
       en: 'Questions & Answers',
       am: 'ጥያቄ እና መልስ',
@@ -136,7 +139,7 @@ export const YOUTH_HEART_CORNER: NavLink[] = [
   },
   {
     href: '/marriage',
-    emoji: '💍',
+    icon: 'marriage',
     label: {
       en: 'Marriage & Love',
       am: 'ጋብቻ እና ፍቅር',
@@ -150,7 +153,7 @@ export const YOUTH_HEART_CORNER: NavLink[] = [
   },
   {
     href: '/articles',
-    emoji: '📝',
+    icon: 'articles',
     label: {
       en: 'Articles',
       am: 'ጽሑፎች',
@@ -187,7 +190,7 @@ export const NAV_SECTIONS: NavSection[] = [
 
 export const ASK_QUESTION = {
   href: '/ask-question',
-  emoji: '📩',
+  icon: 'ask' as SiteIconName,
   label: {
     en: 'Ask a Question',
     am: 'ጥያቄዎን ያቅርቡ',

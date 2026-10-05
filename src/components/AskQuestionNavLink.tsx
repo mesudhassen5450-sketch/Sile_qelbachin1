@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
 import { useLanguage } from '@/context/LanguageContext'
 import { ASK_QUESTION } from '@/config/siteNav'
+import { SiteIcon } from '@/components/icons/SiteIcons'
 
 type Props = {
   className?: string
@@ -25,7 +26,7 @@ export default function AskQuestionNavLink({ className, onClick, trailing }: Pro
 
   return (
     <Link href={href} onClick={onClick} className={className}>
-      <span>{ASK_QUESTION.emoji}</span>
+      <SiteIcon name={ASK_QUESTION.icon} size={16} />
       <span>{getLocalized(ASK_QUESTION.label)}</span>
       {trailing}
     </Link>

@@ -20,6 +20,7 @@ import AskQuestionNavLink from '@/components/AskQuestionNavLink'
 import HomeQuranIntro from '@/components/HomeQuranIntro'
 import KitabCard from '@/components/KitabCard'
 import { EDUCATIONAL_ARCHIVE, YOUTH_HEART_CORNER } from '@/config/siteNav'
+import { SiteIcon } from '@/components/icons/SiteIcons'
 import { kitabsData, siteMetadata, type Kitab } from '@/data/channelData'
 import { getLocalOneMinuteSlides } from '@/data/oneMinuteCatalog'
 import { useLanguage } from '@/context/LanguageContext'
@@ -340,8 +341,8 @@ export default function HomePage() {
               href={item.href}
               className="portfolio-card p-3 sm:p-5 space-y-1.5 sm:space-y-2 hover:border-red-500/40 hover:-translate-y-0.5 transition group min-w-0"
             >
-              <span className="text-xl sm:text-2xl" aria-hidden>
-                {item.emoji}
+              <span className="inline-flex h-8 w-8 items-center justify-center" aria-hidden>
+                <SiteIcon name={item.icon} size={26} />
               </span>
               <h3 className="text-sm sm:text-lg font-bold text-[#111827] dark:text-white group-hover:text-red-600 transition line-clamp-2">
                 {getLocalized(item.label)}
@@ -689,8 +690,8 @@ export default function HomePage() {
                 item.href === '/questions' ? 'border-[#D4AF37]/50' : ''
               }`}
             >
-              <span className="text-2xl" aria-hidden>
-                {item.emoji}
+              <span className="inline-flex h-8 w-8 items-center justify-center" aria-hidden>
+                <SiteIcon name={item.icon} size={26} />
               </span>
               <h3 className="text-lg font-bold text-[#111827] dark:text-white group-hover:text-red-600 transition">
                 {getLocalized(item.label)}

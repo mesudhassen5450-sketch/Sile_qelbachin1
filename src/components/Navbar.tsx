@@ -17,6 +17,7 @@ import {
   YOUTH_HEART_CORNER,
   type NavLink,
 } from '@/config/siteNav';
+import { SiteIcon } from '@/components/icons/SiteIcons';
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -89,8 +90,8 @@ export default function Navbar() {
             : 'text-neutral-700 dark:text-neutral-200 hover:bg-red-600/10 dark:hover:bg-red-600/15 hover:text-red-700 dark:hover:text-red-400 hover:font-semibold'
         }`}
       >
-        <span className="text-base leading-none mt-0.5" aria-hidden>
-          {item.emoji}
+        <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center" aria-hidden>
+          <SiteIcon name={item.icon} size={18} />
         </span>
         <span className="min-w-0">
           <span className="block font-semibold">{getLocalized(item.label)}</span>
@@ -265,7 +266,9 @@ export default function Navbar() {
           <div className="fixed top-[var(--site-header-height)] left-0 right-0 z-40 bg-[#141416] text-white border-b border-neutral-800 px-0 py-0 shadow-xl max-h-[85vh] overflow-y-auto">
             <div className="px-5 py-4 border-b border-neutral-800 flex items-center justify-between bg-[#18191c]">
               <div className="flex items-center gap-2 font-bold">
-                <span className="w-8 h-8 rounded-full bg-red-600 flex items-center justify-center text-sm">❤️</span>
+                <span className="w-8 h-8 rounded-full bg-red-600/15 border border-red-600/30 flex items-center justify-center">
+                  <SiteIcon name="heart" size={16} />
+                </span>
                 <span>{siteMetadata.channelName}</span>
               </div>
               <button type="button" onClick={() => setIsMenuOpen(false)} className="text-neutral-400 p-1" aria-label="Close">
@@ -280,7 +283,9 @@ export default function Navbar() {
                 isActive('/') ? 'border-red-600 bg-red-600/10' : 'border-transparent'
               }`}
             >
-              <span>🏠</span>
+              <span className="inline-flex h-5 w-5 items-center justify-center">
+                <SiteIcon name="home" size={18} />
+              </span>
               <span className="font-medium">{t('nav.home')}</span>
             </Link>
 
@@ -298,7 +303,9 @@ export default function Navbar() {
                       isActive(item.href) ? 'border-red-600 bg-red-600/10' : 'border-transparent hover:bg-white/5'
                     }`}
                   >
-                    <span className="text-lg leading-none mt-0.5">{item.emoji}</span>
+                    <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center">
+                      <SiteIcon name={item.icon} size={18} />
+                    </span>
                     <span>
                       <span className="block font-medium text-[15px]">{getLocalized(item.label)}</span>
                       <span className="block text-[11px] text-neutral-500 mt-0.5">
@@ -317,7 +324,9 @@ export default function Navbar() {
                 isActive('/contact') ? 'border-red-600 bg-red-600/10' : 'border-transparent'
               }`}
             >
-              <span>📞</span>
+              <span className="inline-flex h-5 w-5 items-center justify-center">
+                <SiteIcon name="contact" size={18} />
+              </span>
               <span className="font-medium">{t('nav.contact')}</span>
             </Link>
 

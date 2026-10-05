@@ -6,9 +6,13 @@ const nextConfig = {
   // Monorepo: Admin lives under admincn-1.0.0 — keep tracing rooted here for Vercel
   outputFileTracingRoot: __dirname,
   async rewrites() {
-    // Fallback proxy if App Router /api/cms is not hit. Prefer CMS_REWRITE_TARGET on Vercel.
+    // Fallback proxy if App Router /api/cms is not hit. Prefer CMS_REWRITE_TARGET.
+    // Local: always prefer Admin on :3001 so PDFs/CMS load without hitting Render.
     const cms =
       process.env.CMS_REWRITE_TARGET ||
+      (process.env.NODE_ENV !== 'production'
+        ? 'http://127.0.0.1:3001/api/public/v1'
+        : null) ||
       (process.env.NEXT_PUBLIC_CMS_API_BASE &&
       !String(process.env.NEXT_PUBLIC_CMS_API_BASE).includes('/api/cms')
         ? process.env.NEXT_PUBLIC_CMS_API_BASE

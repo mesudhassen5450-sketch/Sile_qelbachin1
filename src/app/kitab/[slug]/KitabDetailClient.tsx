@@ -7,6 +7,7 @@ import { Kitab } from '@/data/channelData';
 import { useAudio } from '@/context/AudioContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { resolveMediaUrl, resolvePdfEmbedUrl } from '@/lib/mediaUrl';
+import { triggerMediaDownload } from '@/lib/downloadUrl';
 import {
   BookOpen,
   Headphones,
@@ -378,16 +379,14 @@ export default function KitabDetailClient({ kitab }: { kitab: Kitab }) {
                 <Eye className="w-4 h-4 text-red-500" />
                 <span>{t('kitabPdfOnly')}</span>
               </button>
-              <a
-                href={pdfSrc}
-                target="_blank"
-                rel="noopener noreferrer"
-                download
+              <button
+                type="button"
+                onClick={() => pdfSrc && void triggerMediaDownload(pdfSrc, displayTitle)}
                 className="px-5 py-3 rounded-xl font-bold text-xs sm:text-sm bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-white hover:bg-neutral-200 transition flex items-center gap-2 shadow-md"
               >
                 <Download className="w-4 h-4 text-red-500" />
                 <span>{t('downloadPdf')}</span>
-              </a>
+              </button>
             </div>
           </div>
         </section>
@@ -451,19 +450,17 @@ export default function KitabDetailClient({ kitab }: { kitab: Kitab }) {
                   </button>
                 </>
               )}
-              {pdfSrc && (
-                <a
-                  href={pdfSrc}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  download
+              {pdfSrc ? (
+                <button
+                  type="button"
+                  onClick={() => void triggerMediaDownload(pdfSrc, displayTitle)}
                   className="p-2 rounded-lg bg-neutral-800 text-neutral-200 hover:text-white transition"
                   title={t('downloadPdf')}
                   aria-label={t('downloadPdf')}
                 >
                   <Download className="w-4 h-4" />
-                </a>
-              )}
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => closeDualPane()}
@@ -555,17 +552,17 @@ export default function KitabDetailClient({ kitab }: { kitab: Kitab }) {
               >
                 <Maximize2 className="w-4 h-4" />
               </button>
-              <a
-                href={pdfSrc}
-                target="_blank"
-                rel="noopener noreferrer"
-                download
-                className="p-2 rounded-lg bg-neutral-800 text-neutral-200 hover:text-white transition"
-                title={t('downloadPdf')}
-                aria-label={t('downloadPdf')}
-              >
-                <Download className="w-4 h-4" />
-              </a>
+              {pdfSrc ? (
+                <button
+                  type="button"
+                  onClick={() => void triggerMediaDownload(pdfSrc, displayTitle)}
+                  className="p-2 rounded-lg bg-neutral-800 text-neutral-200 hover:text-white transition"
+                  title={t('downloadPdf')}
+                  aria-label={t('downloadPdf')}
+                >
+                  <Download className="w-4 h-4" />
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => closePdfOnly()}

@@ -65,7 +65,9 @@ function AudioRow({ item }: { item: PlayableAudio }) {
         </button>
         <div className="min-w-0 space-y-1">
           <h3 className="font-bold text-neutral-900 dark:text-white truncate">{title}</h3>
-          <p className="text-xs text-neutral-500 truncate">🎙 {item.speaker}</p>
+          {item.speaker.trim() ? (
+            <p className="text-xs text-neutral-500 truncate">🎙 {item.speaker}</p>
+          ) : null}
           {item.category ? (
             <span className="text-[10px] font-bold uppercase tracking-wider text-[#B8860B]">
               {item.category}
@@ -109,10 +111,11 @@ export default function DawahPage() {
         id: `archive-${a.id}`,
         catalogId: a.id,
         title: a.title,
-        speaker: 'እስታዝ አቡ ዐብደላህ · Muhadara',
+        // No mock speaker — client asked to drop placeholder names from audio UI.
+        speaker: '',
         audioUrl: a.fileUrl,
         source: 'archive' as const,
-        category: a.category || 'Muhadara',
+        category: a.category || 'Audio',
         durationSeconds,
       }
     })
@@ -128,10 +131,10 @@ export default function DawahPage() {
           en: a.title.en || a.title.am || '',
           ar: a.title.ar || a.title.en || a.title.am || '',
         },
-        speaker: a.isMuhadara ? 'Muhadara' : a.category || 'Audio lesson',
+        speaker: '',
         audioUrl: a.fileUrl!,
         source: 'cms' as const,
-        category: a.isMuhadara ? 'Muhadara' : a.category || 'Audio',
+        category: a.category || 'Audio',
         durationSeconds: null as number | null,
       }))
   }, [cmsAudio])

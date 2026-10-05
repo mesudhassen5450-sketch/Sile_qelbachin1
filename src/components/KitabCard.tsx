@@ -7,6 +7,7 @@ import { User } from 'lucide-react';
 import { Kitab } from '@/data/channelData';
 import { useLanguage } from '@/context/LanguageContext';
 import { resolveMediaUrl } from '@/lib/mediaUrl';
+import { triggerMediaDownload } from '@/lib/downloadUrl';
 
 export default function KitabCard({ kitab }: { kitab: Kitab }) {
   const { getLocalized, t, language } = useLanguage();
@@ -85,10 +86,9 @@ export default function KitabCard({ kitab }: { kitab: Kitab }) {
           </Link>
 
           {pdfSrc && (
-            <a
-              href={pdfSrc}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              type="button"
+              onClick={() => void triggerMediaDownload(pdfSrc, titleText)}
               className="p-2.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 hover:text-red-600 dark:hover:text-white rounded-lg transition-colors"
               title={t('downloadPdf')}
               aria-label={t('downloadPdf')}
@@ -101,7 +101,7 @@ export default function KitabCard({ kitab }: { kitab: Kitab }) {
                   d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 />
               </svg>
-            </a>
+            </button>
           )}
         </div>
       </div>

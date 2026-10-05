@@ -71,9 +71,15 @@ export default function AudioPlayerBar() {
               <h4 className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">
                 <TranslatedText text={currentTrack.title} targetLang={language} />
               </h4>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
-                <TranslatedText text={currentTrack.speaker} targetLang={language} /> {currentTrack.kitabTitle ? `• ${currentTrack.kitabTitle}` : ''}
-              </p>
+              {(currentTrack.speaker?.trim() || currentTrack.kitabTitle) ? (
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
+                  {currentTrack.speaker?.trim() ? (
+                    <TranslatedText text={currentTrack.speaker} targetLang={language} />
+                  ) : null}
+                  {currentTrack.speaker?.trim() && currentTrack.kitabTitle ? ' • ' : ''}
+                  {currentTrack.kitabTitle || ''}
+                </p>
+              ) : null}
             </div>
           </div>
           <button

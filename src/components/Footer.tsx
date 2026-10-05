@@ -4,8 +4,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { siteMetadata } from '@/data/channelData';
 import { useLanguage } from '@/context/LanguageContext';
-import { Send, Video, Youtube } from 'lucide-react';
 import { ASK_QUESTION, NAV_SECTIONS } from '@/config/siteNav';
+import { SiteIcon } from '@/components/icons/SiteIcons';
 
 export default function Footer() {
   const { t, getLocalized } = useLanguage();
@@ -36,7 +36,7 @@ export default function Footer() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-sky-950/60 border border-sky-800/50 text-sky-300 text-xs hover:bg-sky-900 transition"
               >
-                <Send className="w-3.5 h-3.5" />
+                <SiteIcon name="telegram" size={14} />
                 <span>Telegram: {siteMetadata.telegramHandle}</span>
               </a>
               <a
@@ -45,7 +45,7 @@ export default function Footer() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-red-950/60 border border-red-800/50 text-red-300 text-xs hover:bg-red-900 transition"
               >
-                <Youtube className="w-3.5 h-3.5" />
+                <SiteIcon name="youtube" size={14} />
                 <span>YouTube</span>
               </a>
               <a
@@ -54,7 +54,7 @@ export default function Footer() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs hover:bg-neutral-700 transition"
               >
-                <Video className="w-3.5 h-3.5" />
+                <SiteIcon name="tiktok" size={14} />
                 <span>TikTok</span>
               </a>
             </div>
@@ -68,8 +68,9 @@ export default function Footer() {
               <ul className="space-y-2 text-sm">
                 {section.items.map(item => (
                   <li key={item.href}>
-                    <Link href={item.href} className="hover:text-red-400 transition">
-                      {item.emoji} {getLocalized(item.label)}
+                    <Link href={item.href} className="inline-flex items-center gap-2 hover:text-red-400 transition">
+                      <SiteIcon name={item.icon} size={15} />
+                      <span>{getLocalized(item.label)}</span>
                     </Link>
                   </li>
                 ))}
@@ -83,23 +84,30 @@ export default function Footer() {
             </h4>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href={ASK_QUESTION.href} className="hover:text-red-400 transition font-semibold text-red-400">
-                  {ASK_QUESTION.emoji} {getLocalized(ASK_QUESTION.label)}
+                <Link
+                  href={ASK_QUESTION.href}
+                  className="inline-flex items-center gap-2 hover:text-red-400 transition font-semibold text-red-400"
+                >
+                  <SiteIcon name={ASK_QUESTION.icon} size={15} />
+                  <span>{getLocalized(ASK_QUESTION.label)}</span>
                 </Link>
               </li>
               <li>
-                <Link href="/contact" className="hover:text-white transition">
-                  {t('nav.contact')}
+                <Link href="/contact" className="inline-flex items-center gap-2 hover:text-white transition">
+                  <SiteIcon name="contact" size={15} />
+                  <span>{t('nav.contact')}</span>
                 </Link>
               </li>
               <li>
-                <Link href="/kitab" className="hover:text-white transition">
-                  {t('nav.kitab')}
+                <Link href="/kitab" className="inline-flex items-center gap-2 hover:text-white transition">
+                  <SiteIcon name="library" size={15} />
+                  <span>{t('nav.kitab')}</span>
                 </Link>
               </li>
               <li>
-                <Link href="/reminders" className="hover:text-white transition">
-                  {t('nav.reminders')}
+                <Link href="/reminders" className="inline-flex items-center gap-2 hover:text-white transition">
+                  <SiteIcon name="articles" size={15} />
+                  <span>{t('nav.reminders')}</span>
                 </Link>
               </li>
             </ul>

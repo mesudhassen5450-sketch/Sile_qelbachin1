@@ -206,7 +206,7 @@ function AudioTrackRow({
       playTrack({
         id: audio.id,
         title: displayTitle,
-        speaker: 'እስታዝ አቡ ዐብደላህ',
+        speaker: '',
         duration: audio.fileSize || '35:00',
         audioUrl: audio.fileUrl,
       });
@@ -253,7 +253,7 @@ function AudioTrackRow({
 
           {displayDesc && displayDesc !== displayTitle && (
             <p className="text-xs text-neutral-600 dark:text-neutral-300 truncate max-w-2xl">
-              🎙️ እስታዝ አቡ ዐብደላህ • {displayDesc}
+              {displayDesc}
             </p>
           )}
         </div>

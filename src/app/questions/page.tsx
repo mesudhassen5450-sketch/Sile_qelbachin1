@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import CategoryPageHero from '@/components/CategoryPageHero'
 import { useLanguage } from '@/context/LanguageContext'
 import { ASK_QUESTION } from '@/config/siteNav'
+import { SiteIcon } from '@/components/icons/SiteIcons'
 import { fetchPublishedQuestions, type CmsLoc } from '@/lib/cmsClient'
 
 type CmsQa = {
@@ -277,7 +278,7 @@ function QuestionsPageInner() {
             href={ASK_QUESTION.href}
             className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#A91F24] text-white text-sm font-bold shadow-md hover:bg-[#8F171C] transition shrink-0"
           >
-            <span>{ASK_QUESTION.emoji}</span>
+            <SiteIcon name={ASK_QUESTION.icon} size={16} />
             {getLocalized({
               en: 'Ask a Question',
               am: 'ጥያቄዎን ያቅርቡ',

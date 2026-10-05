@@ -18,6 +18,7 @@ import {
   type CmsKitab,
   type CmsPdf,
 } from '@/lib/cmsClient'
+import { triggerMediaDownload } from '@/lib/downloadUrl'
 
 type Tab = 'kitab' | 'pdf' | 'notes'
 
@@ -57,10 +58,28 @@ function cmsToKitab(k: CmsKitab): Kitab {
 
 export default function LibraryPage() {
   const { getLocalized, language } = useLanguage()
-  const [tab, setTab] = useState<Tab>('kitab')
+  const [tab, setTab] = useState<Tab>('pdf')
   const [kitabs, setKitabs] = useState<Kitab[]>(kitabsData)
   const [pdfs, setPdfs] = useState<CmsPdf[]>([])
-  const [shareTarget, setShareTarget] = useState<{ title: string; url: string } | null>(null)
+  const [shareTarget, setShareTarget] = useState<{
+    title: string
+    url: string
+    fileUrl: string
+    fileName: string
+  } | null>(null)
+  const [highlightPdfId, setHighlightPdfId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const qTab = params.get('tab')
+    if (qTab === 'pdf' || qTab === 'kitab' || qTab === 'notes') setTab(qTab)
+    const qPdf = params.get('pdf')
+    if (qPdf) {
+      setTab('pdf')
+      setHighlightPdfId(qPdf)
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -90,44 +109,74 @@ export default function LibraryPage() {
     }))
   }, [])
 
+  /** Dedupe key: prefer basename so flat R2 + nested kitab URLs don't hide each other wrongly */
+  const pdfKey = (url: string) => {
+    try {
+      const path = decodeURIComponent(new URL(url).pathname)
+      const base = path.split('/').pop() || path
+      return base.toLowerCase().replace(/\s+/g, ' ').trim()
+    } catch {
+      const base = url.split('/').pop() || url
+      return decodeURIComponent(base).toLowerCase().replace(/\s+/g, ' ').trim()
+    }
+  }
+
   const allPdfs = useMemo(() => {
-    const byUrl = new Map<string, PdfCard>()
+    const byKey = new Map<string, PdfCard>()
+    const byExactUrl = new Map<string, PdfCard>()
 
-    archivePdfs.forEach(p => {
-      if (p.fileUrl) byUrl.set(p.fileUrl, p)
-    })
+    const add = (card: PdfCard, prefer = false) => {
+      if (!card.fileUrl) return
+      byExactUrl.set(card.fileUrl, card)
+      const key = pdfKey(card.fileUrl)
+      const existing = byKey.get(key)
+      if (!existing || prefer) byKey.set(key, card)
+    }
 
-    pdfs.forEach((p: CmsPdf) => {
-      if (!p.fileUrl || byUrl.has(p.fileUrl)) return
-      byUrl.set(p.fileUrl, {
-        id: `cms-${p.id}`,
-        title: {
-          am: p.title.am || p.title.en || '',
-          en: p.title.en || p.title.am || '',
-          ar: p.title.ar || p.title.en || p.title.am || '',
+    // 1) CMS first (Admin titles + attached R2 files) — must all appear
+    pdfs.forEach(p => {
+      if (!p.fileUrl) return
+      add(
+        {
+          id: `cms-${p.id}`,
+          title: {
+            am: p.title.am || p.title.en || '',
+            en: p.title.en || p.title.am || '',
+            ar: p.title.ar || p.title.en || p.title.am || '',
+          },
+          fileUrl: p.fileUrl,
+          source: 'cms',
         },
-        fileUrl: p.fileUrl,
-        source: 'cms',
-      })
+        true
+      )
     })
 
+    // 2) Archive catalog — fill any not already from CMS
+    archivePdfs.forEach(p => add(p, false))
+
+    // 3) Kitab PDFs — only if still missing
     pdfFromKitabs.forEach(k => {
       const url = k.pdfUrl
-      if (!url || byUrl.has(url)) return
+      if (!url) return
       const title =
         typeof k.title === 'string'
           ? { am: k.title, en: k.title, ar: k.title }
           : k.title
-      byUrl.set(url, {
-        id: `kitab-pdf-${k.slug}`,
-        title,
-        fileUrl: url,
-        source: 'kitab',
-        meta: typeof k.author === 'string' ? k.author : k.author?.am || k.author?.en,
-      })
+      add(
+        {
+          id: `kitab-pdf-${k.slug}`,
+          title,
+          fileUrl: url,
+          source: 'kitab',
+          meta: typeof k.author === 'string' ? k.author : k.author?.am || k.author?.en,
+        },
+        false
+      )
     })
 
-    return Array.from(byUrl.values())
+    // Prefer unique by basename; if CMS empty, still show every archive/kitab by exact URL
+    if (pdfs.length > 0) return Array.from(byKey.values())
+    return Array.from(byExactUrl.values())
   }, [archivePdfs, pdfs, pdfFromKitabs])
 
   const tabs: { id: Tab; label: { en: string; am: string; ar: string }; icon: typeof BookMarked }[] = [
@@ -233,8 +282,22 @@ export default function LibraryPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {allPdfs.map(pdf => {
               const title = pickCmsLoc(pdf.title, language) || getLocalized(pdf.title)
+              const isHighlight = highlightPdfId === pdf.id
               return (
-                <div key={pdf.id} className="portfolio-card p-5 space-y-3 group">
+                <div
+                  key={pdf.id}
+                  id={`pdf-${pdf.id}`}
+                  ref={
+                    isHighlight
+                      ? el => {
+                          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                        }
+                      : undefined
+                  }
+                  className={`portfolio-card p-5 space-y-3 group ${
+                    isHighlight ? 'ring-2 ring-red-500/60 bg-red-500/5' : ''
+                  }`}
+                >
                   <div className="flex items-start justify-between gap-3">
                     <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-red-600/10 text-red-600 border border-[#D4AF37]/30">
                       <FileText className="w-5 h-5" />
@@ -242,21 +305,30 @@ export default function LibraryPage() {
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
-                        onClick={() => setShareTarget({ title, url: pdf.fileUrl })}
+                        onClick={() => {
+                          const origin =
+                            typeof window !== 'undefined' ? window.location.origin : ''
+                          const pageUrl = `${origin}/library?tab=pdf&pdf=${encodeURIComponent(pdf.id)}`
+                          setShareTarget({
+                            title,
+                            url: pageUrl,
+                            fileUrl: pdf.fileUrl,
+                            fileName: `${title.replace(/\.[Pp][Dd][Ff]$/, '').trim() || 'document'}.pdf`,
+                          })
+                        }}
                         className="btn-interactive p-2 rounded-lg bg-[#D4AF37]/10 border border-[#D4AF37]/40 text-[#B8860B] dark:text-[#E8C547]"
                         aria-label="Share"
                       >
                         <Share2 className="w-4 h-4" />
                       </button>
-                      <a
-                        href={pdf.fileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <button
+                        type="button"
+                        onClick={() => void triggerMediaDownload(pdf.fileUrl, title)}
                         className="btn-interactive p-2 rounded-lg text-neutral-400 hover:text-red-600"
                         aria-label="Download"
                       >
                         <Download className="w-4 h-4" />
-                      </a>
+                      </button>
                     </div>
                   </div>
                   <h3 className="font-bold text-neutral-900 dark:text-white line-clamp-2 group-hover:text-[#B8860B] transition">
@@ -275,9 +347,13 @@ export default function LibraryPage() {
                       {getLocalized({ en: 'Open PDF', am: 'PDF ክፈት', ar: 'افتح PDF' })}
                       <ExternalLink className="w-3 h-3" />
                     </a>
-                    <span className="text-[10px] uppercase font-bold text-[#B8860B]/80">
-                      PDF
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void triggerMediaDownload(pdf.fileUrl, title)}
+                      className="btn-interactive text-[10px] uppercase font-bold text-[#B8860B]/80 hover:text-[#B8860B]"
+                    >
+                      {getLocalized({ en: 'Download', am: 'አውርድ', ar: 'تحميل' })}
+                    </button>
                   </div>
                 </div>
               )
@@ -327,7 +403,10 @@ export default function LibraryPage() {
         open={!!shareTarget}
         onClose={() => setShareTarget(null)}
         title={shareTarget?.title || 'PDF'}
+        text={shareTarget?.title}
         url={shareTarget?.url}
+        fileUrl={shareTarget?.fileUrl}
+        fileName={shareTarget?.fileName}
       />
     </div>
   )
