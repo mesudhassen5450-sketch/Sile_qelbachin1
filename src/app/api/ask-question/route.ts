@@ -34,11 +34,22 @@ type Row = {
 const OPEN_STATUSES = new Set(['new', 'assigned', 'in_review', 'user_replied'])
 
 function adminCmsBase(): string {
-  return (
-    process.env.NEXT_PUBLIC_CMS_API_BASE ||
-    process.env.CMS_API_BASE ||
-    'https://admin.sileqelbachin1.com/api/public/v1'
-  ).replace(/\/+$/, '')
+  const candidates = [
+    process.env.CMS_REWRITE_TARGET,
+    process.env.CMS_API_BASE,
+    process.env.NEXT_PUBLIC_CMS_API_BASE,
+    'https://admin.sileqelbachin1.com/api/public/v1',
+  ]
+  for (const c of candidates) {
+    const v = String(c || '')
+      .trim()
+      .replace(/\/+$/, '')
+    if (!v) continue
+    // Never call the same-origin proxy from this server route (loop / wrong host)
+    if (/\/api\/cms$/i.test(v) || v.includes('/api/cms')) continue
+    if (/^https?:\/\//i.test(v)) return v
+  }
+  return 'https://admin.sileqelbachin1.com/api/public/v1'
 }
 
 function storePaths(): string[] {

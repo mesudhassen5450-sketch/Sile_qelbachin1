@@ -1,9 +1,9 @@
 /**
  * Published CMS client for the public website.
- * Prefer same-origin `/api/cms` (Netlify → Admin) so home works on every computer,
+ * Prefer same-origin `/api/cms` (Vercel/Netlify → Admin) so home works on every computer,
  * even when Admin on Render is cold-starting. Falls back to Admin public URL.
  *
- * Override with NEXT_PUBLIC_CMS_API_BASE in Netlify / .env.local if needed.
+ * Override with NEXT_PUBLIC_CMS_API_BASE / CMS_REWRITE_TARGET on Vercel if needed.
  */
 const DEFAULT_ADMIN_CMS = 'https://admin.sileqelbachin1.com/api/public/v1'
 const ENV_CMS = (process.env.NEXT_PUBLIC_CMS_API_BASE || '').replace(/\/+$/, '')

@@ -99,7 +99,7 @@ export interface LiveLecture {
 }
 
 export const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL || 'https://sileqelbachin1.netlify.app';
+  process.env.NEXT_PUBLIC_SITE_URL || 'https://sileqelbachin1.com';
 
 export const siteMetadata = {
   channelName: 'ስለ ቀልባችን',

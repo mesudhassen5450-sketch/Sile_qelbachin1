@@ -1,0 +1,12 @@
+# Do not upload Admin / local junk to Vercel (website = repo root only)
+admincn-1.0.0
+.data
+.deps
+.recover
+vendor
+vendor-supabase
+.netlify
+.edgeone
+tef_dist
+generated
+*.apk
