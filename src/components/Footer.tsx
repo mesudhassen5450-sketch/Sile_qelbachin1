@@ -84,13 +84,16 @@ export default function Footer() {
             </h4>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link
-                  href={ASK_QUESTION.href}
-                  className="inline-flex items-center gap-2 hover:text-red-400 transition font-semibold text-red-400"
-                >
-                  <SiteIcon name={ASK_QUESTION.icon} size={15} />
-                  <span>{getLocalized(ASK_QUESTION.label)}</span>
+               <Link
+                href="https://t.me/Slekelbachinbot"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 hover:text-red-400 transition font-semibold text-red-400"
+                   >
+               <SiteIcon name={ASK_QUESTION.icon} size={15} />
+             <span>{getLocalized(ASK_QUESTION.label)}</span>
                 </Link>
+
               </li>
               <li>
                 <Link href="/contact" className="inline-flex items-center gap-2 hover:text-white transition">
