@@ -668,40 +668,48 @@ export default function AskQuestionPage() {
         >
           <div className="space-y-3 text-center sm:text-start">
             <p className="text-[11px] font-bold uppercase tracking-wider text-[#A91F24]">
-              {getLocalized({ en: 'Awaiting reply', am: 'መልስ በመጠባበቅ', ar: 'بانتظار الرد' })}
+              {getLocalized({
+                en: 'Awaiting Response',
+                am: 'መልስ በመጠባበቅ ላይ',
+                ar: 'بانتظار الرد',
+              })}
             </p>
             <h2 className="text-xl font-bold text-neutral-900 dark:text-white">
               {getLocalized({
-                en: 'Assalamu alaikum — your question is with the Ustaz',
-                am: 'አሰላሙ ዓለይኩም — ጥያቄዎ ከኡስታዝ ጋር ነው',
-                ar: 'السلام عليكم — سؤالك عند الأستاذ',
+                en: 'السلام عليكم — You Have an Active Question',
+                am: 'السلام عليكم — በመጠባበቅ ላይ ያለ ጥያቄ አለዎት',
+                ar: 'السلام عليكم — لديك سؤال قيد الانتظار',
               })}
             </h2>
             <p className="text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed">
               {getLocalized({
-                en: 'To ensure we give your question the attention it deserves and manage our time effectively, we accept only one question at a time. Once we have answered your pending question (or resolved the matter), we will be ready to process a new submission.',
-                am: 'የእርስዎን ጥያቄ በተገቢው ሁኔታ አስተውለን ለመመለስ እና የጊዜ አጠቃቀማችንን የተስተካከለ ለማድረግ፣ በአንድ ጊዜ አንድ ጥያቄ ብቻ እንቀበላለን። አሁን የላኩልንን ጥያቄ መልሰን ስንጨርስ (ወይም ጉዳዩ ሲጠናቀቅ) አዲስ ጥያቄ ማስተናገድ እንችላለን።',
-                ar: 'لنمنح سؤالك العناية التي يستحقها ونُحسن إدارة الوقت، نقبل سؤالاً واحداً فقط في كل مرة. بعد الإجابة عن سؤالك الحالي (أو إغلاقه) يمكننا استقبال سؤال جديد.',
+                en: 'To give your question the attention it deserves and manage our responses effectively, we process only one question at a time. Once we have answered your current question, you will be able to submit a new one.',
+                am: 'ጥያቄዎን በጥንቃቄ መርምረን ምላሽ ለመስጠት እና የስራ ሂደታችንን የተስተካከለ ለማድረግ፣ በአንድ ጊዜ አንድ ጥያቄ ብቻ እንቀበላለን። አሁን ያቀረቡትን ጥያቄ መልሰን ስንጨርስ አዲስ ጥያቄ ማስተናገድ እንችላለን።',
+                ar: 'لنمنح سؤالك العناية التي يستحقها ونُحسن إدارة الردود، نعالج سؤالاً واحداً فقط في كل مرة. بعد الإجابة عن سؤالك الحالي يمكنك إرسال سؤال جديد.',
               })}
             </p>
             <p className="text-sm font-medium text-neutral-700 dark:text-neutral-200 leading-relaxed">
               {(pendingChannel || submittedChannel) === 'telegram'
                 ? getLocalized({
-                    en: `In shā’ Allāh your reply will arrive privately on Telegram (@${BOT_USERNAME}).`,
-                    am: `በፈቃደ አላህ መልሱ በግል በቴሌግራም (@${BOT_USERNAME}) ይደርስዎታል።`,
-                    ar: `إن شاء الله ستصلك الإجابة بخصوصية على تيليجرام (@${BOT_USERNAME}).`,
+                    en: `Insha’Allah, our response will arrive privately on Telegram (@${BOT_USERNAME}).`,
+                    am: `በአላህ ፈቃድ ምላሹ በግል በቴሌግራም (@${BOT_USERNAME}) ይደርሳል።`,
+                    ar: `إن شاء الله سيصلك ردنا بخصوصية على تيليجرام (@${BOT_USERNAME}).`,
                   })
                 : getLocalized({
-                    en: `In shā’ Allāh your reply will be sent by email to ${contactEmail || 'your inbox'}.`,
-                    am: `በፈቃደ አላህ መልሱ በኢሜይል ወደ ${contactEmail || 'ኢንቦክስዎ'} ይላካል።`,
-                    ar: `إن شاء الله ستُرسل الإجابة بالبريد إلى ${contactEmail || 'صندوقك'}.`,
+                    en: `Insha’Allah, our response will be sent to your email (${contactEmail || 'your inbox'}).`,
+                    am: `በአላህ ፈቃድ ምላሹ በኢሜይልዎ (${contactEmail || 'ኢንቦክስዎ'}) ይላካል።`,
+                    ar: `إن شاء الله سيُرسل ردنا إلى بريدك (${contactEmail || 'صندوقك'}).`,
                   })}
             </p>
           </div>
           {pendingPreview ? (
             <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white/70 dark:bg-neutral-900/50 px-4 py-3 space-y-1">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
-                {getLocalized({ en: 'Your open question', am: 'ክፍት ጥያቄዎ', ar: 'سؤالك المفتوح' })}
+                {getLocalized({
+                  en: 'Pending Question',
+                  am: 'የተላከው ጥያቄ',
+                  ar: 'السؤال المعلق',
+                })}
               </p>
               <p className="text-sm text-neutral-800 dark:text-neutral-200 leading-relaxed">
                 “{pendingPreview}”
@@ -712,14 +720,14 @@ export default function AskQuestionPage() {
             <p className="text-sm text-neutral-700 dark:text-neutral-200 leading-relaxed">
               {(pendingChannel || submittedChannel) === 'telegram'
                 ? getLocalized({
-                    en: `JazakAllahu Khair for your patience! Before submitting a new question, please check Telegram (@${BOT_USERNAME}) for our response.`,
-                    am: `ስለ ትዕግስትዎ ጀዛኩሙላሁ ኸይረን! አዲስ ጥያቄ ከመላክዎ በፊት የላክንልዎትን ምላሽ በቴሌግራም (@${BOT_USERNAME}) ያረጋግጡ።`,
-                    ar: `جزاكم الله خيراً على صبركم! قبل إرسال سؤال جديد، يرجى التحقق من تيليجرام (@${BOT_USERNAME}) لردنا.`,
+                    en: `جزاكم الله خيراً for your patience! Before submitting another question, please check Telegram (@${BOT_USERNAME}) for our reply.`,
+                    am: `ስለ ትዕግስትዎ جزاكم الله خيراً! አዲስ ጥያቄ ከመላክዎ በፊት የላክንልዎትን ምላሽ በቴሌግራም (@${BOT_USERNAME}) ያረጋግጡ።`,
+                    ar: `جزاكم الله خيراً على صبركم! قبل إرسال سؤال جديد، تحقق من تيليجرام (@${BOT_USERNAME}) لردنا.`,
                   })
                 : getLocalized({
-                    en: 'JazakAllahu Khair for your patience! Before submitting a new question, please check your email or dashboard for our response.',
-                    am: 'ስለ ትዕግስትዎ ጀዛኩሙላሁ ኸይረን! አዲስ ጥያቄ ከመላክዎ በፊት የላክንልዎትን ምላሽ በኢሜይልዎ ወይም በዳሽቦርድዎ ያረጋግጡ።',
-                    ar: 'جزاكم الله خيراً على صبركم! قبل إرسال سؤال جديد، يرجى التحقق من بريدكم أو لوحة التحكم لردنا.',
+                    en: 'جزاكم الله خيراً for your patience! Before submitting another question, please check your email or dashboard for our reply.',
+                    am: 'ስለ ትዕግስትዎ جزاكم الله خيراً! አዲስ ጥያቄ ከመላክዎ በፊት የላክንልዎትን ምላሽ በኢሜይልዎ ወይም በዳሽቦርድዎ ያረጋገጡ።',
+                    ar: 'جزاكم الله خيراً على صبركم! قبل إرسال سؤال جديد، تحقق من بريدكم أو لوحة التحكم لردنا.',
                   })}
             </p>
           </div>
@@ -732,7 +740,16 @@ export default function AskQuestionPage() {
             >
               @{BOT_USERNAME}
             </a>
-          ) : null}
+          ) : (
+            <a
+              href="https://mail.google.com/mail/u/0/#inbox"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex px-5 py-2.5 rounded-xl bg-[#A91F24] text-white text-sm font-bold"
+            >
+              {getLocalized({ en: 'Open Gmail', am: 'Gmail ክፈት', ar: 'افتح Gmail' })}
+            </a>
+          )}
         </div>
       ) : null}
 
@@ -747,15 +764,15 @@ export default function AskQuestionPage() {
           <div className="space-y-2">
             <h2 className="text-xl font-bold text-neutral-900 dark:text-white">
               {getLocalized({
-                en: 'Assalamu Alaikum — We Have Received Your Question',
-                am: 'አሰላሙ ዓለይኩም — ጥያቄዎን ተቀብለናል',
+                en: 'السلام عليكم — Question Received',
+                am: 'السلام عليكم — ጥያቄዎን ተቀብለናል',
                 ar: 'السلام عليكم — تم استلام سؤالك',
               })}
             </h2>
             <p className="text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed max-w-lg mx-auto">
               {getLocalized({
-                en: "JazakAllahu Khair! We have respectfully received your question. Insha'Allah, we will carefully review it and provide you with a response as soon as possible.",
-                am: 'ዛኩሙላሁ ኸይረን! ጥያቄዎን በአክብሮት ተቀብለናል። በአላህ ፈቃድ በጥንቃቄ ተመልክተን በተቻለ ፍጥነት ምላሽ እንሰጥዎታለን።',
+                en: 'جزاكم الله خيراً! We have respectfully received your question. Insha’Allah, we will carefully review it and provide you with a response as soon as possible.',
+                am: 'جزاكم الله خيراً! ጥያቄዎን በአክብሮት ተቀብለናል። በአላህ ፈቃድ በጥንቃቄ ተመልክተን በተቻለ ፍጥነት ምላሽ እንሰጥዎታለን።',
                 ar: 'جزاكم الله خيراً! استلمنا سؤالك بكل احترام. إن شاء الله سنراجعه بعناية ونرد في أقرب وقت.',
               })}
             </p>
@@ -763,21 +780,21 @@ export default function AskQuestionPage() {
           <p className="text-sm font-medium text-neutral-800 dark:text-neutral-100 leading-relaxed max-w-md mx-auto">
             {submittedChannel === 'telegram'
               ? getLocalized({
-                  en: `Insha'Allah your reply will arrive privately on Telegram (@${BOT_USERNAME}).`,
-                  am: `በአላህ ፈቃድ መልሱ በግል በቴሌግራም (@${BOT_USERNAME}) ይደርስዎታል።`,
-                  ar: `إن شاء الله ستصلك الإجابة بخصوصية على تيليجرام (@${BOT_USERNAME}).`,
+                  en: `Insha’Allah, our response will arrive privately on Telegram (@${BOT_USERNAME}).`,
+                  am: `በአላህ ፈቃድ ምላሹ በግል በቴሌግራም (@${BOT_USERNAME}) ይደርሳል።`,
+                  ar: `إن شاء الله سيصلك ردنا بخصوصية على تيليجرام (@${BOT_USERNAME}).`,
                 })
               : getLocalized({
-                  en: `Insha'Allah your reply will be sent by email to ${contactEmail}.`,
-                  am: `በአላህ ፈቃድ መልሱ በኢሜይል ወደ ${contactEmail} ይላካል።`,
-                  ar: `إن شاء الله ستُرسل الإجابة بالبريد إلى ${contactEmail}.`,
+                  en: `Insha’Allah, our response will be sent to your email (${contactEmail}).`,
+                  am: `በአላህ ፈቃድ ምላሹ በኢሜይልዎ (${contactEmail}) ይላካል።`,
+                  ar: `إن شاء الله سيُرسل ردنا إلى بريدك (${contactEmail}).`,
                 })}
           </p>
           <p className="text-xs text-neutral-500 leading-relaxed max-w-md mx-auto rounded-xl border border-amber-500/25 bg-amber-50/70 dark:bg-amber-950/20 px-4 py-3">
             {getLocalized({
-              en: 'To ensure we provide an accurate and thoughtful response, we accept only one question at a time until your current question is answered and completed.',
-              am: 'ትክክለኛና ጥንቃቄ የተሞላበት ምላሽ ለመስጠት እንድንችል፣ አሁን የላኩት ጥያቄ ምላሽ አግኝቶ እስኪጠናቀቅ ድረስ በአንድ ጊዜ አንድ ጥያቄ ብቻ እንቀበላለን',
-              ar: 'لضمان رد دقيق ومتأنٍ، نقبل سؤالاً واحداً فقط حتى يُجاب سؤالك الحالي ويكتمل.',
+              en: 'To ensure we provide an accurate and thoughtful response, we accept only one question at a time until your pending question is completed.',
+              am: 'ትክክለኛና ጥንቃቄ የተሞላበት ምላሽ ለመስጠት እንድንችል፣ አሁን ያቀረቡት ጥያቄ ምላሽ አግኝቶ እስኪጠናቀቅ ድረስ በአንድ ጊዜ አንድ ጥያቄ ብቻ እንቀበላለን።',
+              ar: 'لضمان رد دقيق ومتأنٍ، نقبل سؤالاً واحداً فقط حتى يكتمل سؤالك الحالي.',
             })}
           </p>
           {submittedChannel === 'telegram' ? (
@@ -789,7 +806,20 @@ export default function AskQuestionPage() {
             >
               @{BOT_USERNAME}
             </a>
-          ) : null}
+          ) : (
+            <a
+              href="https://mail.google.com/mail/u/0/#inbox"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#A91F24] text-white text-sm font-bold hover:bg-red-700 transition"
+            >
+              {getLocalized({
+                en: 'Open Gmail',
+                am: 'Gmail ክፈት',
+                ar: 'افتح Gmail',
+              })}
+            </a>
+          )}
         </div>
       ) : null}
 

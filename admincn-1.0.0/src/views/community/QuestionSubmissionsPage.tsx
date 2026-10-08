@@ -392,6 +392,12 @@ export default function QuestionSubmissionsPage() {
                             ? ` · ${t({ en: 'Delivery failed', am: 'መላክ አልተሳካም' })}`
                             : ''}
                       </p>
+                      {row.delivery_status === 'failed' &&
+                      (row.delivery_error || row.email_error) ? (
+                        <p className="text-destructive max-w-xl whitespace-pre-wrap text-[11px] leading-snug">
+                          {row.delivery_error || row.email_error}
+                        </p>
+                      ) : null}
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger

@@ -25,11 +25,13 @@ export function resolveTgLocale(input?: {
 }
 
 const CONN_AM = "💚 አሰላሙ ዓለይኩም ወራሕመቱላሂ ወበረካቱህ\n\nቴሌግራምዎ ከስለ ቀልባችን (Sile Qelbachin) ጋር በትክክል ተያይዟል።\n\n➡️ አሁን ወደ ድረ-ገጹ ተመልሰው ጥያቄዎን ያቅረቡ / ይላኩ።\nኢንሻአላህ የኡስታዝ ምላሽ ቀጥታ እዚህ በግል ይደርስዎታል።"
-const ANS_HEAD_AM = "🌙 <b>ስለ ቀልባችን (Sile Qelbachin)</b>"
-const ANS_INTRO_AM = "አሰላሙ ዓለይኩም ወራሕመቱላሂ ወበረካቱህ።\n\nአልሐምዱሊላህ — ለጠየቁት ጥያቄ ምላሽ ሰጥተናል።"
+const ANS_HEAD_AM = "🌙 <b>ስለ ቀልባችን | Sile Qelbachin</b>"
+const ANS_INTRO_AM =
+  "አሰላሙ ዓለይኩም ወራሕመቱልላሂ ወበረካቱሁ\n\nለጠየቁት ጥያቄ ምላሽ ተሰጥቷል።"
 const Q_LABEL_AM = "❓ <b>የእርስዎ ጥያቄ፦</b>"
-const A_LABEL_AM = "💡 <b>የኡስታዝ ምላሽ፦</b>"
-const DUA_AM = "🤲 አላህ ጠቃሚ ዕውቀትን ይጨምርልዎት፤ በጥቅም ላይም የሚያውሉት ያድርገው። አሚን። ❤️"
+const A_LABEL_AM = "💡 <b>የተሰጠው ምላሽ፦</b>"
+const DUA_AM =
+  "🤲 አላህ ጠቃሚ እውቀትን ይለግስዎ፤ በትክክለኛው መንገድ ላይም ብርሃን ያድርግልዎ። አሚን!"
 const BTN_AM = "🌐 ወደ ድረ-ገጹ ተመለስ — ጥያቄዎን ያቅረቡ"
 const CAP_IMG_AM = "📷 ከኡስታዝ — ምስል"
 const CAP_AUD_AM = "🎧 ከኡስታዝ — ድምጽ"
@@ -47,16 +49,23 @@ export function connectionConfirmationText(locale: TgLocale): string {
   ].join("\n")
 }
 
+/** Telegram message hard limit is 4096 — keep room for template chrome. */
+function clipTelegramField(s: string, max: number): string {
+  const t = String(s || "").trim()
+  if (t.length <= max) return t
+  return `${t.slice(0, Math.max(0, max - 1))}…`
+}
+
 export function formatAnswerDeliveryText(input: {
   locale: TgLocale
   question: string
   answer: string
   greeting?: string | null
 }): string {
-  const q = escapeHtml(input.question.trim())
-  let a = escapeHtml(input.answer.trim())
+  const q = escapeHtml(clipTelegramField(input.question, 1200))
+  let a = escapeHtml(clipTelegramField(input.answer, 2000))
   if (input.greeting?.trim()) {
-    a = `${escapeHtml(input.greeting.trim())}\n\n${a}`
+    a = `${escapeHtml(clipTelegramField(input.greeting, 400))}\n\n${a}`
   }
   if (input.locale === "am") {
     return [
@@ -80,17 +89,17 @@ export function formatAnswerDeliveryText(input: {
     "",
     "Assalamu alaikum wa rahmatullahi wa barakatuh.",
     "",
-    "Alhamdulillah — we have replied to your question.",
+    "A reply has been provided for your question.",
     "",
     "━━━━━━━━━━━━━━━━━━━━━━",
-    "❓ <b>Your question</b>",
+    "❓ <b>Your question:</b>",
     q,
     "",
-    "💡 <b>Answer from the Ustaz</b>",
+    "💡 <b>The answer:</b>",
     a,
     "━━━━━━━━━━━━━━━━━━━━━━",
     "",
-    "🤲 May Allah grant you beneficial knowledge and make it a light upon your path. Āmīn.",
+    "🤲 May Allah grant you beneficial knowledge and make it a light upon the right path. Āmīn!",
   ].join("\n")
 }
 
@@ -139,6 +148,8 @@ export function websiteAskReturnUrl(): string {
   )
     .trim()
     .replace(/\/+$/, "")
+  // TELEGRAM_RETURN_URL may already be …/ask-question — never double the path.
+  if (/\/ask-question$/i.test(base)) return base
   return `${base}/ask-question`
 }
 
