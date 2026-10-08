@@ -167,11 +167,23 @@ export async function POST(request: Request) {
     )
   }
 
-  // link-start
-  if (user && !body.guest_email) {
-    const started = await createTelegramLinkStart(user.id)
+  // link-start — prefer signed-in user_id so chat_id is cached on the account
+  if (user) {
+    const started = await createTelegramLinkStart(user.id, user.email)
     if (!started.ok) {
       return cors(NextResponse.json({ ok: false, error: started.error }, { status: 400 }))
+    }
+    if ('already_connected' in started && started.already_connected) {
+      return cors(
+        NextResponse.json({
+          ok: true,
+          already_connected: true,
+          connected: true,
+          username: started.username,
+          connected_at: started.connected_at,
+          bot_username: started.bot_username,
+        })
+      )
     }
     return cors(
       NextResponse.json({
@@ -184,10 +196,22 @@ export async function POST(request: Request) {
     )
   }
 
-  const guestEmail = String(body.guest_email || body.email || user?.email || '').trim()
+  const guestEmail = String(body.guest_email || body.email || '').trim()
   const started = await createTelegramLinkStartForGuest(guestEmail)
   if (!started.ok) {
     return cors(NextResponse.json({ ok: false, error: started.error }, { status: 400 }))
+  }
+  if ('already_connected' in started && started.already_connected) {
+    return cors(
+      NextResponse.json({
+        ok: true,
+        already_connected: true,
+        connected: true,
+        username: started.username,
+        connected_at: started.connected_at,
+        bot_username: started.bot_username,
+      })
+    )
   }
   return cors(
     NextResponse.json({

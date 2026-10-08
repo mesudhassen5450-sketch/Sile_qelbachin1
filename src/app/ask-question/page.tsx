@@ -301,15 +301,37 @@ export default function AskQuestionPage() {
     setError(null)
   }
 
-  const refreshGuestTelegram = async (email: string, token: string) => {
-    const res = await fetch(
-      `/api/telegram/status?email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`,
-      { cache: 'no-store' }
-    )
+  const rememberTgConnected = (username: string | null) => {
+    setTgConnected(true)
+    setTgUsername(username)
+    try {
+      if (contactEmail.includes('@')) {
+        localStorage.setItem(
+          'sile_tg_linked_v1',
+          JSON.stringify({ email: contactEmail, username, at: Date.now() })
+        )
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /** Session-based status — reuses cached chat_id after the first Start (no second Start). */
+  const refreshTelegramStatus = async (token?: string | null) => {
+    const params = new URLSearchParams()
+    if (contactEmail.includes('@') && token) {
+      params.set('email', contactEmail)
+      params.set('token', token)
+    }
+    const qs = params.toString()
+    const res = await fetch(`/api/telegram/status${qs ? `?${qs}` : ''}`, { cache: 'no-store' })
     const data = await res.json().catch(() => ({}))
     const ok = Boolean(data.connected)
-    setTgConnected(ok)
-    setTgUsername(typeof data.username === 'string' ? data.username : null)
+    if (ok) {
+      rememberTgConnected(typeof data.username === 'string' ? data.username : null)
+    } else {
+      setTgConnected(false)
+    }
     return ok
   }
 
@@ -318,7 +340,7 @@ export default function AskQuestionPage() {
     let tries = 0
     const timer = window.setInterval(() => {
       tries += 1
-      void refreshGuestTelegram(contactEmail, token).then(connected => {
+      void refreshTelegramStatus(token).then(connected => {
         if (connected) {
           window.clearInterval(timer)
           setTgWaiting(false)
@@ -332,7 +354,9 @@ export default function AskQuestionPage() {
   }
 
   /** Prefetch deep link so Open is a real <a href> (keeps user gesture for tg://). */
-  const prepareTelegramDeepLink = async (): Promise<{ link: string; token: string } | null> => {
+  const prepareTelegramDeepLink = async (): Promise<
+    { link: string; token: string } | { already: true } | null
+  > => {
     if (!user?.email) {
       setError(
         getLocalized({
@@ -343,16 +367,25 @@ export default function AskQuestionPage() {
       )
       return null
     }
+    // Already linked on this account — never ask to Start again.
+    const linked = await refreshTelegramStatus(tgToken)
+    if (linked || tgConnected) return { already: true }
+
     if (tgDeepLink && tgToken) return { link: tgDeepLink, token: tgToken }
     setTgConnecting(true)
     setError(null)
     try {
+      // Do NOT send guest_email when signed in — cache chat_id on the user account.
       const res = await fetch('/api/telegram/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'link-start', guest_email: user.email }),
+        body: JSON.stringify({ action: 'link-start' }),
       })
       const data = await res.json().catch(() => ({}))
+      if (data.already_connected || data.connected) {
+        rememberTgConnected(typeof data.username === 'string' ? data.username : null)
+        return { already: true }
+      }
       if (!res.ok || !data.ok || !data.deep_link) {
         throw new Error(
           data.error ||
@@ -383,20 +416,41 @@ export default function AskQuestionPage() {
   useEffect(() => {
     if (!showDeliveryModal || modalChannel !== 'telegram') return
     if (!user?.email) return
-    if (tgConnected || tgDeepLink) return
-    void prepareTelegramDeepLink()
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- prefetch when Telegram modal opens after Google
+    void (async () => {
+      const ok = await refreshTelegramStatus(tgToken)
+      if (ok) return
+      if (!tgDeepLink) void prepareTelegramDeepLink()
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- prefetch when Telegram modal opens
   }, [showDeliveryModal, modalChannel, user?.email])
 
+  // After return from bot / page reload — restore linked state from server (and local cache hint).
+  useEffect(() => {
+    if (!user?.email || authLoading) return
+    try {
+      const raw = localStorage.getItem('sile_tg_linked_v1')
+      if (raw) {
+        const parsed = JSON.parse(raw) as { email?: string; username?: string | null }
+        if (parsed.email === contactEmail) {
+          setTgUsername(parsed.username || null)
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    void refreshTelegramStatus(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.email, authLoading])
+
   const onTelegramOpenClick = () => {
+    if (tgConnected) return
     if (tgDeepLink && tgToken) {
       startWaitingForTelegram(tgToken)
       return
     }
-    // Fallback: open blank tab under the click, then navigate after fetch.
     const popup = window.open('about:blank', '_blank')
     void prepareTelegramDeepLink().then(prepared => {
-      if (!prepared) {
+      if (!prepared || 'already' in prepared) {
         popup?.close()
         return
       }
@@ -446,31 +500,20 @@ export default function AskQuestionPage() {
       }
 
       if (channel === 'telegram') {
-        if (!tgConnected) {
-          if (tgToken) {
-            const ok = await refreshGuestTelegram(contactEmail, tgToken)
-            if (!ok) {
-              setError(
-                getLocalized({
-                  en: 'Open the bot and press Start first — then send.',
-                  am: 'መጀመሪያ ቦቱን ክፈተው Start ይጫኑ — ከዚያ ይላኩ።',
-                  ar: 'افتح البوت واضغط Start أولاً — ثم أرسل.',
-                })
-              )
-              setSubmitting(false)
-              return
-            }
-          } else {
-            setError(
-              getLocalized({
-                en: 'Connect Telegram (press Start) before sending.',
-                am: 'ከመላክዎ በፊት ቴሌግራም ያገናኙ (Start)።',
-                ar: 'اربط تيليجرام (Start) قبل الإرسال.',
-              })
-            )
-            setSubmitting(false)
-            return
-          }
+        let linked = tgConnected
+        if (!linked) {
+          linked = await refreshTelegramStatus(tgToken)
+        }
+        if (!linked) {
+          setError(
+            getLocalized({
+              en: 'Open the bot and press Start once — then send. Next time it stays connected.',
+              am: 'ቦቱን አንድ ጊዜ ክፈተው Start ይጫኑ — ከዚያ ይላኩ። በሚቀጥለው ጊዜ ተገናኝቶ ይቆያል።',
+              ar: 'افتح البوت واضغط Start مرة واحدة — ثم أرسل. في المرات التالية يبقى متصلاً.',
+            })
+          )
+          setSubmitting(false)
+          return
         }
       }
 
@@ -622,9 +665,9 @@ export default function AskQuestionPage() {
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       <p className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50/80 dark:bg-neutral-900/40 px-4 py-2.5 text-xs text-neutral-600 dark:text-neutral-300 leading-relaxed">
         {getLocalized({
-          en: 'Submit your question. Choose Telegram or Email for the reply. Note: Telegram needs bot Start; Email needs Google sign-in.',
-          am: 'ጥያቄዎን ያቅርቡ። ምላሽ የሚያገኙበትን መንገድ (ቴሌግራም ወይም ኢሜይል) ይምረጡ። (ማስታወሻ፡ በቴሌግራም ምላሽ ለማግኘት ቦቱን ማስጀመር/Start ማለት፣ በኢሜይል ለማግኘት ደግሞ በGoogle መለያዎ መግባት ያስፈልጋል)',
-          ar: 'قدّم سؤالك. اختر تيليجرام أو البريد للرد. ملاحظة: تيليجرام يحتاج Start على البوت؛ البريد يحتاج تسجيل Google.',
+          en: 'Submit your question. Choose Telegram or Email for the reply. (Note: Telegram needs bot Start once; Email needs Google sign-in.)',
+          am: 'ጥያቄዎን ያቅርቡ። ምላሽ የሚያገኙበትን መንገድ (ቴሌግራም ወይም ኢሜይል) ይምረጡ። (ማስታወሻ፦ በቴሌግራም ምላሽ ለማግኘት ቦቱን ማስጀመር/Start ማለት፤ በኢሜይል ለማግኘት ደግሞ በGoogle መለያዎ መግባት ያስፈልጋል)',
+          ar: 'قدّم سؤالك. اختر تيليجرام أو البريد للرد. (ملاحظة: تيليجرام يحتاج Start مرة واحدة؛ البريد يحتاج تسجيل Google.)',
         })}
       </p>
 
@@ -651,13 +694,6 @@ export default function AskQuestionPage() {
               ar: 'قدّم سؤالك',
             })}
           </h1>
-          <p className="text-sm sm:text-base text-[#6b7280] dark:text-neutral-400 max-w-2xl leading-relaxed">
-            {getLocalized({
-              en: 'Choose how you want the reply (Telegram or Email). Note: for Telegram, open the bot and press Start; for Email, sign in with your Google account.',
-              am: 'ምላሽ የሚያገኙበትን መንገድ (ቴሌግራም ወይም ኢሜይል) ይምረጡ። (ማስታወሻ፡ በቴሌግራም ምላሽ ለማግኘት ቦቱን ማስጀመር/Start ማለት፣ በኢሜይል ለማግኘት ደግሞ በGoogle መለያዎ መግባት ያስፈልጋል)',
-              ar: 'اختر كيف تريد الرد (تيليجرام أو البريد). ملاحظة: لتيليجرام افتح البوت واضغط Start؛ للبريد سجّل الدخول بحساب Google.',
-            })}
-          </p>
         </div>
       </section>
 
@@ -758,30 +794,32 @@ export default function AskQuestionPage() {
           role="alert"
           className="portfolio-card p-8 space-y-5 text-center border border-emerald-600/30 bg-gradient-to-b from-emerald-950/15 to-transparent"
         >
-          <p className="text-lg font-arabic text-emerald-800/80 dark:text-emerald-300/90" aria-hidden>
-            بِسْمِ ٱللَّٰهِ
+          <p
+            className="text-base sm:text-lg font-arabic text-emerald-800/90 dark:text-emerald-300/90 leading-relaxed"
+            dir="rtl"
+          >
+            بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ
           </p>
-          <div className="space-y-2">
-            <h2 className="text-xl font-bold text-neutral-900 dark:text-white">
-              {getLocalized({
-                en: 'السلام عليكم — Question Received',
-                am: 'السلام عليكم — ጥያቄዎን ተቀብለናል',
-                ar: 'السلام عليكم — تم استلام سؤالك',
-              })}
+          <div className="space-y-3">
+            <h2 className="text-xl font-bold text-neutral-900 dark:text-white font-arabic" dir="rtl">
+              السلام عليكم
             </h2>
+            <p className="text-base font-semibold text-neutral-800 dark:text-neutral-100 font-arabic" dir="rtl">
+              جَزَاكُمُ ٱللَّهُ خَيْرًا!
+            </p>
             <p className="text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed max-w-lg mx-auto">
               {getLocalized({
-                en: 'جزاكم الله خيراً! We have respectfully received your question. Insha’Allah, we will carefully review it and provide you with a response as soon as possible.',
-                am: 'جزاكم الله خيراً! ጥያቄዎን በአክብሮት ተቀብለናል። በአላህ ፈቃድ በጥንቃቄ ተመልክተን በተቻለ ፍጥነት ምላሽ እንሰጥዎታለን።',
-                ar: 'جزاكم الله خيراً! استلمنا سؤالك بكل احترام. إن شاء الله سنراجعه بعناية ونرد في أقرب وقت.',
+                en: 'We have respectfully received your question. Insha’Allah, we will carefully review it and provide you with a response as soon as possible.',
+                am: 'ጥያቄዎን በአክብሮት ተቀብለናል። በአላህ ፈቃድ በጥንቃቄ ተመልክተን በተቻለ ፍጥነት ምላሽ እንሰጥዎታለን።',
+                ar: 'استلمنا سؤالك بكل احترام. إن شاء الله سنراجعه بعناية ونرد في أقرب وقت.',
               })}
             </p>
           </div>
           <p className="text-sm font-medium text-neutral-800 dark:text-neutral-100 leading-relaxed max-w-md mx-auto">
             {submittedChannel === 'telegram'
               ? getLocalized({
-                  en: `Insha’Allah, our response will arrive privately on Telegram (@${BOT_USERNAME}).`,
-                  am: `በአላህ ፈቃድ ምላሹ በግል በቴሌግራም (@${BOT_USERNAME}) ይደርሳል።`,
+                  en: `Insha’Allah, our response will reach you privately on Telegram (@${BOT_USERNAME}).`,
+                  am: `በአላህ ፈቃድ ምላሹ በግል በቴሌግራም (@${BOT_USERNAME}) ይደርስዎታል።`,
                   ar: `إن شاء الله سيصلك ردنا بخصوصية على تيليجرام (@${BOT_USERNAME}).`,
                 })
               : getLocalized({
@@ -793,7 +831,7 @@ export default function AskQuestionPage() {
           <p className="text-xs text-neutral-500 leading-relaxed max-w-md mx-auto rounded-xl border border-amber-500/25 bg-amber-50/70 dark:bg-amber-950/20 px-4 py-3">
             {getLocalized({
               en: 'To ensure we provide an accurate and thoughtful response, we accept only one question at a time until your pending question is completed.',
-              am: 'ትክክለኛና ጥንቃቄ የተሞላበት ምላሽ ለመስጠት እንድንችል፣ አሁን ያቀረቡት ጥያቄ ምላሽ አግኝቶ እስኪጠናቀቅ ድረስ በአንድ ጊዜ አንድ ጥያቄ ብቻ እንቀበላለን።',
+              am: 'ትክክለኛና ጥንቃቄ የተሞላበት ምላሽ ለመስጠት እንድንችል፤ አሁን ያቀረቡት ጥያቄ ምላሽ አግኝቶ እስኪጠናቀቅ ድረስ በአንድ ጊዜ አንድ ጥያቄ ብቻ እንቀበላለን።',
               ar: 'لضمان رد دقيق ومتأنٍ، نقبل سؤالاً واحداً فقط حتى يكتمل سؤالك الحالي.',
             })}
           </p>
@@ -1063,25 +1101,23 @@ export default function AskQuestionPage() {
                             })}
                       </button>
                     )}
-                    {tgToken ? (
-                      <button
-                        type="button"
-                        className="text-xs font-semibold text-sky-800 underline"
-                        onClick={() => void refreshGuestTelegram(contactEmail, tgToken)}
-                      >
-                        {tgWaiting
-                          ? getLocalized({
-                              en: 'Waiting for Start… refresh',
-                              am: 'Start በመጠባበቅ… አድስ',
-                              ar: 'بانتظار Start… حدّث',
-                            })
-                          : getLocalized({
-                              en: 'I pressed Start — refresh',
-                              am: 'Start ጫንኩ — አድስ',
-                              ar: 'ضغطت Start — حدّث',
-                            })}
-                      </button>
-                    ) : null}
+                    <button
+                      type="button"
+                      className="text-xs font-semibold text-sky-800 underline"
+                      onClick={() => void refreshTelegramStatus(tgToken)}
+                    >
+                      {tgWaiting
+                        ? getLocalized({
+                            en: 'Waiting for Start… refresh',
+                            am: 'Start በመጠባበቅ… አድስ',
+                            ar: 'بانتظار Start… حدّث',
+                          })
+                        : getLocalized({
+                            en: 'I pressed Start — refresh',
+                            am: 'Start ጫንኩ — አድስ',
+                            ar: 'ضغطت Start — حدّث',
+                          })}
+                    </button>
                   </div>
                 )}
               </div>
@@ -1106,8 +1142,8 @@ export default function AskQuestionPage() {
                 onClick={() => {
                   setShowDeliveryModal(false)
                   setError(null)
-                  setTgDeepLink(null)
                   setTgWaiting(false)
+                  // Keep tgConnected / chat link — do not force Start again.
                 }}
                 disabled={submitting}
               >
@@ -1115,9 +1151,7 @@ export default function AskQuestionPage() {
               </button>
               <button
                 type="button"
-                disabled={
-                  submitting || (modalChannel === 'telegram' && !tgConnected && !tgToken)
-                }
+                disabled={submitting}
                 onClick={() => void submitQuestion(modalChannel)}
                 className="px-5 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold disabled:opacity-50"
               >

@@ -230,7 +230,49 @@ async function insertLinkToken(input: {
   }
 }
 
-export async function createTelegramLinkStart(userId: string) {
+export async function createTelegramLinkStart(userId: string, email?: string | null) {
+  const bot = getTelegramBotUsername()
+  const existing = await getTelegramStatusForUser(userId)
+  if (existing.connected) {
+    return {
+      ok: true as const,
+      already_connected: true as const,
+      bot_username: bot,
+      username: existing.username,
+      connected_at: existing.connected_at,
+    }
+  }
+
+  // Migrate a prior guest link (same Google email) onto the signed-in account.
+  const e = normalizeEmail(email || '')
+  if (e.includes('@')) {
+    const guest = await getTelegramStatusForGuest(e, null)
+    const chatId = await getTelegramChatIdForEmail(e)
+    if (guest.connected && chatId) {
+      const sb = getServiceSupabase()
+      if (sb) {
+        const now = new Date().toISOString()
+        await sb.from('user_telegram_links').upsert(
+          {
+            user_id: userId,
+            chat_id: chatId,
+            username: guest.username,
+            connected_at: guest.connected_at || now,
+            updated_at: now,
+          },
+          { onConflict: 'user_id' }
+        )
+      }
+      return {
+        ok: true as const,
+        already_connected: true as const,
+        bot_username: bot,
+        username: guest.username,
+        connected_at: guest.connected_at,
+      }
+    }
+  }
+
   return insertLinkToken({ userId })
 }
 
@@ -238,6 +280,17 @@ export async function createTelegramLinkStartForGuest(email: string) {
   const e = normalizeEmail(email)
   if (!e.includes('@')) {
     return { ok: false as const, error: 'Valid email required to connect Telegram.' }
+  }
+  const existing = await getTelegramStatusForGuest(e, null)
+  if (existing.connected) {
+    const bot = getTelegramBotUsername()
+    return {
+      ok: true as const,
+      already_connected: true as const,
+      bot_username: bot,
+      username: existing.username,
+      connected_at: existing.connected_at,
+    }
   }
   return insertLinkToken({ guestEmail: e })
 }
