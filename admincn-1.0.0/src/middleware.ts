@@ -13,6 +13,6 @@ export const config = {
      * Media upload must not pass through middleware body limits —
      * auth still runs in the route via requireApiPermission.
      */
-    '/((?!_next/static|_next/image|favicon.ico|api/admin/media/upload|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'
+    '/((?!_next/static|_next/image|favicon.ico|api/admin/media/upload|api/telegram/webhook|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'
   ]
 }

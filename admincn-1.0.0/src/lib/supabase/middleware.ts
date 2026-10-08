@@ -14,6 +14,8 @@ const PUBLIC_PATHS = [
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.some(p => pathname === p || pathname.startsWith(`${p}/`))) return true
   if (pathname.startsWith('/api/public/')) return true
+  // Telegram Bot API webhook + setup — must stay unauthenticated (secret header / setup key).
+  if (pathname.startsWith('/api/telegram/')) return true
   if (pathname.startsWith('/_next/')) return true
   if (pathname.startsWith('/images/') || pathname === '/favicon.ico') return true
   return false
@@ -136,6 +138,10 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (pathname.startsWith('/api/public/')) {
+    return supabaseResponse
+  }
+
+  if (pathname.startsWith('/api/telegram/')) {
     return supabaseResponse
   }
 
