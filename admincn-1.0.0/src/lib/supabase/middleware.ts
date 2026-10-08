@@ -114,8 +114,9 @@ export async function updateSession(request: NextRequest) {
     }
   })
 
-  const userResult = await withTimeout(supabase.auth.getUser(), 4000)
+  const userResult = await withTimeout(supabase.auth.getUser(), 8000)
   const user = userResult?.data?.user ?? null
+  const hasAuthCookie = hasSupabaseAuthCookie(request)
 
   if (isPublicPath(pathname)) {
     if (user && pathname === '/pages/auth/login') {
@@ -152,6 +153,10 @@ export async function updateSession(request: NextRequest) {
 
   if (pathname.startsWith('/api/admin/')) {
     if (!user) {
+      // Cookie present but getUser timed out — do not force logout; let the route retry.
+      if (hasAuthCookie && userResult === null) {
+        return supabaseResponse
+      }
       return NextResponse.json(
         { ok: false, error: 'Authentication required.', code: 'unauthenticated' },
         { status: 401 }
@@ -161,6 +166,10 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (!user) {
+    // Keep staff logged in across refresh when Auth check is slow/fails transiently.
+    if (hasAuthCookie && userResult === null) {
+      return supabaseResponse
+    }
     const loginUrl = request.nextUrl.clone()
     loginUrl.pathname = '/pages/auth/login'
     loginUrl.searchParams.set('next', pathname)

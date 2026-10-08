@@ -84,8 +84,8 @@ export async function GET(request: Request) {
     )
   }
 
-  if (guestEmail.includes('@') && guestToken) {
-    const status = await getTelegramStatusForGuest(guestEmail, guestToken)
+  if (guestEmail.includes('@')) {
+    const status = await getTelegramStatusForGuest(guestEmail, guestToken || null)
     return cors(
       NextResponse.json({
         ok: true,
@@ -97,7 +97,7 @@ export async function GET(request: Request) {
     )
   }
 
-  return cors(NextResponse.json({ ok: false, error: 'Sign in or guest email+token required.' }, { status: 401 }))
+  return cors(NextResponse.json({ ok: false, error: 'Sign in or guest email required.' }, { status: 401 }))
 }
 
 /**
@@ -185,6 +185,9 @@ export async function POST(request: Request) {
         })
       )
     }
+    if (!('deep_link' in started) || !started.deep_link || !started.token) {
+      return cors(NextResponse.json({ ok: false, error: 'Could not create Telegram link.' }, { status: 500 }))
+    }
     return cors(
       NextResponse.json({
         ok: true,
@@ -212,6 +215,9 @@ export async function POST(request: Request) {
         bot_username: started.bot_username,
       })
     )
+  }
+  if (!('deep_link' in started) || !started.deep_link || !started.token) {
+    return cors(NextResponse.json({ ok: false, error: 'Could not create Telegram link.' }, { status: 500 }))
   }
   return cors(
     NextResponse.json({
