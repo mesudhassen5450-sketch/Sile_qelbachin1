@@ -47,6 +47,7 @@ type QuestionStatus =
 
 type Row = {
   id: string
+  user_id?: string | null
   auth_email: string
   name: string | null
   category: string
@@ -60,6 +61,9 @@ type Row = {
   audio_url: string | null
   video_url: string | null
   published_public: boolean
+  answer_channel?: 'email' | 'telegram' | string
+  delivery_status?: 'pending' | 'sent' | 'failed' | string
+  delivery_error?: string | null
   email_sent: boolean
   email_error: string | null
   admin_seen_at?: string | null
@@ -208,6 +212,11 @@ export default function QuestionSubmissionsPage() {
     setInfo(null)
   }
 
+  const channelLabel = (ch?: string) =>
+    ch === 'telegram'
+      ? t({ en: '✈️ Telegram', am: '✈️ ቴሌግራም' })
+      : t({ en: '✉️ Email', am: '✉️ ኢሜይል' })
+
   const submitAnswer = async () => {
     if (!active) return
     setBusy(true)
@@ -229,8 +238,10 @@ export default function QuestionSubmissionsPage() {
         }),
       })
       const data = await res.json()
-      if (!res.ok || !data.ok) throw new Error(data.error || 'Failed')
-      setInfo(data.message || t({ en: 'Saved.', am: 'ተቀምጧል።' }))
+      if (!res.ok || !data.ok || data.delivery_ok === false) {
+        throw new Error(data.error || data.message || 'Delivery failed')
+      }
+      setInfo(data.message || t({ en: '✓ Answer sent', am: '✓ መልስ ተልኳል' }))
       setActive(null)
       await load()
     } catch (err) {
@@ -372,6 +383,15 @@ export default function QuestionSubmissionsPage() {
                         {row.category}
                         {row.assigned_to ? ` · ${row.assigned_to}` : ''}
                       </p>
+                      <p className="text-xs font-medium">
+                        {t({ en: 'Answer delivery:', am: 'መልስ መላኪያ:' })}{' '}
+                        {channelLabel(row.answer_channel)}
+                        {row.delivery_status === 'sent'
+                          ? ` · ${t({ en: 'Sent', am: 'ተልኳል' })}`
+                          : row.delivery_status === 'failed'
+                            ? ` · ${t({ en: 'Delivery failed', am: 'መላክ አልተሳካም' })}`
+                            : ''}
+                      </p>
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger
@@ -482,6 +502,10 @@ export default function QuestionSubmissionsPage() {
             <p className="text-muted-foreground text-xs font-bold uppercase tracking-wide">
               {viewRow ? statusLabel(viewRow.status, t) : ''} · {viewRow?.category}
             </p>
+            <p className="text-sm font-medium">
+              {t({ en: 'Answer delivery:', am: 'መልስ መላኪያ:' })}{' '}
+              {channelLabel(viewRow?.answer_channel)}
+            </p>
             <p className="rounded-xl border bg-muted/40 p-4 text-base font-semibold leading-relaxed whitespace-pre-wrap">
               {viewRow?.question}
             </p>
@@ -542,20 +566,32 @@ export default function QuestionSubmissionsPage() {
       </Dialog>
 
       <Dialog open={Boolean(active)} onOpenChange={open => !open && setActive(null)}>
-        <DialogContent className="max-h-[92vh] w-[calc(100%-1.5rem)] max-w-2xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{t({ en: 'Answer question', am: 'መልስ ይስጡ' })}</DialogTitle>
-            <DialogDescription>
-              {t({ en: 'Reply goes to', am: 'መልሱ ይላካል ወደ' })}{' '}
-              <span className="font-mono">{active?.auth_email}</span>
+        <DialogContent className="flex max-h-[min(92dvh,900px)] w-[calc(100%-0.75rem)] max-w-2xl flex-col gap-0 overflow-hidden p-0 sm:w-[calc(100%-2rem)]">
+          <DialogHeader className="shrink-0 space-y-1 border-b px-4 py-3 sm:px-6">
+            <DialogTitle className="text-base sm:text-lg">
+              {t({ en: 'Answer question', am: 'መልስ ይስጡ' })}
+            </DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
+              {t({ en: 'User:', am: 'ተጠቃሚ:' })}{' '}
+              <span className="font-mono break-all">{active?.auth_email}</span>
+              {' · '}
+              <span className="font-semibold">{channelLabel(active?.answer_channel)}</span>
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 text-sm">
-            <div className="rounded-xl border bg-muted/30 p-4 space-y-2">
-              <p className="text-muted-foreground text-xs font-bold uppercase tracking-wide">
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-3 text-sm sm:space-y-4 sm:px-6 sm:py-4">
+            <div className="rounded-xl border bg-muted/30 p-3 space-y-2 sm:p-4">
+              <p className="text-muted-foreground text-[11px] font-bold uppercase tracking-wide">
                 {t({ en: 'Visitor question', am: 'የጎብኚ ጥያቄ' })}
               </p>
-              <p className="font-semibold whitespace-pre-wrap leading-relaxed">{active?.question}</p>
+              <p className="font-semibold whitespace-pre-wrap leading-relaxed text-sm sm:text-[15px]">
+                {active?.question}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {t({
+                  en: 'Delivery channel is fixed by the visitor — admin cannot change it.',
+                  am: 'መላኪያ መንገዱ በጎብኚ ምርጫ ብቻ ነው — አስተዳዳሪ መቀየር አይችልም።',
+                })}
+              </p>
             </div>
 
             <Field>
@@ -573,7 +609,8 @@ export default function QuestionSubmissionsPage() {
             <Field>
               <FieldLabel>{t({ en: 'Your answer *', am: 'መልስዎ *' })}</FieldLabel>
               <Textarea
-                rows={6}
+                rows={5}
+                className="min-h-[120px] sm:min-h-[140px]"
                 value={answer}
                 onChange={e => setAnswer(e.target.value)}
                 placeholder={t({
@@ -583,37 +620,43 @@ export default function QuestionSubmissionsPage() {
               />
             </Field>
 
+            <div className="grid gap-3 sm:grid-cols-1">
+              <R2FileField
+                label={t({ en: 'Cover image', am: 'ሽፋን ምስል' })}
+                accept="image/*"
+                folder="staff-uploads/questions/covers"
+                value={cover}
+                onChange={setCover}
+                hint={t({
+                  en: 'Telegram: deleted from Cloudflare after send (saves storage).',
+                  am: 'ቴሌግራም፦ ከመላክ በኋላ ከ Cloudflare ይሰረዛል (ማከማቻ ይቆጥባል)።',
+                })}
+              />
+              <R2FileField
+                label={t({ en: 'Audio', am: 'ድምጽ' })}
+                accept="audio/*"
+                folder="staff-uploads/questions/audio"
+                value={audio}
+                onChange={setAudio}
+              />
+              <R2FileField
+                label={t({ en: 'Video', am: 'ቪዲዮ' })}
+                accept="video/*"
+                folder="staff-uploads/questions/video"
+                value={video}
+                onChange={setVideo}
+              />
+            </div>
+
             <Field>
               <FieldLabel>{t({ en: 'Description (optional)', am: 'መግለጫ (አማራጭ)' })}</FieldLabel>
               <Textarea
-                rows={3}
+                rows={2}
                 value={description}
                 onChange={e => setDescription(e.target.value)}
                 placeholder={t({ en: 'Short note…', am: 'አጭር ማስታወሻ…' })}
               />
             </Field>
-
-            <R2FileField
-              label={t({ en: 'Cover image', am: 'ሽፋን ምስል' })}
-              accept="image/*"
-              folder="staff-uploads/questions/covers"
-              value={cover}
-              onChange={setCover}
-            />
-            <R2FileField
-              label={t({ en: 'Audio', am: 'ድምጽ' })}
-              accept="audio/*"
-              folder="staff-uploads/questions/audio"
-              value={audio}
-              onChange={setAudio}
-            />
-            <R2FileField
-              label={t({ en: 'Video', am: 'ቪዲዮ' })}
-              accept="video/*"
-              folder="staff-uploads/questions/video"
-              value={video}
-              onChange={setVideo}
-            />
 
             <label className="flex cursor-pointer items-start gap-2 rounded-lg border p-3">
               <input
@@ -625,14 +668,14 @@ export default function QuestionSubmissionsPage() {
               <span className="text-sm">
                 <span className="block font-semibold">
                   {t({
-                    en: 'Also publish anonymized copy on public Q&A (explicit only)',
-                    am: 'በግልጽ ብቻ — በድረ-ገጽ ታትም',
+                    en: 'Also publish on public Q&A (keeps media on Cloudflare)',
+                    am: 'በግልጽ ብቻ — በድረ-ገጽ ታትም (ሚዲያ ይቆያል)',
                   })}
                 </span>
               </span>
             </label>
           </div>
-          <DialogFooter className="flex-col gap-2 sm:flex-row">
+          <DialogFooter className="shrink-0 flex-col gap-2 border-t bg-background px-4 py-3 sm:flex-row sm:px-6">
             <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setActive(null)}>
               {t({ en: 'Cancel', am: 'ሰርዝ' })}
             </Button>
@@ -644,7 +687,9 @@ export default function QuestionSubmissionsPage() {
               <SendIcon className="size-4" />
               {busy
                 ? t({ en: 'Sending…', am: 'በመላክ…' })
-                : t({ en: 'Save & email', am: 'አስቀምጥና ላክ' })}
+                : active?.answer_channel === 'telegram'
+                  ? t({ en: 'Send Answer (Telegram)', am: 'መልስ ላክ (ቴሌግራም)' })
+                  : t({ en: 'Send Answer (Email)', am: 'መልስ ላክ (ኢሜይል)' })}
             </Button>
           </DialogFooter>
         </DialogContent>

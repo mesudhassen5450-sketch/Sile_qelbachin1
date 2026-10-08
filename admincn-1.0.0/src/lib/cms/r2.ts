@@ -314,6 +314,35 @@ export async function getObjectTextFromR2(objectKey: string): Promise<string | n
   }
 }
 
+/** Map a public R2 URL back to the object key (null if not our public base). */
+export function objectKeyFromPublicUrl(url: string, env = getR2Env()): string | null {
+  const raw = String(url || '').trim()
+  if (!raw) return null
+  const base = env.publicBaseUrl.replace(/\/+$/, '')
+  if (!base || !raw.startsWith(`${base}/`)) return null
+  try {
+    return decodeURIComponent(raw.slice(base.length + 1).replace(/^\/+/, ''))
+  } catch {
+    return raw.slice(base.length + 1).replace(/^\/+/, '') || null
+  }
+}
+
+/** Best-effort delete of private answer media after successful delivery (saves R2 storage). */
+export async function deletePublicUrlsFromR2(urls: Array<string | null | undefined>): Promise<string[]> {
+  const deleted: string[] = []
+  for (const url of urls) {
+    const key = objectKeyFromPublicUrl(String(url || ''))
+    if (!key) continue
+    try {
+      const res = await deleteObjectFromR2(key)
+      if (res.deleted) deleted.push(key)
+    } catch {
+      /* ignore single-file failures */
+    }
+  }
+  return deleted
+}
+
 /** Delete one object from online storage. Missing keys are treated as success. */
 export async function deleteObjectFromR2(objectKey: string): Promise<{ deleted: boolean; objectKey: string }> {
   const env = getR2Env()

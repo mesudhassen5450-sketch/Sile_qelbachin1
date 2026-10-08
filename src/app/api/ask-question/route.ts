@@ -24,6 +24,8 @@ type Row = {
   published_public: boolean
   answered_at: string | null
   answered_by: string | null
+  answer_channel?: 'email' | 'telegram'
+  delivery_status?: 'pending' | 'sent' | 'failed'
   email_sent: boolean
   email_error: string | null
   admin_seen_at?: string | null
@@ -155,6 +157,7 @@ export async function GET(request: Request) {
     created_at: pending.created_at,
     category: pending.category,
     question_preview: pending.question.slice(0, 160),
+    answer_channel: pending.answer_channel === 'telegram' ? 'telegram' : 'email',
   })
 }
 
@@ -171,6 +174,10 @@ export async function POST(request: Request) {
   const category = String(body.category || 'General Islamic Question').trim()
   const userId = typeof body.user_id === 'string' ? body.user_id : null
   const name = typeof body.name === 'string' ? body.name.trim() : authEmail
+  const channelRaw = String(body.answer_channel || 'email')
+    .trim()
+    .toLowerCase()
+  const answer_channel = channelRaw === 'telegram' ? 'telegram' : 'email'
 
   if (!authEmail.includes('@')) {
     return NextResponse.json({ ok: false, error: 'Authenticated email required.' }, { status: 400 })
@@ -186,6 +193,7 @@ export async function POST(request: Request) {
     question,
     user_id: userId,
     auth_email: authEmail,
+    answer_channel,
   }
 
   // Production path: Admin on Render is the inbox source of truth
@@ -198,16 +206,22 @@ export async function POST(request: Request) {
     })
     const data = await res.json().catch(() => ({}))
     if (res.status === 409 || data.pending) {
+      const answer_channel =
+        data.answer_channel === 'telegram' ? 'telegram' : 'email'
       return NextResponse.json(
         {
           ok: false,
           pending: true,
           id: data.id,
           question_preview: data.question_preview,
+          answer_channel,
           error:
             data.error ||
-            'You already have a question waiting for an answer. Please check your email for the Ustaz reply before asking another.',
-          check_email: true,
+            (answer_channel === 'telegram'
+              ? 'You already have a question waiting. In shā’ Allāh the Ustaz will reply on Telegram — please wait before asking another.'
+              : 'You already have a question waiting. In shā’ Allāh the Ustaz will reply by email — please wait before asking another.'),
+          check_email: answer_channel === 'email',
+          check_telegram: answer_channel === 'telegram',
         },
         { status: 409 }
       )
@@ -233,6 +247,8 @@ export async function POST(request: Request) {
         published_public: false,
         answered_at: null,
         answered_by: null,
+        answer_channel,
+        delivery_status: 'pending',
         email_sent: false,
         email_error: null,
         admin_seen_at: null,
@@ -242,9 +258,12 @@ export async function POST(request: Request) {
       return NextResponse.json({
         ok: true,
         id: data.id,
+        answer_channel,
         message:
           data.message ||
-          'Question received. An Ustaz will answer and the reply will be sent to your email. Please stay alert.',
+          (answer_channel === 'telegram'
+            ? 'Question received. An Ustaz will answer on Telegram.'
+            : 'Question received. An Ustaz will answer and the reply will be sent to your email. Please stay alert.'),
       })
     }
     // If Admin returned a hard error, surface it
@@ -261,14 +280,21 @@ export async function POST(request: Request) {
   // Local/dev fallback when Admin API is unreachable
   const pending = findPendingForEmail(authEmail)
   if (pending) {
+    const answer_channel =
+      pending.answer_channel === 'telegram' ? 'telegram' : 'email'
     return NextResponse.json(
       {
         ok: false,
         pending: true,
         id: pending.id,
+        question_preview: pending.question.slice(0, 160),
+        answer_channel,
         error:
-          'You already have a question waiting for an answer. Please check your email for the Ustaz reply before asking another.',
-        check_email: true,
+          answer_channel === 'telegram'
+            ? 'You already have a question waiting. In shā’ Allāh the Ustaz will reply on Telegram — please wait before asking another.'
+            : 'You already have a question waiting. In shā’ Allāh the Ustaz will reply by email — please wait before asking another.',
+        check_email: answer_channel === 'email',
+        check_telegram: answer_channel === 'telegram',
       },
       { status: 409 }
     )
@@ -293,6 +319,8 @@ export async function POST(request: Request) {
     published_public: false,
     answered_at: null,
     answered_by: null,
+    answer_channel,
+    delivery_status: 'pending',
     email_sent: false,
     email_error: null,
     admin_seen_at: null,

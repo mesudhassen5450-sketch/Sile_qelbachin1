@@ -150,7 +150,8 @@ function RegisterForm() {
   }
 
   const safeNext = next
-  const isAskFlow = safeNext === '/ask-question' || safeNext.startsWith('/ask-question/')
+  const askPath = safeNext.split('?')[0]
+  const isAskFlow = askPath === '/ask-question'
 
   return (
     <AuthShell

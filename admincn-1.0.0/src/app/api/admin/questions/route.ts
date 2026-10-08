@@ -11,9 +11,12 @@ import {
   markQuestionSeen,
   QUESTION_STATUSES,
   updateQuestionStatus,
+  type AnswerChannel,
   type QuestionStatus,
 } from '@/lib/cms/question-submissions'
 import { sendUstazAnswerEmail } from '@/lib/cms/send-answer-email'
+import { telegramDeliverUstazAnswer } from '@/lib/cms/telegram-bot'
+import { getTelegramChatIdForUser } from '@/lib/cms/telegram-link'
 import { upsertYouthContent } from '@/lib/cms/youth-content'
 
 export const runtime = 'nodejs'
@@ -149,30 +152,91 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ ok: false, error: 'Question not found.' }, { status: 404 })
     }
 
-    const mail = await sendUstazAnswerEmail({
-      to: existing.auth_email,
-      question: existing.question,
-      answer,
-      greeting: greeting || null,
-      description: description || null,
-      category: existing.category,
-      coverUrl: cover_url,
-      audioUrl: audio_url,
-      videoUrl: video_url,
-    })
+    // Delivery channel is chosen by the visitor on Ask — admin cannot override.
+    const channel: AnswerChannel =
+      existing.answer_channel === 'telegram' ? 'telegram' : 'email'
+
+    let deliveryOk = false
+    let deliveryError: string | null = null
+    let email_sent = false
+    let email_error: string | null = null
+
+    if (channel === 'email') {
+      const mail = await sendUstazAnswerEmail({
+        to: existing.auth_email,
+        question: existing.question,
+        answer,
+        greeting: greeting || null,
+        description: description || null,
+        category: existing.category,
+        coverUrl: cover_url,
+        audioUrl: audio_url,
+        videoUrl: video_url,
+      })
+      deliveryOk = mail.ok
+      deliveryError = mail.ok ? null : mail.error || 'Email failed'
+      email_sent = mail.ok
+      email_error = deliveryError
+    } else {
+      let chatId = existing.telegram_chat_id || null
+      if (!chatId && existing.user_id) {
+        chatId = await getTelegramChatIdForUser(existing.user_id)
+      }
+      if (!chatId && existing.auth_email) {
+        const { getTelegramChatIdForEmail } = await import('@/lib/cms/telegram-link')
+        chatId = await getTelegramChatIdForEmail(existing.auth_email)
+      }
+      if (!chatId) {
+        deliveryOk = false
+        deliveryError =
+          '⚠️ This user has not connected Telegram (no chat_id).\nAsk them to open Ask a Question, choose Telegram, and press Start on the bot — then try sending again.'
+      } else {
+        const tg = await telegramDeliverUstazAnswer({
+          chatId,
+          question: existing.question,
+          answer,
+          greeting: greeting || null,
+          coverUrl: cover_url,
+          audioUrl: audio_url,
+          videoUrl: video_url,
+        })
+        deliveryOk = tg.ok
+        deliveryError = tg.ok
+          ? tg.media_errors?.length
+            ? tg.error || null
+            : null
+          : tg.error || 'Telegram delivery failed. The answer was not sent to Telegram.'
+      }
+    }
+
+    // After Telegram delivery, Telegram keeps a copy — delete R2 media to save storage
+    // (unless also publishing publicly). Email keeps R2 links live in the inbox.
+    let finalCover = cover_url
+    let finalAudio = audio_url
+    let finalVideo = video_url
+    if (deliveryOk && channel === 'telegram' && !publishPublic) {
+      const { deletePublicUrlsFromR2 } = await import('@/lib/cms/r2')
+      await deletePublicUrlsFromR2([cover_url, audio_url, video_url])
+      finalCover = null
+      finalAudio = null
+      finalVideo = null
+    }
 
     const row = await answerQuestionSubmission({
       id,
       greeting: greeting || null,
       answer,
       description: description || null,
-      cover_url,
-      audio_url,
-      video_url,
+      cover_url: finalCover,
+      audio_url: finalAudio,
+      video_url: finalVideo,
       published_public: publishPublic,
       answered_by: gate.ctx.user.email || null,
-      email_sent: mail.ok,
-      email_error: mail.ok ? null : mail.error || 'Email failed',
+      answer_channel: channel,
+      email_sent,
+      email_error,
+      delivery_status: deliveryOk ? 'sent' : 'failed',
+      delivery_error: deliveryError,
     })
 
     if (publishPublic) {
@@ -194,14 +258,40 @@ export async function PATCH(request: Request) {
       })
     }
 
+    if (!deliveryOk) {
+      return NextResponse.json({
+        ok: false,
+        delivery_ok: false,
+        row,
+        answer_channel: channel,
+        delivery_status: 'failed',
+        email_sent: false,
+        email_error: channel === 'email' ? deliveryError : null,
+        error:
+          channel === 'telegram'
+            ? `⚠️ Telegram delivery failed.\n\n${deliveryError || 'The answer was not sent to Telegram.'}\nPlease try again. (Channel is locked to the visitor’s choice.)`
+            : `⚠️ Email delivery failed.\n\n${deliveryError || 'The answer was not sent by email.'}`,
+        message:
+          channel === 'telegram'
+            ? `Answer saved, but Telegram delivery failed: ${deliveryError}`
+            : `Answer saved, but email was not sent: ${deliveryError}`,
+      })
+    }
+
     return NextResponse.json({
       ok: true,
+      delivery_ok: true,
       row,
-      email_sent: mail.ok,
-      email_error: mail.ok ? null : mail.error || null,
-      message: mail.ok
-        ? `Answer saved and emailed to ${existing.auth_email}.`
-        : `Answer saved, but email was not sent: ${mail.error}`,
+      answer_channel: channel,
+      delivery_status: 'sent',
+      email_sent: channel === 'email',
+      email_error: null,
+      message:
+        channel === 'telegram'
+          ? deliveryError
+            ? `✓ Answer text sent by Telegram (media warning: ${deliveryError})`
+            : '✓ Answer sent by Telegram (text + any attached media)'
+          : `✓ Answer sent by email to ${existing.auth_email}.`,
     })
   } catch (err) {
     return NextResponse.json(

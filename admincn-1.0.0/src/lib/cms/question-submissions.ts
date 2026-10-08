@@ -51,6 +51,9 @@ const LEGACY_STATUS: Record<string, QuestionStatus> = {
   archived: 'archived',
 }
 
+export type AnswerChannel = 'email' | 'telegram'
+export type DeliveryStatus = 'pending' | 'sent' | 'failed'
+
 export type QuestionSubmission = {
   id: string
   user_id: string | null
@@ -70,12 +73,31 @@ export type QuestionSubmission = {
   answered_at: string | null
   answered_by: string | null
   closed_at: string | null
+  /** User-requested delivery channel at ask time */
+  answer_channel: AnswerChannel
+  /** Snapshot of Telegram chat when asked (guest or linked) — used to deliver answer */
+  telegram_chat_id: string | null
+  /** Outcome of last send attempt */
+  delivery_status: DeliveryStatus
+  delivery_error: string | null
   email_sent: boolean
   email_error: string | null
   /** Set when an admin opens the inbox / views this question — clears sidebar badge */
   admin_seen_at: string | null
   created_at: string
   updated_at: string
+}
+
+function coerceChannel(raw: unknown): AnswerChannel {
+  return String(raw || '').toLowerCase() === 'telegram' ? 'telegram' : 'email'
+}
+
+function coerceDelivery(raw: unknown, emailSent?: boolean, emailError?: string | null): DeliveryStatus {
+  const v = String(raw || '').toLowerCase()
+  if (v === 'sent' || v === 'failed' || v === 'pending') return v
+  if (emailSent) return 'sent'
+  if (emailError) return 'failed'
+  return 'pending'
 }
 
 function ensureDir() {
@@ -88,6 +110,8 @@ function coerceStatus(raw: unknown): QuestionStatus {
 }
 
 function normalize(row: Partial<QuestionSubmission> & { id: string }): QuestionSubmission {
+  const email_sent = Boolean(row.email_sent)
+  const email_error = row.email_error ?? null
   return {
     id: row.id,
     user_id: row.user_id ?? null,
@@ -107,8 +131,12 @@ function normalize(row: Partial<QuestionSubmission> & { id: string }): QuestionS
     answered_at: row.answered_at ?? null,
     answered_by: row.answered_by ?? null,
     closed_at: row.closed_at ?? null,
-    email_sent: Boolean(row.email_sent),
-    email_error: row.email_error ?? null,
+    answer_channel: coerceChannel(row.answer_channel),
+    telegram_chat_id: row.telegram_chat_id ? String(row.telegram_chat_id) : null,
+    delivery_status: coerceDelivery(row.delivery_status, email_sent, email_error),
+    delivery_error: row.delivery_error ?? email_error,
+    email_sent,
+    email_error,
     admin_seen_at: row.admin_seen_at ?? null,
     created_at: row.created_at || new Date().toISOString(),
     updated_at: row.updated_at || new Date().toISOString(),
@@ -135,6 +163,10 @@ function rowToDb(r: QuestionSubmission) {
     answered_at: r.answered_at,
     answered_by: r.answered_by,
     closed_at: r.closed_at,
+    answer_channel: r.answer_channel,
+    telegram_chat_id: r.telegram_chat_id,
+    delivery_status: r.delivery_status,
+    delivery_error: r.delivery_error,
     email_sent: r.email_sent,
     email_error: r.email_error,
     admin_seen_at: r.admin_seen_at,
@@ -226,7 +258,26 @@ async function persistDurable(rows: QuestionSubmission[]): Promise<void> {
 
   const payload = rows.map(rowToDb)
   if (payload.length) {
-    const { error } = await sb.from('question_submissions').upsert(payload, { onConflict: 'id' })
+    let { error } = await sb.from('question_submissions').upsert(payload, { onConflict: 'id' })
+    // Before migration 009, strip new columns and retry so Email flow keeps working.
+    if (error && /answer_channel|delivery_status|delivery_error|telegram_chat_id|column/i.test(error.message)) {
+      const legacy = payload.map(r => {
+        const {
+          answer_channel: _c,
+          delivery_status: _d,
+          delivery_error: _e,
+          telegram_chat_id: _t,
+          ...rest
+        } = r as Record<string, unknown>
+        return rest
+      })
+      ;({ error } = await sb.from('question_submissions').upsert(legacy, { onConflict: 'id' }))
+      if (!error) {
+        console.warn(
+          '[questions] Saved without Telegram columns — apply migration 009_telegram_answer_delivery.sql'
+        )
+      }
+    }
     if (error) {
       if (/relation|does not exist|schema cache/i.test(error.message)) {
         console.warn(
@@ -330,6 +381,8 @@ export async function createQuestionSubmission(input: {
   name?: string | null
   category?: string
   question: string
+  answer_channel?: AnswerChannel | string | null
+  telegram_chat_id?: string | null
 }): Promise<QuestionSubmission> {
   const email = String(input.auth_email || '')
     .trim()
@@ -340,12 +393,21 @@ export async function createQuestionSubmission(input: {
 
   const pending = await findOpenQuestionByEmail(email)
   if (pending) {
+    const viaTelegram = pending.answer_channel === 'telegram'
     const err = new Error(
-      'You already have a question waiting for an answer. Please check your email before asking another.'
-    ) as Error & { code?: string; pendingId?: string; preview?: string }
+      viaTelegram
+        ? 'You already have a question waiting. In shā’ Allāh the Ustaz will reply on Telegram — please wait before asking another.'
+        : 'You already have a question waiting. In shā’ Allāh the Ustaz will reply by email — please wait before asking another.'
+    ) as Error & {
+      code?: string
+      pendingId?: string
+      preview?: string
+      answerChannel?: string
+    }
     err.code = 'PENDING'
     err.pendingId = pending.id
     err.preview = pending.question.slice(0, 160)
+    err.answerChannel = pending.answer_channel
     throw err
   }
 
@@ -379,6 +441,10 @@ export async function createQuestionSubmission(input: {
     answered_at: null,
     answered_by: null,
     closed_at: null,
+    answer_channel: coerceChannel(input.answer_channel),
+    telegram_chat_id: input.telegram_chat_id ? String(input.telegram_chat_id) : null,
+    delivery_status: 'pending',
+    delivery_error: null,
     email_sent: false,
     email_error: null,
     admin_seen_at: null,
@@ -464,8 +530,12 @@ export async function answerQuestionSubmission(input: {
   video_url?: string | null
   published_public?: boolean
   answered_by?: string | null
+  /** Channel used for this send (may override user request) */
+  answer_channel?: AnswerChannel | string | null
   email_sent?: boolean
   email_error?: string | null
+  delivery_status?: DeliveryStatus | string | null
+  delivery_error?: string | null
 }): Promise<QuestionSubmission> {
   const rows = await listQuestionSubmissions()
   const idx = rows.findIndex(r => r.id === input.id)
@@ -473,6 +543,16 @@ export async function answerQuestionSubmission(input: {
   const answer = String(input.answer || '').trim()
   if (answer.length < 2) throw new Error('Answer is required.')
   const now = new Date().toISOString()
+  const email_sent = Boolean(input.email_sent)
+  const email_error = input.email_error || null
+  const channel = input.answer_channel
+    ? coerceChannel(input.answer_channel)
+    : rows[idx].answer_channel
+  const delivery_status = coerceDelivery(
+    input.delivery_status,
+    email_sent,
+    email_error || input.delivery_error
+  )
   const next: QuestionSubmission = {
     ...rows[idx],
     greeting: String(input.greeting || '').trim() || null,
@@ -485,8 +565,11 @@ export async function answerQuestionSubmission(input: {
     status: 'answered',
     answered_at: now,
     answered_by: input.answered_by || null,
-    email_sent: Boolean(input.email_sent),
-    email_error: input.email_error || null,
+    answer_channel: channel,
+    delivery_status,
+    delivery_error: input.delivery_error ?? email_error,
+    email_sent,
+    email_error,
     updated_at: now,
   }
   rows[idx] = next

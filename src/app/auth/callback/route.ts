@@ -11,6 +11,7 @@ import { getSiteOrigin } from '@/lib/supabase/env'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
+  // Preserve full relative path + query (Ask draft embeds `d=` for OAuth host hops).
   const next = safePublicNextPath(searchParams.get('next'), '/')
   const siteOrigin = getSiteOrigin()
 
@@ -43,8 +44,13 @@ export async function GET(request: Request) {
       const supabase = await createClient()
       const { error } = await supabase.auth.exchangeCodeForSession(code)
       if (!error) {
-        const base = siteOrigin || origin
-        return NextResponse.redirect(`${base.replace(/\/+$/, '')}${next}`)
+        // Stay on the host that received the callback (localhost / 127.0.0.1 / production).
+        // Do NOT force NEXT_PUBLIC_SITE_URL here — that sent local logins to the wrong site.
+        let base = origin.replace(/\/+$/, '')
+        if (/onrender\.com|:3001\b|admin\./i.test(base)) {
+          base = (siteOrigin || 'http://localhost:3000').replace(/\/+$/, '')
+        }
+        return NextResponse.redirect(`${base}${next}`)
       }
       const login = new URL('/login', origin)
       const msg = (error.message || '').toLowerCase()

@@ -9,7 +9,8 @@ export function safeNextPath(next: string | null | undefined, fallback = '/'): s
 /** Supabase OAuth callback URL (must be allowlisted in Supabase Dashboard). */
 export function getGoogleOAuthRedirectTo(next?: string | null): string {
   const path = safeNextPath(next)
-  // Always use the public website origin — never Admin (onrender / :3001).
+  // Prefer the browser’s real origin so local login stays on this machine.
+  // Never Admin (onrender / :3001).
   let origin =
     (typeof window !== 'undefined' && window.location?.origin) || getSiteOrigin()
   origin = origin.replace(/\/+$/, '')
@@ -20,6 +21,9 @@ export function getGoogleOAuthRedirectTo(next?: string | null): string {
   ) {
     origin = getSiteOrigin().replace(/\/+$/, '') || 'http://localhost:3000'
   }
+  // Keep the exact browser host (localhost vs 127.0.0.1). Rewriting hosts
+  // drops sessionStorage drafts and looks like a “wrong page” after Google.
+  // Both callback URLs must stay in the Supabase Redirect allowlist.
   return `${origin}/auth/callback?next=${encodeURIComponent(path)}`
 }
 

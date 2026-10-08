@@ -5,8 +5,11 @@ import { getSupabasePublishableKey, getSupabaseUrl } from '@/lib/supabase/env'
 /**
  * Refresh Supabase auth cookies on protected routes so sessions stay alive
  * across page navigations (avoids false "sign in again" after a few minutes).
+ *
+ * /ask-question is public — visitors write freely; Google is only required
+ * when they choose Email delivery (handled in the Ask page UI).
  */
-const PROTECTED_PREFIXES = ['/ask-question', '/my-questions', '/account']
+const PROTECTED_PREFIXES = ['/my-questions', '/account']
 
 function isProtected(path: string): boolean {
   return PROTECTED_PREFIXES.some(p => path === p || path.startsWith(`${p}/`))
@@ -66,12 +69,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    '/ask-question',
-    '/ask-question/:path*',
-    '/my-questions',
-    '/my-questions/:path*',
-    '/account',
-    '/account/:path*',
-  ],
+  matcher: ['/my-questions', '/my-questions/:path*', '/account', '/account/:path*'],
 }

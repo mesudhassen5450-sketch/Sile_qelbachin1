@@ -2,7 +2,6 @@
 
 import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { useAuth } from '@/context/AuthContext'
 import { useLanguage } from '@/context/LanguageContext'
 import { ASK_QUESTION } from '@/config/siteNav'
 import { SiteIcon } from '@/components/icons/SiteIcons'
@@ -14,18 +13,14 @@ type Props = {
 }
 
 /**
- * Ask Ustaz CTA:
- * - While auth is loading, still go to /ask-question (page waits / shows Loading).
- * - Never bounce a signed-in user through /login just because session is still hydrating.
+ * Ask Ustaz CTA — always opens /ask-question (no login gate).
+ * Google is requested only if the visitor chooses Email delivery.
  */
 export default function AskQuestionNavLink({ className, onClick, trailing }: Props) {
-  const { user, loading } = useAuth()
   const { getLocalized } = useLanguage()
-  const href =
-    loading || user ? ASK_QUESTION.href : '/login?next=/ask-question'
 
   return (
-    <Link href={href} onClick={onClick} className={className}>
+    <Link href={ASK_QUESTION.href} onClick={onClick} className={className}>
       <SiteIcon name={ASK_QUESTION.icon} size={16} />
       <span>{getLocalized(ASK_QUESTION.label)}</span>
       {trailing}

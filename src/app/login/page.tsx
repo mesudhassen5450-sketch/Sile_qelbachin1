@@ -42,7 +42,8 @@ function LoginForm() {
 
   const configured = useMemo(() => isSupabaseAuthConfigured(), [])
   const safeNext = safePublicNextPath(next, '/')
-  const isAskFlow = safeNext === '/ask-question' || safeNext.startsWith('/ask-question/')
+  const askPath = safeNext.split('?')[0]
+  const isAskFlow = askPath === '/ask-question'
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -105,9 +106,9 @@ function LoginForm() {
       subtitle={getLocalized(
         isAskFlow
           ? {
-              en: 'Your email keeps the Ustaz answer safe in your inbox.',
-              am: 'ኢሜይልዎ የኡስታዝ መልስ በደህና ወደ እርስዎ ያደርሳል።',
-              ar: 'بريدك يحفظ رد الأستاذ في صندوقك بأمان.',
+              en: 'Sign in with Google to receive the Ustaz answer by email. (Telegram delivery does not need this.)',
+              am: 'መልሱ በኢሜይል እንዲደርስዎ በGoogle ይግቡ። (ቴሌግራም ይህን አይፈልግም።)',
+              ar: 'سجّل بـ Google لاستلام رد الأستاذ بالبريد. (تيليجرام لا يحتاج ذلك.)',
             }
           : {
               en: 'Continue with Google — quick and friendly.',

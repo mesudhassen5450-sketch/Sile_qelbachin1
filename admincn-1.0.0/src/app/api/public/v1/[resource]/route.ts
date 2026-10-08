@@ -455,6 +455,7 @@ export async function GET(
             created_at: pending.created_at,
             category: pending.category,
             question_preview: pending.question.slice(0, 160),
+            answer_channel: pending.answer_channel === 'telegram' ? 'telegram' : 'email',
           })
         )
       }
@@ -553,35 +554,79 @@ export async function POST(
       const question = String(body.question || body.question_text || '').trim()
       const category =
         typeof body.category === 'string' ? body.category : 'General Islamic Question'
+      const channelRaw = String(body.answer_channel || body.delivery_channel || 'email')
+        .trim()
+        .toLowerCase()
+      const answer_channel = channelRaw === 'telegram' ? 'telegram' : 'email'
+
+      let telegram_chat_id: string | null = null
+      if (answer_channel === 'telegram') {
+        const {
+          getTelegramChatIdForUser,
+          getTelegramChatIdForEmail,
+        } = await import('@/lib/cms/telegram-link')
+        const uid = typeof body.user_id === 'string' ? body.user_id : ''
+        if (uid) telegram_chat_id = await getTelegramChatIdForUser(uid)
+        if (!telegram_chat_id && authEmail) {
+          telegram_chat_id = await getTelegramChatIdForEmail(authEmail)
+        }
+        if (!telegram_chat_id) {
+          return withCors(
+            NextResponse.json(
+              {
+                ok: false,
+                error:
+                  'Please open the answer bot and press Start first, then send your question.',
+                need_telegram: true,
+              },
+              { status: 400 }
+            )
+          )
+        }
+      }
+
       const row = await createQuestionSubmission({
         user_id: typeof body.user_id === 'string' ? body.user_id : null,
         auth_email: authEmail,
         name: typeof body.name === 'string' ? body.name : authEmail,
         category,
         question,
+        answer_channel,
+        telegram_chat_id,
       })
-      // Best-effort receipt email (requires verified EMAIL_FROM domain on Resend)
-      try {
-        const { sendQuestionReceivedEmail } = await import('@/lib/cms/send-answer-email')
-        void sendQuestionReceivedEmail({
-          to: authEmail,
-          question,
-          category,
-        })
-      } catch {
-        /* never block intake on mail */
+      // Best-effort receipt email for Email channel only
+      if (answer_channel === 'email') {
+        try {
+          const { sendQuestionReceivedEmail } = await import('@/lib/cms/send-answer-email')
+          void sendQuestionReceivedEmail({
+            to: authEmail,
+            question,
+            category,
+          })
+        } catch {
+          /* never block intake on mail */
+        }
       }
       return withCors(
         NextResponse.json({
           ok: true,
           id: row.id,
+          answer_channel,
           message:
-            'Question received. An Ustaz will answer and the reply will be sent to your email.',
+            answer_channel === 'telegram'
+              ? 'Question received. An Ustaz will answer and the reply will be sent on Telegram.'
+              : 'Question received. An Ustaz will answer and the reply will be sent to your email.',
         })
       )
     } catch (err) {
-      const e = err as Error & { code?: string; pendingId?: string; preview?: string }
+      const e = err as Error & {
+        code?: string
+        pendingId?: string
+        preview?: string
+        answerChannel?: string
+      }
       if (e.code === 'PENDING') {
+        const answer_channel = e.answerChannel === 'telegram' ? 'telegram' : 'email'
         return withCors(
           NextResponse.json(
             {
@@ -589,8 +634,10 @@ export async function POST(
               pending: true,
               id: e.pendingId,
               question_preview: e.preview,
+              answer_channel,
               error: e.message,
-              check_email: true,
+              check_email: answer_channel === 'email',
+              check_telegram: answer_channel === 'telegram',
             },
             { status: 409 }
           )
