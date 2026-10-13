@@ -1,6 +1,41 @@
 import type { Metadata } from 'next';
 import { SITE_URL, siteMetadata, kitabsData, sahabahData } from '@/data/channelData';
 
+/**
+ * Brand + discovery keywords for Google Search Console / international SEO.
+ * Includes Amharic queries that already convert, Latin spellings, and intent terms.
+ */
+export const SEO_KEYWORDS = [
+  // Brand (Amharic — already ranking)
+  'ስለ ቀልባችን',
+  'ስለቀልባችን',
+  // Brand (Latin / common misspellings)
+  'sile qelbachin',
+  'sileqelbachin',
+  'seleqelbachin',
+  'sle qelbachin',
+  'sle_qelbachn1',
+  'Sle Qelbachin',
+  // Intent / international
+  'islamic website ethiopia',
+  'best islamic website',
+  'islamic website ethiopia amharic',
+  'asking question from website ethiopia',
+  'ask islamic question ethiopia',
+  'amharic islamic education',
+  'quran tafsir amharic',
+  'kitab audio ders',
+] as const;
+
+export const SITE_ALTERNATE_NAMES = [
+  'ስለ ቀልባችን',
+  'Sile Qelbachin',
+  'Sileqelbachin',
+  'Seleqelbachin',
+  'Sle Qelbachin',
+  'Sle_qelbachn1',
+] as const;
+
 export interface SitePage {
   path: string;
   name: string;
@@ -34,11 +69,13 @@ export const SITE_PAGES: SitePage[] = [
     path: '/',
     name: 'Home',
     nameAm: 'መነሻ',
-    title: 'ስለ ቀልባችን — Islamic Educational Channel',
+    title: 'ስለ ቀልባችን (Sile Qelbachin) — Best Islamic Website Ethiopia',
     description:
-      'Islamic educational platform with Qur’an, da’wah, videos, library, and youth Q&A from Sle Qelbachin.',
+      'Sile Qelbachin (ስለ ቀልባችን) — Islamic educational website in Ethiopia. Qur’an tilawah & tafsir, kitab audio ders, da’wah, videos, and ask an Ustaz online.',
     descriptionAm:
-      'ከቁርኣንና ከሐዲሥ ቀልባችንን የምናክምበትን ጥበብ በጋራ የምንፈልግበት የእስልምና ትምህርታዊ መድረክ።',
+      'ስለ ቀልባችን — በኢትዮጵያ የእስልምና ትምህርታዊ ድረ-ገጽ። ቁርኣን፣ ኪታብ፣ ዳዕዋ፣ ቪዲዮ እና ጥያቄ ለኡስታዝ በመስመር ላይ።',
+    descriptionAr:
+      'سله قيلباتشن — منصة تعليمية إسلامية في إثيوبيا: قرآن، كتب، دعوة، فيديو واسأل العالِم.',
     changeFrequency: 'weekly',
     priority: 1,
     sitelink: false,
@@ -131,6 +168,22 @@ export const SITE_PAGES: SitePage[] = [
     descriptionAr: 'أسئلة الشباب وإجابات حقيقية — نص أو صوت أو فيديو.',
     changeFrequency: 'daily',
     priority: 0.9,
+    sitelink: true,
+  },
+  {
+    path: '/ask-question',
+    name: 'Ask a Question',
+    nameAm: 'ጥያቄዎን ያቅርቡ',
+    nameAr: 'اطرح سؤالك',
+    title: 'Ask an Islamic Question Online — Ethiopia | Sile Qelbachin',
+    description:
+      'Ask a question from the website in Ethiopia — reply by Telegram or Gmail. Sile Qelbachin (ስለ ቀልባችን) personal Ustaz guidance.',
+    descriptionAm:
+      'ከድረ-ገጹ ጥያቄ ይጠይቁ — መልስ በቴሌግራም ወይም በኢሜይል። ስለ ቀልባችን የግል የኡስታዝ መመሪያ።',
+    descriptionAr:
+      'اطرح سؤالك من الموقع — الإجابة عبر تيليجرام أو البريد. إرشاد شخصي من سله قيلباتشن.',
+    changeFrequency: 'weekly',
+    priority: 0.95,
     sitelink: true,
   },
   {
@@ -279,30 +332,75 @@ export function pageMetadata(path: string, overrides: Metadata = {}): Metadata {
   const description = overrides.description || page?.description || siteMetadata.channelName;
   const canonical = path === '/' ? '/' : path;
 
-  const { openGraph, twitter, alternates, ...rest } = overrides;
+  const { openGraph, twitter, alternates, keywords, ...rest } = overrides;
 
   return {
     title,
     description,
+    keywords: keywords ?? [...SEO_KEYWORDS],
     alternates: { canonical, ...alternates },
     openGraph: {
       type: 'website',
       locale: 'am_ET',
-      siteName: siteMetadata.channelName,
-      images: [{ url: '/logo.jpg', alt: siteMetadata.channelName }],
+      alternateLocale: ['en_US', 'ar'],
+      siteName: 'Sile Qelbachin — ስለ ቀልባችን',
+      images: [{ url: '/logo.jpg', width: 512, height: 512, alt: 'Sile Qelbachin — ስለ ቀልባችን' }],
       ...openGraph,
       title,
       description,
       url: absoluteUrl(path),
     },
     twitter: {
-      card: 'summary',
+      card: 'summary_large_image',
       images: ['/logo.jpg'],
       ...twitter,
       title,
       description,
     },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        'max-image-preview': 'large',
+        'max-snippet': -1,
+        'max-video-preview': -1,
+      },
+    },
     ...rest,
+  };
+}
+
+export function buildOrganizationJsonLd() {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    '@id': `${SITE_URL}/#organization`,
+    name: siteMetadata.channelName,
+    alternateName: [...SITE_ALTERNATE_NAMES],
+    url: SITE_URL,
+    logo: {
+      '@type': 'ImageObject',
+      url: absoluteUrl('/logo.jpg'),
+      width: 512,
+      height: 512,
+    },
+    image: absoluteUrl('/logo.jpg'),
+    description:
+      'Islamic educational platform in Ethiopia — Qur’an, kitab, da’wah, and ask-an-Ustaz (Sile Qelbachin / ስለ ቀልባችን).',
+    areaServed: {
+      '@type': 'Country',
+      name: 'Ethiopia',
+    },
+    availableLanguage: ['am', 'ar', 'en'],
+    sameAs: [siteMetadata.telegramUrl, siteMetadata.youtubeUrl, siteMetadata.tiktokUrl],
+    contactPoint: {
+      '@type': 'ContactPoint',
+      contactType: 'customer support',
+      url: absoluteUrl('/ask-question'),
+      availableLanguage: ['am', 'ar', 'en'],
+    },
   };
 }
 
@@ -310,30 +408,40 @@ export function buildWebsiteJsonLd() {
   return {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
-    name: siteMetadata.channelName,
-    alternateName: ['Sle Qelbachin', 'Sile Qelbachin', 'ስለ ቀልባችን'],
+    '@id': `${SITE_URL}/#website`,
+    name: 'Sile Qelbachin — ስለ ቀልባችን',
+    alternateName: [...SITE_ALTERNATE_NAMES],
     url: SITE_URL,
+    description:
+      'Best Islamic educational website for Amharic speakers in Ethiopia. Qur’an tilawah, kitab ders, videos, and ask questions online.',
     inLanguage: ['am', 'ar', 'en'],
-    publisher: {
-      '@type': 'Organization',
-      name: siteMetadata.channelName,
-      url: SITE_URL,
-      logo: absoluteUrl('/logo.jpg'),
-      sameAs: [siteMetadata.telegramUrl, siteMetadata.youtubeUrl, siteMetadata.tiktokUrl],
+    keywords: SEO_KEYWORDS.join(', '),
+    publisher: { '@id': `${SITE_URL}/#organization` },
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: {
+        '@type': 'EntryPoint',
+        urlTemplate: `${SITE_URL}/ask-question`,
+      },
+      'query-input': 'required name=search_term_string',
     },
   };
 }
 
+/** Netlify-style sitelink candidates — clear hub URLs Google can promote under the brand. */
 export function buildSiteNavigationJsonLd() {
   return {
     '@context': 'https://schema.org',
     '@type': 'ItemList',
-    name: 'Main navigation',
+    '@id': `${SITE_URL}/#sitelinks`,
+    name: 'Sile Qelbachin — main sections',
+    numberOfItems: SITELINK_PAGES.length,
     itemListElement: SITELINK_PAGES.map((page, index) => ({
       '@type': 'SiteNavigationElement',
       position: index + 1,
-      name: page.nameAm,
-      description: page.descriptionAm,
+      name: page.name,
+      alternateName: [page.nameAm, page.nameAr].filter(Boolean),
+      description: page.description,
       url: absoluteUrl(page.path),
     })),
   };

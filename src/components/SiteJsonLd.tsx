@@ -1,6 +1,15 @@
 import JsonLd from '@/components/JsonLd';
-import { buildSiteNavigationJsonLd, buildWebsiteJsonLd } from '@/lib/seo';
+import {
+  buildOrganizationJsonLd,
+  buildSiteNavigationJsonLd,
+  buildWebsiteJsonLd,
+} from '@/lib/seo';
 
+/** Global Organization + WebSite + sitelink navigation (Netlify-style hub discovery). */
 export default function SiteJsonLd() {
-  return <JsonLd data={[buildWebsiteJsonLd(), buildSiteNavigationJsonLd()]} />;
+  return (
+    <JsonLd
+      data={[buildOrganizationJsonLd(), buildWebsiteJsonLd(), buildSiteNavigationJsonLd()]}
+    />
+  );
 }

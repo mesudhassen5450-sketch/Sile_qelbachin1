@@ -2,6 +2,11 @@ import type { MetadataRoute } from 'next';
 import { kitabsData, sahabahData, SITE_URL } from '@/data/channelData';
 import { SITE_PAGES } from '@/lib/seo';
 
+/**
+ * Clean sitemap for international indexing.
+ * Hub pages + kitabs + sahabah only — no ?ders= query URLs (those inflate
+ * Search Console “Not indexed” without helping sitelinks).
+ */
 export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = new Date();
 
@@ -19,16 +24,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.8,
   }));
 
-  // Help Google discover each ders under its kitab (e.g. Intebih Ders 1…)
-  const dersRoutes: MetadataRoute.Sitemap = kitabsData.flatMap((kitab) =>
-    kitab.dersList.map((_, index) => ({
-      url: `${SITE_URL}/kitab/${kitab.slug}?ders=${index + 1}`,
-      lastModified,
-      changeFrequency: 'monthly' as const,
-      priority: 0.65,
-    }))
-  );
-
   const sahabahRoutes: MetadataRoute.Sitemap = sahabahData.map((sahabah) => ({
     url: `${SITE_URL}/sahabah/${sahabah.slug}`,
     lastModified,
@@ -36,5 +31,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.6,
   }));
 
-  return [...staticRoutes, ...kitabRoutes, ...dersRoutes, ...sahabahRoutes];
+  return [...staticRoutes, ...kitabRoutes, ...sahabahRoutes];
 }

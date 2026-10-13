@@ -110,3 +110,4 @@ Live page: https://sileqelbachin1.com/ask-question
 
 - On-site UI: `src/components/AskHowToGuide.tsx`
 - Placed under the **Submit your question / ጥያቄዎን ያቅርቡ** heading on `/ask-question`
+- **Mobile (Flutter) Email + Telegram Ask implementation:** [`MOBILE-ASK-QA-IMPLEMENTATION.md`](./MOBILE-ASK-QA-IMPLEMENTATION.md)

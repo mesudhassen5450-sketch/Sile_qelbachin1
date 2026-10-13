@@ -17,6 +17,7 @@ import CompactAudioRow from '@/components/CompactAudioRow'
 import HomeHero from '@/components/HomeHero'
 import HomeReminders from '@/components/HomeReminders'
 import AskQuestionNavLink from '@/components/AskQuestionNavLink'
+import HomeSitelinks from '@/components/HomeSitelinks'
 import HomeQuranIntro from '@/components/HomeQuranIntro'
 import KitabCard from '@/components/KitabCard'
 import { EDUCATIONAL_ARCHIVE, YOUTH_HEART_CORNER } from '@/config/siteNav'
@@ -781,6 +782,9 @@ export default function HomePage() {
           </Link>
         </div>
       </section>
+
+      {/* Organized hub links — sitelink candidates for Google (Netlify-style) */}
+      <HomeSitelinks />
 
       {/* Stay Connected — social before footer / contact */}
       <section className="portfolio-card p-8 sm:p-10 space-y-6">

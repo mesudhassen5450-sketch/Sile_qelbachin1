@@ -1,9 +1,13 @@
 # ስለ ቀልባችን (Sle Qelbachin) — Production Snapshot & Flutter Handoff
 
+> **Category / nav / home UI (client 2026-10 update):** use **`MOBILE_APP_CATEGORY_UI.md`** as the source of truth.  
+> **Ask question (Email + Telegram bot) for mobile:** use **`docs/ask/MOBILE-ASK-QA-IMPLEMENTATION.md`**.  
+> This file remains useful for R2, kitab deep links, and older screen notes — but Educational Archive + Youth & Heart replace the old primary sitemap below.
+
 **Purpose:** Exact record of the **current live website** so the next Flutter mobile app can copy structure, media, colors, and behavior without guessing.
 
-**Snapshot date:** 2026-09-14  
-**Live site:** https://sileqelbachin1.netlify.app/  
+**Snapshot date:** 2026-09-14 (IA superseded by `MOBILE_APP_CATEGORY_UI.md`)  
+**Live site:** https://sileqelbachin1.com  
 **Frontend repo:** https://github.com/mesudhassen5450-sketch/Sile_qelbachin1  
 **Media playback (production):** Cloudflare R2 — see `CLOUDFLARE_R2.md`  
 **Media archive (optional):** https://github.com/mesudhassen5450-sketch/sileqelbachin-media  

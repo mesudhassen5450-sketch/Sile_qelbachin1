@@ -15,37 +15,60 @@ import AnalyticsBeacon from '@/components/AnalyticsBeacon';
 import SiteJsonLd from '@/components/SiteJsonLd';
 import PageSeo from '@/components/PageSeo';
 import { SITE_URL } from '@/data/channelData';
+import { SEO_KEYWORDS } from '@/lib/seo';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: 'ስለ ቀልባችን — Islamic Educational Channel',
-    template: '%s | ስለ ቀልባችን',
+    default: 'ስለ ቀልባችን (Sile Qelbachin) — Islamic Website Ethiopia',
+    template: '%s | Sile Qelbachin — ስለ ቀልባችን',
   },
   description:
-    'ከቁርኣንና ከሐዲሥ ቀልባችንን የምናክምበትን ጥበብ በጋራ የምንፈልግበት የእስልምና ትምህርታዊ መድረክ። Kitab, audio ders, muhadara, and reminders from Sle Qelbachin.',
+    'Sile Qelbachin (ስለ ቀልባችን / sileqelbachin / seleqelbachin) — best Islamic educational website in Ethiopia. Qur’an, kitab, da’wah, videos, and ask an Ustaz online by Telegram or email.',
+  keywords: [...SEO_KEYWORDS],
+  applicationName: 'Sile Qelbachin',
+  authors: [{ name: 'Sile Qelbachin', url: SITE_URL }],
+  creator: 'Sile Qelbachin — ስለ ቀልባችን',
+  publisher: 'Sile Qelbachin',
+  category: 'religion',
+  classification: 'Islamic Education',
   alternates: {
     canonical: '/',
+    languages: {
+      am: '/',
+      en: '/',
+      ar: '/',
+      'x-default': '/',
+    },
   },
   openGraph: {
     type: 'website',
     locale: 'am_ET',
+    alternateLocale: ['en_US', 'ar'],
     url: SITE_URL,
-    siteName: 'ስለ ቀልባችን',
-    title: 'ስለ ቀልባችን — Islamic Educational Channel',
+    siteName: 'Sile Qelbachin — ስለ ቀልባችን',
+    title: 'ስለ ቀልባችን (Sile Qelbachin) — Islamic Website Ethiopia',
     description:
-      'Islamic educational platform with kitab collections, audio lessons, muhadara, and daily reminders.',
-    images: [{ url: '/logo.jpg', alt: 'ስለ ቀልባችን' }],
+      'Islamic educational platform in Ethiopia: Qur’an tilawah & tafsir, kitab audio ders, da’wah, videos, and ask a question online.',
+    images: [{ url: '/logo.jpg', width: 512, height: 512, alt: 'Sile Qelbachin — ስለ ቀልባችን' }],
   },
   twitter: {
-    card: 'summary',
-    title: 'ስለ ቀልባችን — Islamic Educational Channel',
-    description: 'Kitab, audio ders, muhadara, and reminders from Sle Qelbachin.',
+    card: 'summary_large_image',
+    title: 'ስለ ቀልባችን (Sile Qelbachin) — Islamic Website Ethiopia',
+    description:
+      'Qur’an, kitab, da’wah, videos, and ask an Ustaz — Sile Qelbachin / sileqelbachin / seleqelbachin.',
     images: ['/logo.jpg'],
   },
   robots: {
     index: true,
     follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+      'max-video-preview': -1,
+    },
   },
   other: {
     google: 'notranslate',

@@ -140,14 +140,31 @@ export type CreateKitabInput = {
   }>
 }
 
+async function findExistingKitabBySlug(slug: string): Promise<KitabRecord | null> {
+  const store = loadLocalStore()
+  const local = store.kitabs.find(k => k.slug === slug)
+  if (local) return local
+  const sb = isSupabaseConfigured() ? getServiceSupabase() : null
+  if (!sb) return null
+  const { data, error } = await sb.from('kitabs').select('*').eq('slug', slug).maybeSingle()
+  if (error || !data) return null
+  return data as KitabRecord
+}
+
 export async function createKitabWithDers(input: CreateKitabInput) {
   const store = loadLocalStore()
   const now = nowIso()
   const status: ContentStatus = input.status || 'published'
   const slug = input.slug?.trim() || slugify(input.title_en || input.title_am || `kitab-${Date.now()}`)
 
-  if (store.kitabs.some(k => k.slug === slug)) {
-    throw new Error(`Kitab slug already exists: ${slug}`)
+  const existing = await findExistingKitabBySlug(slug)
+  if (existing) {
+    const title = existing.title_en || existing.title_am || slug
+    throw new Error(
+      `This kitab already exists (“${title}”, slug: ${slug}). ` +
+        'Do not use Add Kitab again. Open Content → Library → Kitabs, expand that kitab, ' +
+        'then use “Child ders audio” → Add ders audio to upload part 01 and more.'
+    )
   }
 
   const kitab: KitabRecord = {
