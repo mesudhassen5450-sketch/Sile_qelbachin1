@@ -2,6 +2,11 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 import type { CmsStoreSnapshot, MediaAsset, ScanRun } from './types'
 
+/** In-memory snapshot cache — cuts Free-plan egress (full table dumps were uncached). */
+const SNAPSHOT_TTL_MS = 45_000
+let snapshotCache: { at: number; data: CmsStoreSnapshot } | null = null
+let snapshotInflight: Promise<CmsStoreSnapshot | null> | null = null
+
 export function isSupabaseConfigured(): boolean {
   return Boolean(
     process.env.SUPABASE_URL &&
@@ -18,43 +23,28 @@ export function getServiceSupabase(): SupabaseClient | null {
   })
 }
 
-/** Load a snapshot-compatible view from Supabase for Admin UI / matching. */
-export async function loadSupabaseSnapshot(): Promise<CmsStoreSnapshot | null> {
+/** Call after Admin publish / edit / delete so the next public read is fresh. */
+export function invalidateSupabaseSnapshotCache(): void {
+  snapshotCache = null
+}
+
+async function fetchSupabaseSnapshot(): Promise<CmsStoreSnapshot | null> {
   const sb = getServiceSupabase()
   if (!sb) return null
 
-  const [
-    media,
-    kitabs,
-    ders,
-    audio,
-    video,
-    pdfs,
-    scans,
-    audits
-  ] = await Promise.all([
+  // Public CMS does not need audit_logs / scan_runs — skip them to cut egress.
+  const [media, kitabs, ders, audio, video, pdfs] = await Promise.all([
     sb.from('media_assets').select('*'),
     sb.from('kitabs').select('*'),
     sb.from('ders').select('*'),
     sb.from('audio_items').select('*'),
     sb.from('video_items').select('*'),
     sb.from('pdf_items').select('*'),
-    sb.from('scan_runs').select('*').order('started_at', { ascending: false }).limit(20),
-    sb.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(200)
   ])
 
   const err =
-    media.error ||
-    kitabs.error ||
-    ders.error ||
-    audio.error ||
-    video.error ||
-    pdfs.error ||
-    scans.error ||
-    audits.error
+    media.error || kitabs.error || ders.error || audio.error || video.error || pdfs.error
   if (err) throw new Error(`Supabase load failed: ${err.message}`)
-
-  const lastScan = (scans.data?.[0] as ScanRun | undefined)?.finished_at || null
 
   return {
     media_assets: (media.data || []) as MediaAsset[],
@@ -66,10 +56,45 @@ export async function loadSupabaseSnapshot(): Promise<CmsStoreSnapshot | null> {
     sahabah_items: [],
     reminders: [],
     analytics_events: [],
-    scan_runs: (scans.data || []) as ScanRun[],
-    audit_logs: audits.data || [],
-    meta: { last_scan_at: lastScan, backend: 'supabase' }
+    scan_runs: [],
+    audit_logs: [],
+    meta: { last_scan_at: null, backend: 'supabase' },
   }
+}
+
+/**
+ * Load CMS snapshot from Supabase.
+ * Cached ~45s by default (shared across concurrent public API hits).
+ * Pass `{ bypassCache: true }` for Admin after writes, or call invalidateSupabaseSnapshotCache().
+ */
+export async function loadSupabaseSnapshot(opts?: {
+  bypassCache?: boolean
+}): Promise<CmsStoreSnapshot | null> {
+  if (!isSupabaseConfigured()) return null
+
+  const now = Date.now()
+  if (!opts?.bypassCache && snapshotCache && now - snapshotCache.at < SNAPSHOT_TTL_MS) {
+    return snapshotCache.data
+  }
+
+  if (!opts?.bypassCache && snapshotInflight) {
+    return snapshotInflight
+  }
+
+  const run = (async () => {
+    try {
+      const data = await fetchSupabaseSnapshot()
+      if (data) {
+        snapshotCache = { at: Date.now(), data }
+      }
+      return data
+    } finally {
+      snapshotInflight = null
+    }
+  })()
+
+  if (!opts?.bypassCache) snapshotInflight = run
+  return run
 }
 
 export async function upsertMediaAssetsRemote(assets: MediaAsset[]): Promise<MediaAsset[]> {
@@ -98,6 +123,7 @@ export async function upsertMediaAssetsRemote(assets: MediaAsset[]): Promise<Med
       resolved.push((data as MediaAsset) || asset)
     }
   }
+  invalidateSupabaseSnapshotCache()
   return resolved
 }
 

@@ -137,7 +137,7 @@ export default function QuestionSubmissionsPage() {
 
   useEffect(() => {
     void load({ markSeen: true })
-    const timer = window.setInterval(() => void load(), 15000)
+    const timer = window.setInterval(() => void load(), 45000)
     return () => window.clearInterval(timer)
   }, [load])
 

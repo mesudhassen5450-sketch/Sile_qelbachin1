@@ -6,7 +6,11 @@ import {
   upsertByLegacyId
 } from '@/lib/cms/local-store'
 import { insertNewAtFront } from '@/lib/cms/priority-cascade'
-import { isSupabaseConfigured, getServiceSupabase } from '@/lib/cms/supabase'
+import {
+  getServiceSupabase,
+  invalidateSupabaseSnapshotCache,
+  isSupabaseConfigured,
+} from '@/lib/cms/supabase'
 import type {
   AudioItemRecord,
   ContentStatus,
@@ -216,6 +220,7 @@ export async function upsertPublishableContent(input: PublishContentInput) {
       } else {
         await sb.from('pdf_items').upsert(fresh as PdfItemRecord, { onConflict: 'id' })
       }
+      invalidateSupabaseSnapshotCache()
       if (isNew) {
         const { syncPriorityAssignments } = await import('@/lib/cms/priority-cascade')
         const peers =

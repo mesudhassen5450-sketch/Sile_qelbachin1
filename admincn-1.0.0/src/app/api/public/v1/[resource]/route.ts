@@ -18,11 +18,22 @@ import type { CmsStoreSnapshot } from '@/lib/cms/types'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-function withCors(res: NextResponse) {
+function withCors(res: NextResponse, opts?: { cacheSeconds?: number }) {
   res.headers.set('Access-Control-Allow-Origin', '*')
   res.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
   res.headers.set('Access-Control-Allow-Headers', 'Content-Type')
-  res.headers.set('Cache-Control', 'no-store, max-age=0, must-revalidate')
+  // Short CDN/browser cache for public reads — cuts repeat Supabase egress.
+  // POSTs (Ask intake) stay no-store via callers that pass cacheSeconds: 0.
+  const sec = opts?.cacheSeconds
+  if (sec == null || sec > 0) {
+    const s = sec ?? 60
+    res.headers.set(
+      'Cache-Control',
+      `public, max-age=${s}, s-maxage=${s}, stale-while-revalidate=${s * 2}`
+    )
+  } else {
+    res.headers.set('Cache-Control', 'no-store, max-age=0, must-revalidate')
+  }
   return res
 }
 
@@ -445,7 +456,7 @@ export async function GET(
         const { findOpenQuestionByEmail } = await import('@/lib/cms/question-submissions')
         const pending = await findOpenQuestionByEmail(email)
         if (!pending) {
-          return withCors(NextResponse.json({ ok: true, pending: false }))
+          return withCors(NextResponse.json({ ok: true, pending: false }), { cacheSeconds: 0 })
         }
         return withCors(
           NextResponse.json({
@@ -456,7 +467,8 @@ export async function GET(
             category: pending.category,
             question_preview: pending.question.slice(0, 160),
             answer_channel: pending.answer_channel === 'telegram' ? 'telegram' : 'email',
-          })
+          }),
+          { cacheSeconds: 0 }
         )
       }
     }
@@ -546,6 +558,7 @@ export async function POST(
 ) {
   const { resource } = await context.params
   const body = await request.json().catch(() => ({}))
+  const noStore = { cacheSeconds: 0 as const }
 
   if (resource === 'questions') {
     try {
@@ -580,7 +593,8 @@ export async function POST(
                 need_telegram: true,
               },
               { status: 400 }
-            )
+            ),
+            noStore
           )
         }
       }
@@ -616,7 +630,8 @@ export async function POST(
             answer_channel === 'telegram'
               ? 'Question received. An Ustaz will answer and the reply will be sent on Telegram.'
               : 'Question received. An Ustaz will answer and the reply will be sent to your email.',
-        })
+        }),
+        noStore
       )
     } catch (err) {
       const e = err as Error & {
@@ -640,25 +655,30 @@ export async function POST(
               check_telegram: answer_channel === 'telegram',
             },
             { status: 409 }
-          )
+          ),
+          noStore
         )
       }
       return withCors(
         NextResponse.json(
           { ok: false, error: err instanceof Error ? err.message : 'Could not save question.' },
           { status: 400 }
-        )
+        ),
+        noStore
       )
     }
   }
 
   if (resource !== 'events') {
-    return withCors(NextResponse.json({ ok: false, error: 'POST only for events or questions.' }, { status: 404 }))
+    return withCors(
+      NextResponse.json({ ok: false, error: 'POST only for events or questions.' }, { status: 404 }),
+      noStore
+    )
   }
 
   const event = String(body.event || '').trim()
   if (!event) {
-    return withCors(NextResponse.json({ ok: false, error: 'event required.' }, { status: 400 }))
+    return withCors(NextResponse.json({ ok: false, error: 'event required.' }, { status: 400 }), noStore)
   }
 
   const { recordAnalyticsEvent } = await import('@/lib/cms/reminders')
@@ -670,5 +690,5 @@ export async function POST(
     platform,
     meta: typeof body.meta === 'object' && body.meta ? body.meta : undefined
   })
-  return withCors(NextResponse.json({ ok: true }))
+  return withCors(NextResponse.json({ ok: true }), noStore)
 }

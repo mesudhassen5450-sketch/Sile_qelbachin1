@@ -168,13 +168,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const { createClient } = await import('@/lib/supabase/client')
         const supabase = createClient()
-        const { data: userData } = await supabase.auth.getUser()
+        // Guests: getSession only (local) — avoid getUser network call on every visit
+        const { data: sessionData } = await supabase.auth.getSession()
         if (!mounted) return
-        if (!userData.user) {
+        if (!sessionData.session) {
           await applySession(null)
         } else {
-          const { data } = await supabase.auth.getSession()
-          await applySession(data.session)
+          const { data: userData } = await supabase.auth.getUser()
+          if (!mounted) return
+          if (!userData.user) {
+            await applySession(null)
+          } else {
+            const { data } = await supabase.auth.getSession()
+            await applySession(data.session)
+          }
         }
         setLoading(false)
 
@@ -188,8 +195,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     })()
 
+    // Guests: never re-hit Auth on tab focus (big Free-plan egress).
+    // Signed-in: refresh at most once per 5 minutes on focus.
+    let lastFocusRefresh = 0
     const onVisible = () => {
-      if (document.visibilityState === 'visible') void refresh()
+      if (document.visibilityState !== 'visible') return
+      void (async () => {
+        try {
+          const { createClient } = await import('@/lib/supabase/client')
+          const supabase = createClient()
+          const { data } = await supabase.auth.getSession()
+          if (!data.session) return
+          const now = Date.now()
+          if (now - lastFocusRefresh < 5 * 60_000) return
+          lastFocusRefresh = now
+          void refresh()
+        } catch {
+          /* ignore */
+        }
+      })()
     }
     document.addEventListener('visibilitychange', onVisible)
     window.addEventListener('focus', onVisible)

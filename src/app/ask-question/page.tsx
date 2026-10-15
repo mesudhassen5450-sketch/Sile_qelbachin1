@@ -365,6 +365,7 @@ export default function AskQuestionPage() {
   const startWaitingForTelegram = (token: string) => {
     setTgWaiting(true)
     let tries = 0
+    // 5s interval × 36 ≈ 3 min — slower than 2s to cut Admin/Supabase egress
     const timer = window.setInterval(() => {
       tries += 1
       void refreshTelegramStatus(token).then(connected => {
@@ -373,11 +374,11 @@ export default function AskQuestionPage() {
           setTgWaiting(false)
         }
       })
-      if (tries >= 60) {
+      if (tries >= 36) {
         window.clearInterval(timer)
         setTgWaiting(false)
       }
-    }, 2000)
+    }, 5000)
   }
 
   /** Prefetch deep link — Telegram does not require Google. */

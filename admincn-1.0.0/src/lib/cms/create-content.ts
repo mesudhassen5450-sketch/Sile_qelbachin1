@@ -6,7 +6,12 @@ import {
   upsertBySlug
 } from '@/lib/cms/local-store'
 import { insertNewAtFront, syncPriorityAssignments } from '@/lib/cms/priority-cascade'
-import { getServiceSupabase, isSupabaseConfigured, upsertMediaAssetsRemote } from '@/lib/cms/supabase'
+import {
+  getServiceSupabase,
+  invalidateSupabaseSnapshotCache,
+  isSupabaseConfigured,
+  upsertMediaAssetsRemote,
+} from '@/lib/cms/supabase'
 import type {
   AudioItemRecord,
   ContentStatus,
@@ -49,7 +54,10 @@ async function requireUpsert(
   const sb = getServiceSupabase()
   if (!sb) throw new Error('Database is not configured on Admin (Supabase).')
   const { error } = await sb.from(table).upsert(row, { onConflict })
-  if (!error) return
+  if (!error) {
+    invalidateSupabaseSnapshotCache()
+    return
+  }
 
   if (
     /column|schema cache/i.test(error.message) &&
@@ -60,6 +68,7 @@ async function requireUpsert(
     if (retry.error) {
       throw new Error(`Could not save to ${table}: ${retry.error.message}`)
     }
+    invalidateSupabaseSnapshotCache()
     return
   }
 
@@ -250,6 +259,7 @@ export async function createKitabWithDers(input: CreateKitabInput) {
         .from('ders')
         .upsert(dersRows.map(dersPayloadForSupabase), { onConflict: 'id' })
       if (error) throw new Error(`Could not save ders: ${error.message}`)
+      invalidateSupabaseSnapshotCache()
     }
   }
 

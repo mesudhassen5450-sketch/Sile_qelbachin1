@@ -505,7 +505,8 @@ const SidebarLayout = () => {
       }
     }
     void poll()
-    const timer = window.setInterval(() => void poll(), 10000)
+    // 45s — enough for inbox badge; cuts Admin → Supabase egress on Free plan
+    const timer = window.setInterval(() => void poll(), 45000)
     return () => {
       mounted = false
       window.clearInterval(timer)

@@ -5,7 +5,11 @@ import {
   saveLocalStore
 } from '@/lib/cms/local-store'
 import { deleteObjectFromR2, hasR2ApiCredentials } from '@/lib/cms/r2'
-import { getServiceSupabase, isSupabaseConfigured } from '@/lib/cms/supabase'
+import {
+  getServiceSupabase,
+  invalidateSupabaseSnapshotCache,
+  isSupabaseConfigured,
+} from '@/lib/cms/supabase'
 
 export type DeletableContentType = 'kitabs' | 'audio' | 'video' | 'pdfs' | 'sahabah' | 'ders'
 
@@ -159,6 +163,7 @@ export async function deleteContentItem(input: {
     after_data: { deleted_r2_keys: deletedKeys, skipped_r2: skipped, at: nowIso() }
   })
   saveLocalStore(store)
+  invalidateSupabaseSnapshotCache()
 
   if (isSupabaseConfigured()) {
     const sb = getServiceSupabase()

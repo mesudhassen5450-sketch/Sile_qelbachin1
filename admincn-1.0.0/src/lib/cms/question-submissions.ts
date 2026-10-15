@@ -210,6 +210,13 @@ function saveLocal(rows: QuestionSubmission[]) {
   }
 }
 
+let questionsListCache: { at: number; rows: QuestionSubmission[] } | null = null
+const QUESTIONS_LIST_TTL_MS = 20_000
+
+function invalidateQuestionsListCache() {
+  questionsListCache = null
+}
+
 async function loadFromSupabase(): Promise<QuestionSubmission[] | null> {
   const sb = getServiceSupabase()
   if (!sb) return null
@@ -234,6 +241,7 @@ async function loadFromR2(): Promise<QuestionSubmission[] | null> {
 }
 
 async function persistDurable(rows: QuestionSubmission[]): Promise<void> {
+  invalidateQuestionsListCache()
   saveLocal(rows)
   try {
     await putObjectToR2({
@@ -336,10 +344,17 @@ export function listQuestionSubmissionsLocal(): QuestionSubmission[] {
  * Survives Render redeploys once migration 007 is applied.
  */
 export async function listQuestionSubmissions(): Promise<QuestionSubmission[]> {
+  const now = Date.now()
+  if (questionsListCache && now - questionsListCache.at < QUESTIONS_LIST_TTL_MS) {
+    return questionsListCache.rows
+  }
+
   const fromDb = await loadFromSupabase()
   if (fromDb && fromDb.length) {
     saveLocal(fromDb)
-    return dedupe(fromDb)
+    const rows = dedupe(fromDb)
+    questionsListCache = { at: now, rows }
+    return rows
   }
 
   const fromR2 = await loadFromR2()
@@ -350,16 +365,21 @@ export async function listQuestionSubmissions(): Promise<QuestionSubmission[]> {
     } catch {
       /* migration may still be missing */
     }
-    return dedupe(fromR2)
+    const rows = dedupe(fromR2)
+    questionsListCache = { at: now, rows }
+    return rows
   }
 
   // Empty DB is authoritative once the table exists
   if (fromDb) {
     saveLocal([])
+    questionsListCache = { at: now, rows: [] }
     return []
   }
 
-  return dedupe(loadLocal())
+  const local = dedupe(loadLocal())
+  questionsListCache = { at: now, rows: local }
+  return local
 }
 
 export async function findOpenQuestionByEmail(
