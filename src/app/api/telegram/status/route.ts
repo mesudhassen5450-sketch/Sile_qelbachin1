@@ -58,6 +58,17 @@ export async function GET(request: Request) {
       signal: AbortSignal.timeout(12000),
     })
     const data = await res.json().catch(() => ({}))
+    // Never bubble Admin 401 to the Ask UI — guests must poll as connected:false, not crash.
+    if (res.status === 401 || res.status === 403) {
+      return NextResponse.json({
+        ok: true,
+        connected: false,
+        username: null,
+        connected_at: null,
+        bot_username: 'sileqelbachin1_Bot',
+        error: typeof data.error === 'string' ? data.error : 'Telegram status unavailable',
+      })
+    }
     return NextResponse.json(data, { status: res.status })
   } catch (err) {
     return NextResponse.json(

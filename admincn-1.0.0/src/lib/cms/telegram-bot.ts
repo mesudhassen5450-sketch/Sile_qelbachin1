@@ -258,8 +258,18 @@ export async function telegramAnswerCallbackQuery(id: string, text?: string): Pr
   }
 }
 
-/** Local/dev only — use getUpdates when webhook cannot reach localhost. */
+/**
+ * Local/dev only — use getUpdates when webhook cannot reach localhost.
+ * NEVER enable on Render/Vercel/production: polling calls deleteWebhook and
+ * silently breaks Start → chat_id cache for the live site.
+ */
 export function isTelegramPollingMode(): boolean {
+  const onCloud = Boolean(
+    process.env.RENDER ||
+      process.env.VERCEL ||
+      process.env.NODE_ENV === 'production'
+  )
+  if (onCloud) return false
   return /^(1|true|yes)$/i.test(String(process.env.TELEGRAM_POLLING || '').trim())
 }
 
@@ -270,6 +280,7 @@ export async function ensureTelegramPollingReady(): Promise<void> {
   const token = getTelegramBotToken()
   if (!token || pollingWebhookCleared) return
   try {
+    // Only safe locally — cloud must keep the public webhook.
     await fetch(`${API}/bot${token}/deleteWebhook`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
