@@ -43,9 +43,13 @@ export async function GET(request: Request) {
     const headers: Record<string, string> = { Accept: 'application/json' }
     if (authToken) headers.Authorization = `Bearer ${authToken}`
 
+    // Guest status must work with email alone after Start (token is optional).
+    // Before: email was only forwarded when token was also present → never showed Connected after return.
     let target = adminTelegramBase()
-    if (guestEmail && guestToken) {
-      target += `?email=${encodeURIComponent(guestEmail)}&token=${encodeURIComponent(guestToken)}`
+    if (guestEmail.includes('@')) {
+      const qs = new URLSearchParams({ email: guestEmail })
+      if (guestToken) qs.set('token', guestToken)
+      target += `?${qs.toString()}`
     }
 
     const res = await fetch(target, {

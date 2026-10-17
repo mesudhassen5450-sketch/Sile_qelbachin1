@@ -140,17 +140,27 @@ export function alreadyConnectedReturnText(locale: TgLocale): string {
 }
 
 export function websiteAskReturnUrl(): string {
-  const base = (
+  const raw = (
     process.env.TELEGRAM_RETURN_URL ||
     process.env.NEXT_PUBLIC_SITE_URL ||
     process.env.WEBSITE_PUBLIC_URL ||
-    "http://localhost:3000"
+    ''
   )
     .trim()
-    .replace(/\/+$/, "")
-  // TELEGRAM_RETURN_URL may already be …/ask-question — never double the path.
-  if (/\/ask-question$/i.test(base)) return base
-  return `${base}/ask-question`
+    .replace(/\/+$/, '')
+
+  const isLocalHost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(raw || 'x')
+  const onCloud = Boolean(process.env.RENDER || process.env.VERCEL || process.env.NODE_ENV === 'production')
+
+  // Never point live Telegram "Return" buttons at localhost (common misconfig on Render).
+  // Local Admin: TELEGRAM_RETURN_URL=http://localhost:3000/ask-question and NODE_ENV=development.
+  let base = raw
+  if (!base || (isLocalHost && onCloud)) {
+    base = onCloud ? 'https://sileqelbachin1.com' : 'http://localhost:3000'
+  }
+
+  if (/\/ask-question$/i.test(base)) return `${base}?tg=1`
+  return `${base}/ask-question?tg=1`
 }
 
 export function returnToWebsiteButton(locale: TgLocale): {

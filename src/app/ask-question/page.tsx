@@ -10,6 +10,7 @@ const BOT_USERNAME = 'sileqelbachin1_Bot'
 const BOT_URL = `https://t.me/${BOT_USERNAME}`
 const ASK_DRAFT_KEY = 'sile_ask_question_draft_v1'
 const TG_GUEST_EMAIL_KEY = 'sile_tg_guest_email_v1'
+const TG_TOKEN_KEY = 'sile_tg_link_token_v1'
 
 /** Stable anonymous email for Telegram-only guests (no Google required). */
 function ensureTelegramGuestEmail(): string {
@@ -331,9 +332,33 @@ export default function AskQuestionPage() {
           JSON.stringify({ email, username, at: Date.now() })
         )
       }
+      sessionStorage.removeItem(TG_TOKEN_KEY)
     } catch {
       /* ignore */
     }
+  }
+
+  const persistTgToken = (token: string | null) => {
+    setTgToken(token)
+    try {
+      if (token) sessionStorage.setItem(TG_TOKEN_KEY, token)
+      else sessionStorage.removeItem(TG_TOKEN_KEY)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const saveTelegramDraftNow = () => {
+    const guest = guestEmail || ensureTelegramGuestEmail()
+    if (!guestEmail) setGuestEmail(guest)
+    saveAskDraft({
+      question: question.trim() || question,
+      categoryValue,
+      otherCategory,
+      guestName: '',
+      guestEmail: guest,
+      channel: 'telegram',
+    })
   }
 
   /** Reuses cached chat_id after the first Start (Google optional for Telegram). */
@@ -425,7 +450,7 @@ export default function AskQuestionPage() {
       const token = typeof data.token === 'string' ? data.token : null
       if (!token) throw new Error('Missing Telegram link token.')
       setTgDeepLink(link)
-      setTgToken(token)
+      persistTgToken(token)
       return { link, token }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Telegram connect failed.')
@@ -448,26 +473,33 @@ export default function AskQuestionPage() {
   // Restore Telegram linked state after return / reload (Google optional).
   useEffect(() => {
     if (authLoading) return
+    let storedToken: string | null = null
     try {
       const guest = localStorage.getItem(TG_GUEST_EMAIL_KEY)
       if (guest && !user?.email) setGuestEmail(guest)
+      storedToken = sessionStorage.getItem(TG_TOKEN_KEY)
+      if (storedToken && !tgToken) setTgToken(storedToken)
       const raw = localStorage.getItem('sile_tg_linked_v1')
       if (raw) {
         const parsed = JSON.parse(raw) as { email?: string; username?: string | null }
         const email = (user?.email || guest || '').toLowerCase()
         if (parsed.email && parsed.email === email) {
           setTgUsername(parsed.username || null)
+          // Optimistic UI — status fetch confirms; prevents false "Start again" after return
+          setTgConnected(true)
         }
       }
     } catch {
       /* ignore */
     }
-    void refreshTelegramStatus(null)
+    void refreshTelegramStatus(storedToken || tgToken)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.email, authLoading])
 
   const onTelegramOpenClick = () => {
     if (tgConnected) return
+    // Persist draft + guest email before leaving for Telegram (Chrome / in-app browser return)
+    saveTelegramDraftNow()
     if (tgDeepLink && tgToken) {
       startWaitingForTelegram(tgToken)
       return
@@ -478,6 +510,7 @@ export default function AskQuestionPage() {
         popup?.close()
         return
       }
+      saveTelegramDraftNow()
       if (popup && !popup.closed) {
         popup.location.replace(prepared.link)
       } else {
@@ -641,6 +674,14 @@ export default function AskQuestionPage() {
       setGuestEmail,
       setModalChannel,
     })
+    if (draft.guestEmail && draft.guestEmail.includes('@telegram.guest')) {
+      setGuestEmail(draft.guestEmail)
+      try {
+        localStorage.setItem(TG_GUEST_EMAIL_KEY, draft.guestEmail)
+      } catch {
+        /* ignore */
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once on mount
   }, [])
 
@@ -649,27 +690,34 @@ export default function AskQuestionPage() {
     if (submitted) return
     if (!question.trim() && !otherCategory.trim()) return
     const timer = window.setTimeout(() => {
+      const guest =
+        modalChannel === 'telegram'
+          ? guestEmail ||
+            (typeof window !== 'undefined' ? localStorage.getItem(TG_GUEST_EMAIL_KEY) || '' : '')
+          : ''
       saveAskDraft({
         question: question.trim() || question,
         categoryValue,
         otherCategory,
         guestName: '',
-        guestEmail: '',
+        guestEmail: guest,
         channel: modalChannel,
       })
     }, 350)
     return () => window.clearTimeout(timer)
-  }, [question, categoryValue, otherCategory, modalChannel, submitted])
+  }, [question, categoryValue, otherCategory, modalChannel, guestEmail, submitted])
 
-  // After Google OAuth: restore question (from URL or storage) and reopen delivery modal.
+  // After Google OAuth OR return from Telegram bot: restore draft + reopen delivery modal.
   useEffect(() => {
     if (authLoading || draftHandled.current) return
 
     let resume = false
+    let fromTelegram = false
     let resumeChannel: 'email' | 'telegram' | null = null
     try {
       const params = new URLSearchParams(window.location.search)
       resume = params.get('resume') === '1'
+      fromTelegram = params.get('tg') === '1'
       const ch = params.get('channel')
       if (ch === 'telegram' || ch === 'email') resumeChannel = ch
     } catch {
@@ -677,7 +725,7 @@ export default function AskQuestionPage() {
     }
 
     const draft = readDraftFromLocation() || readAskDraft()
-    if (!draft && !resume) return
+    if (!draft && !resume && !fromTelegram) return
 
     draftHandled.current = true
     if (draft) {
@@ -689,14 +737,33 @@ export default function AskQuestionPage() {
         setGuestEmail,
         setModalChannel,
       })
+      if (draft.guestEmail?.includes('@telegram.guest')) {
+        setGuestEmail(draft.guestEmail)
+      }
     }
     if (resumeChannel) setModalChannel(resumeChannel)
-    // Only reopen the delivery modal after an OAuth return (not every visit with a saved draft).
-    if (resume) {
+    else if (fromTelegram || draft?.channel === 'telegram') setModalChannel('telegram')
+
+    // Reopen delivery modal after OAuth or after Telegram "Return to website"
+    if (resume || fromTelegram || draft?.channel === 'telegram') {
       setShowDeliveryModal(true)
       setError(null)
+      // Confirm bot link as soon as user returns
+      if (fromTelegram || draft?.channel === 'telegram') {
+        const tok = sessionStorage.getItem(TG_TOKEN_KEY)
+        void refreshTelegramStatus(tok)
+      }
     }
     clearOauthResumeParams()
+    try {
+      const url = new URL(window.location.href)
+      if (url.searchParams.has('tg')) {
+        url.searchParams.delete('tg')
+        window.history.replaceState({}, '', url.pathname + (url.search || ''))
+      }
+    } catch {
+      /* ignore */
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once after auth hydrates
   }, [authLoading, user?.email])
 
