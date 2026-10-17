@@ -11,11 +11,21 @@ function escapeHtml(s: string): string {
 
 export type TgLocale = "en" | "am"
 
-/** Prefer Amharic when Telegram language_code is am, or sample text is Ethiopic-heavy. */
+/**
+ * Locale for Telegram templates (EN / AM only today).
+ * Priority: website preferred_locale → Telegram language_code → Ethiopic in sample text → en.
+ */
 export function resolveTgLocale(input?: {
+  preferred?: string | null
   languageCode?: string | null
   sampleText?: string | null
 }): TgLocale {
+  const pref = String(input?.preferred || "")
+    .trim()
+    .toLowerCase()
+  if (pref.startsWith("am") || pref.startsWith("ti")) return "am"
+  // Website EN/AR: Telegram chrome is EN/AM only → use EN for Arabic UI
+  if (pref.startsWith("en") || pref.startsWith("ar")) return "en"
   const code = String(input?.languageCode || "").toLowerCase()
   if (code.startsWith("am") || code.startsWith("ti")) return "am"
   const sample = String(input?.sampleText || "")
@@ -24,12 +34,21 @@ export function resolveTgLocale(input?: {
   return "en"
 }
 
+/** Default Ustaz greeting for Admin answer form (matches visitor website language). */
+export function defaultUstazGreeting(locale: TgLocale): string {
+  if (locale === "am") {
+    return "አሰላሙ ዓለይኩም ወራሕመቱላሂ ወበረካቱህ"
+  }
+  return "Assalamu alaikum wa rahmatullahi wa barakatuh"
+}
+
 const CONN_AM = "💚 አሰላሙ ዓለይኩም ወራሕመቱላሂ ወበረካቱህ\n\nቴሌግራምዎ ከስለ ቀልባችን (Sile Qelbachin) ጋር በትክክል ተያይዟል።\n\n➡️ አሁን ወደ ድረ-ገጹ ተመልሰው ጥያቄዎን ያቅረቡ / ይላኩ።\nኢንሻአላህ የኡስታዝ ምላሽ ቀጥታ እዚህ በግል ይደርስዎታል።"
 const ANS_HEAD_AM = "🌙 <b>ስለ ቀልባችን | Sile Qelbachin</b>"
 const ANS_INTRO_AM =
   "አሰላሙ ዓለይኩም ወራሕመቱልላሂ ወበረካቱሁ\n\nለጠየቁት ጥያቄ ምላሽ ተሰጥቷል።"
 const Q_LABEL_AM = "❓ <b>የእርስዎ ጥያቄ፦</b>"
 const A_LABEL_AM = "💡 <b>የተሰጠው ምላሽ፦</b>"
+const NOTE_LABEL_AM = "📝 <b>ማስታወሻ፦</b>"
 const DUA_AM =
   "🤲 አላህ ጠቃሚ እውቀትን ይለግስዎ፤ በትክክለኛው መንገድ ላይም ብርሃን ያድርግልዎ። አሚን!"
 const BTN_AM = "🌐 ወደ ድረ-ገጹ ተመለስ — ጥያቄዎን ያቅረቡ"
@@ -61,12 +80,15 @@ export function formatAnswerDeliveryText(input: {
   question: string
   answer: string
   greeting?: string | null
+  description?: string | null
 }): string {
   const q = escapeHtml(clipTelegramField(input.question, 1200))
   let a = escapeHtml(clipTelegramField(input.answer, 2000))
   if (input.greeting?.trim()) {
     a = `${escapeHtml(clipTelegramField(input.greeting, 400))}\n\n${a}`
   }
+  const noteRaw = String(input.description || "").trim()
+  const note = noteRaw ? escapeHtml(clipTelegramField(noteRaw, 800)) : ""
   if (input.locale === "am") {
     return [
       ANS_HEAD_AM,
@@ -79,6 +101,7 @@ export function formatAnswerDeliveryText(input: {
       "",
       A_LABEL_AM,
       a,
+      ...(note ? ["", NOTE_LABEL_AM, note] : []),
       "━━━━━━━━━━━━━━━━━━━━━━",
       "",
       DUA_AM,
@@ -97,6 +120,7 @@ export function formatAnswerDeliveryText(input: {
     "",
     "💡 <b>The answer:</b>",
     a,
+    ...(note ? ["", "📝 <b>Note:</b>", note] : []),
     "━━━━━━━━━━━━━━━━━━━━━━",
     "",
     "🤲 May Allah grant you beneficial knowledge and make it a light upon the right path. Āmīn!",

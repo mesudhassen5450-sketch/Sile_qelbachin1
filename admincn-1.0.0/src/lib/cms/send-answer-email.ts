@@ -121,6 +121,7 @@ export async function sendUstazAnswerEmail(input: {
   coverUrl?: string | null
   audioUrl?: string | null
   videoUrl?: string | null
+  preferredLocale?: string | null
 }): Promise<{ ok: boolean; error?: string }> {
   const to = input.to.trim()
   if (!to || !to.includes('@')) return { ok: false, error: 'Missing recipient email.' }
@@ -130,10 +131,18 @@ export async function sendUstazAnswerEmail(input: {
     return { ok: false, error: 'EMAIL_FROM is missing.' }
   }
 
-  const am = isAmharicDominant(`${input.question}\n${input.answer}\n${input.greeting || ''}`)
+  const pref = String(input.preferredLocale || '')
+    .trim()
+    .toLowerCase()
+  const amFromPref = pref.startsWith('am') || pref.startsWith('ti')
+  const am =
+    amFromPref ||
+    (!pref.startsWith('en') &&
+      !pref.startsWith('ar') &&
+      isAmharicDominant(`${input.question}\n${input.answer}\n${input.greeting || ''}`))
   const rawGreeting = (input.greeting || '').trim()
   const greeting = am
-    ? rawGreeting || 'አሰላሙዓለይኩም ወረሕመቱላሂ ወበረካቱሁ፣'
+    ? rawGreeting || 'አሰላሙ ዓለይኩም ወራሕመቱላሂ ወበረካቱህ'
     : rawGreeting || 'Assalamu alaikum wa rahmatullahi wa barakatuh,'
 
   let answerBody = stripLeadingSalams(input.answer.trim())

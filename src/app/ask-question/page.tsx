@@ -424,8 +424,8 @@ export default function AskQuestionPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
           user?.email
-            ? { action: 'link-start' }
-            : { action: 'link-start', guest_email: guest }
+            ? { action: 'link-start', preferred_locale: language }
+            : { action: 'link-start', guest_email: guest, preferred_locale: language }
         ),
       })
       const data = await res.json().catch(() => ({}))
@@ -606,6 +606,7 @@ export default function AskQuestionPage() {
         user_id: user?.id || null,
         auth_email: deliveryEmail,
         answer_channel: channel,
+        preferred_locale: language,
       }
 
       const res = await fetch(cmsQuestionsUrl(), {

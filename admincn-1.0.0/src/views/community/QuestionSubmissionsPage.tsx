@@ -62,6 +62,7 @@ type Row = {
   video_url: string | null
   published_public: boolean
   answer_channel?: 'email' | 'telegram' | string
+  preferred_locale?: string | null
   delivery_status?: 'pending' | 'sent' | 'failed' | string
   delivery_error?: string | null
   email_sent: boolean
@@ -69,6 +70,19 @@ type Row = {
   admin_seen_at?: string | null
   created_at: string
   answered_at: string | null
+}
+
+function defaultGreetingForRow(row: Row): string {
+  if (row.greeting?.trim()) return row.greeting
+  const pref = String(row.preferred_locale || '')
+    .trim()
+    .toLowerCase()
+  if (pref.startsWith('am') || pref.startsWith('ti')) {
+    return 'አሰላሙ ዓለይኩም ወራሕመቱላሂ ወበረካቱህ'
+  }
+  const eth = (String(row.question || '').match(/[\u1200-\u137F]/g) || []).length
+  if (eth >= 6) return 'አሰላሙ ዓለይኩም ወራሕመቱላሂ ወበረካቱህ'
+  return 'Assalamu alaikum wa rahmatullahi wa barakatuh'
 }
 
 const STATUS_FILTERS: Array<{ id: string; en: string; am: string }> = [
@@ -202,7 +216,7 @@ export default function QuestionSubmissionsPage() {
   const openAnswer = (row: Row) => {
     setActive(row)
     if (isOpen(row)) void markSeen(row.id)
-    setGreeting(row.greeting || '')
+    setGreeting(defaultGreetingForRow(row))
     setAnswer(row.answer || '')
     setDescription(row.description || '')
     setCover(row.cover_url ? { id: 'existing', public_url: row.cover_url, object_key: 'cover' } : null)

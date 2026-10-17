@@ -167,9 +167,19 @@ export async function POST(request: Request) {
     )
   }
 
+  const preferredLocale = String(
+    body.preferred_locale || body.locale || body.language || ''
+  )
+    .trim()
+    .toLowerCase()
+
   // link-start — prefer signed-in user_id so chat_id is cached on the account
   if (user) {
-    const started = await createTelegramLinkStart(user.id, user.email)
+    const started = await createTelegramLinkStart(
+      user.id,
+      user.email,
+      preferredLocale || null
+    )
     if (!started.ok) {
       return cors(NextResponse.json({ ok: false, error: started.error }, { status: 400 }))
     }
@@ -200,7 +210,10 @@ export async function POST(request: Request) {
   }
 
   const guestEmail = String(body.guest_email || body.email || '').trim()
-  const started = await createTelegramLinkStartForGuest(guestEmail)
+  const started = await createTelegramLinkStartForGuest(
+    guestEmail,
+    preferredLocale || null
+  )
   if (!started.ok) {
     return cors(NextResponse.json({ ok: false, error: started.error }, { status: 400 }))
   }

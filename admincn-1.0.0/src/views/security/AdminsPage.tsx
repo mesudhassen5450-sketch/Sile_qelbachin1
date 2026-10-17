@@ -422,8 +422,9 @@ const AdminsPage = () => {
           <DialogHeader>
             <DialogTitle>Add staff</DialogTitle>
             <DialogDescription>
-              Creates a Supabase Auth user and staff profile. They sign in to Admin only — website
-              and mobile stay public.
+              Creates a staff profile for Admin login. If this email already signed up on the
+              website (Auth), it is linked here — it does not need to appear in staff_profiles
+              first. Website and mobile stay public.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={e => void onCreate(e)} className='space-y-4'>

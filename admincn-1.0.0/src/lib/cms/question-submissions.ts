@@ -77,6 +77,8 @@ export type QuestionSubmission = {
   answer_channel: AnswerChannel
   /** Snapshot of Telegram chat when asked (guest or linked) — used to deliver answer */
   telegram_chat_id: string | null
+  /** Website UI language at ask time (am / en / ar) — drives Telegram/email chrome */
+  preferred_locale: string | null
   /** Outcome of last send attempt */
   delivery_status: DeliveryStatus
   delivery_error: string | null
@@ -133,6 +135,9 @@ function normalize(row: Partial<QuestionSubmission> & { id: string }): QuestionS
     closed_at: row.closed_at ?? null,
     answer_channel: coerceChannel(row.answer_channel),
     telegram_chat_id: row.telegram_chat_id ? String(row.telegram_chat_id) : null,
+    preferred_locale: row.preferred_locale
+      ? String(row.preferred_locale).trim().toLowerCase().slice(0, 8)
+      : null,
     delivery_status: coerceDelivery(row.delivery_status, email_sent, email_error),
     delivery_error: row.delivery_error ?? email_error,
     email_sent,
@@ -165,6 +170,7 @@ function rowToDb(r: QuestionSubmission) {
     closed_at: r.closed_at,
     answer_channel: r.answer_channel,
     telegram_chat_id: r.telegram_chat_id,
+    preferred_locale: r.preferred_locale,
     delivery_status: r.delivery_status,
     delivery_error: r.delivery_error,
     email_sent: r.email_sent,
@@ -268,13 +274,19 @@ async function persistDurable(rows: QuestionSubmission[]): Promise<void> {
   if (payload.length) {
     let { error } = await sb.from('question_submissions').upsert(payload, { onConflict: 'id' })
     // Before migration 009, strip new columns and retry so Email flow keeps working.
-    if (error && /answer_channel|delivery_status|delivery_error|telegram_chat_id|column/i.test(error.message)) {
+    if (
+      error &&
+      /answer_channel|delivery_status|delivery_error|telegram_chat_id|preferred_locale|column/i.test(
+        error.message
+      )
+    ) {
       const legacy = payload.map(r => {
         const {
           answer_channel: _c,
           delivery_status: _d,
           delivery_error: _e,
           telegram_chat_id: _t,
+          preferred_locale: _p,
           ...rest
         } = r as Record<string, unknown>
         return rest
@@ -403,6 +415,7 @@ export async function createQuestionSubmission(input: {
   question: string
   answer_channel?: AnswerChannel | string | null
   telegram_chat_id?: string | null
+  preferred_locale?: string | null
 }): Promise<QuestionSubmission> {
   const email = String(input.auth_email || '')
     .trim()
@@ -463,6 +476,15 @@ export async function createQuestionSubmission(input: {
     closed_at: null,
     answer_channel: coerceChannel(input.answer_channel),
     telegram_chat_id: input.telegram_chat_id ? String(input.telegram_chat_id) : null,
+    preferred_locale: (() => {
+      const v = String(input.preferred_locale || '')
+        .trim()
+        .toLowerCase()
+      if (v.startsWith('am') || v.startsWith('ti')) return 'am'
+      if (v.startsWith('ar')) return 'ar'
+      if (v.startsWith('en')) return 'en'
+      return null
+    })(),
     delivery_status: 'pending',
     delivery_error: null,
     email_sent: false,

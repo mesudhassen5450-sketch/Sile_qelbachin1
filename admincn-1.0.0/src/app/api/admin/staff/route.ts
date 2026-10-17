@@ -17,6 +17,27 @@ function generateTempPassword(): string {
   return `Tmp!${base}9a`
 }
 
+/** Auth users live in auth.users — separate from staff_profiles. Find by email. */
+async function findAuthUserByEmail(
+  admin: ReturnType<typeof createServiceClient>,
+  email: string
+): Promise<{ id: string; email?: string } | null> {
+  const target = email.trim().toLowerCase()
+  for (let page = 1; page <= 20; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 })
+    if (error) return null
+    const users = data?.users || []
+    const hit = users.find(u => String(u.email || '').trim().toLowerCase() === target)
+    if (hit?.id) return { id: hit.id, email: hit.email || undefined }
+    if (users.length < 200) break
+  }
+  return null
+}
+
+function isAlreadyRegisteredAuthError(message?: string | null): boolean {
+  return /already|exists|registered|duplicate/i.test(String(message || ''))
+}
+
 export async function GET() {
   const gate = await requireApiPermission(['admins.view', 'security.view'])
   if ('response' in gate) return gate.response
@@ -83,50 +104,106 @@ export async function POST(request: Request) {
 
   const admin = createServiceClient()
 
-  // Block duplicate staff emails
+  // Block duplicate staff emails (Admins list / staff_profiles only)
   const { data: existingProfile } = await admin
     .from('staff_profiles')
     .select('user_id')
     .eq('email', email)
     .maybeSingle()
   if (existingProfile) {
-    return NextResponse.json({ ok: false, error: 'A staff profile with this email already exists.' }, { status: 400 })
+    return NextResponse.json(
+      { ok: false, error: 'A staff profile with this email already exists.' },
+      { status: 400 }
+    )
   }
+
+  // Create Auth user — or reuse one that already exists (e.g. website Google sign-in)
+  // without a staff_profiles row. That is why the UI said “exists” while Admins was empty.
+  let userId: string | null = null
+  let linkedExistingAuth = false
 
   const { data: created, error: createError } = await admin.auth.admin.createUser({
     email,
     password: tempPassword,
     // Confirmed so they can sign in immediately; must_change_password forces rotation.
     email_confirm: true,
-    user_metadata: { display_name: displayName }
+    user_metadata: { display_name: displayName },
   })
 
-  if (createError || !created.user) {
+  if (created?.user?.id) {
+    userId = created.user.id
+  } else if (isAlreadyRegisteredAuthError(createError?.message)) {
+    const existingAuth = await findAuthUserByEmail(admin, email)
+    if (!existingAuth) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            'This email is already in Supabase Auth, but the user could not be found. Open Authentication → Users in Supabase and remove or invite them, then try again.',
+        },
+        { status: 400 }
+      )
+    }
+    // Already a staff row for this auth id? (email mismatch edge case)
+    const { data: byUser } = await admin
+      .from('staff_profiles')
+      .select('user_id, email')
+      .eq('user_id', existingAuth.id)
+      .maybeSingle()
+    if (byUser) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `This Auth account is already linked as staff (${byUser.email || email}).`,
+        },
+        { status: 400 }
+      )
+    }
+    const { error: updateError } = await admin.auth.admin.updateUserById(existingAuth.id, {
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: { display_name: displayName },
+    })
+    if (updateError) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Auth account exists but password could not be set: ${updateError.message}`,
+        },
+        { status: 400 }
+      )
+    }
+    userId = existingAuth.id
+    linkedExistingAuth = true
+  } else {
     return NextResponse.json(
       {
         ok: false,
-        error: createError?.message?.includes('already')
-          ? 'Unable to create Auth user. The email may already exist in Auth.'
-          : 'Unable to create Auth user. The email may already exist.'
+        error: createError?.message || 'Unable to create Auth user.',
       },
       { status: 400 }
     )
   }
 
   const { error: profileError } = await admin.from('staff_profiles').insert({
-    user_id: created.user.id,
+    user_id: userId,
     email,
     display_name: displayName,
     role,
     status,
     must_change_password: true,
-    created_by: gate.ctx.user.id
+    created_by: gate.ctx.user.id,
   })
 
   if (profileError) {
-    // Best-effort cleanup so we don't leave orphan Auth users
-    await admin.auth.admin.deleteUser(created.user.id).catch(() => undefined)
-    return NextResponse.json({ ok: false, error: 'Auth user created but profile failed.' }, { status: 500 })
+    // Only delete Auth if we just created it — never wipe a pre-existing website login
+    if (!linkedExistingAuth && userId) {
+      await admin.auth.admin.deleteUser(userId).catch(() => undefined)
+    }
+    return NextResponse.json(
+      { ok: false, error: `Auth ready but staff profile failed: ${profileError.message}` },
+      { status: 500 }
+    )
   }
 
   await writeAuditLog({
@@ -134,17 +211,19 @@ export async function POST(request: Request) {
     adminEmail: gate.ctx.user.email,
     action: 'admin_created',
     entityType: 'staff_profiles',
-    entityId: created.user.id,
-    after: { email, role, status }
+    entityId: userId,
+    after: { email, role, status, linked_existing_auth: linkedExistingAuth },
   })
 
   return NextResponse.json({
     ok: true,
-    user_id: created.user.id,
+    user_id: userId,
     temporary_password: tempPassword,
     password_auto_generated: autoPassword,
-    message:
-      'Staff created and can sign in. Share the temporary password securely — they must change it on first login. Published content they manage appears on the website and mobile apps via the public API.'
+    linked_existing_auth: linkedExistingAuth,
+    message: linkedExistingAuth
+      ? 'This email already had a website/Auth account — linked as staff. Share the temporary password securely; they must change it on first Admin login.'
+      : 'Staff created and can sign in. Share the temporary password securely — they must change it on first login. Published content they manage appears on the website and mobile apps via the public API.',
   })
 }
 
@@ -271,10 +350,18 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ ok: false, error: 'Unable to delete staff profile.' }, { status: 500 })
   }
 
+  // Remove Auth so the same email can be added again later.
+  // "User not found" is OK (already gone / orphan profile).
   const { error: authError } = await admin.auth.admin.deleteUser(userId)
-  if (authError) {
+  const authGone =
+    !authError || /not\s*found|does not exist|user.*missing/i.test(authError.message || '')
+  if (!authGone) {
     return NextResponse.json(
-      { ok: false, error: 'Profile deleted but Auth user removal failed. Remove them in Supabase Auth manually.' },
+      {
+        ok: false,
+        error:
+          'Staff removed from Admins, but Auth user removal failed. Delete them under Supabase → Authentication → Users, then you can add this email again.',
+      },
       { status: 500 }
     )
   }
@@ -285,8 +372,11 @@ export async function DELETE(request: Request) {
     action: 'admin_deleted',
     entityType: 'staff_profiles',
     entityId: userId,
-    before
+    before,
   })
 
-  return NextResponse.json({ ok: true, message: 'Staff removed from Admin and Auth.' })
+  return NextResponse.json({
+    ok: true,
+    message: 'Staff removed from Admin and Auth. You can add this email again anytime.',
+  })
 }

@@ -2,9 +2,13 @@
 
 **Product:** ስለ ቀልባችን / Sile Qelbachin  
 **Canonical file:** this document (repo root)  
-**Updated:** 2026-09-26
+**Updated:** 2026-10-07
 
-Also see (older / internal): `admincn-1.0.0/docs/admin/CMS-WEBSITE-MOBILE-WORKFLOW.md`
+Also see:
+
+- **`HOW_ADMIN_CONNECTS.md`** — full map (UI shell vs CMS content · Supabase · Render · R2 · Vercel)
+- **`MOBILE_APP_CATEGORY_UI.md`** — client Home/nav UI (Daily priority = app-only)
+- `admincn-1.0.0/docs/admin/CMS-WEBSITE-MOBILE-WORKFLOW.md` — staff publish steps
 
 ---
 
@@ -22,8 +26,8 @@ Cloudflare R2  (public HTTPS file URLs)
         │
         ▼
 GET /api/public/v1/*   (published only, CORS *)
-        ├── Website (Netlify)
-        └── Flutter / mobile
+        ├── Website (Vercel · sileqelbachin1.com · /api/cms proxy)
+        └── Flutter / mobile  (same JSON; Daily UI from MOBILE_APP_CATEGORY_UI.md)
 ```
 
 | Do | Don’t |
@@ -41,7 +45,7 @@ GET /api/public/v1/*   (published only, CORS *)
 | **Admin login** | https://admin.sileqelbachin1.com/pages/auth/login |
 | **Admin API (mobile)** | https://admin.sileqelbachin1.com/api/public/v1 |
 | Render fallback Admin | https://sile-qelbachin1-1.onrender.com |
-| Public website | Netlify / `sileqelbachin1.com` |
+| Public website | Vercel / `https://sileqelbachin1.com` |
 | Local Admin | http://localhost:3001/pages/auth/login |
 
 DNS: Cloudflare `admin` CNAME → `sile-qelbachin1-1.onrender.com` (DNS only).
@@ -141,7 +145,7 @@ SUPABASE_SERVICE_ROLE_KEY=<service_role JWT>
 
 ---
 
-## 5. Netlify (website) — 4 public vars
+## 5. Vercel (website) — public vars
 
 ```text
 NEXT_PUBLIC_SITE_URL=https://sileqelbachin1.com
@@ -149,6 +153,8 @@ NEXT_PUBLIC_CMS_API_BASE=https://admin.sileqelbachin1.com/api/public/v1
 NEXT_PUBLIC_R2_PUBLIC_BASE=https://pub-03bea4f667534df5ab6c67f073c73d1e.r2.dev
 NEXT_PUBLIC_R2_OBJECT_PREFIX=sileqelbachin-meadia
 ```
+
+Website browsers usually call same-origin `/api/cms/*`, which proxies to the Admin public API (`src/lib/cmsClient.ts`).
 
 ---
 

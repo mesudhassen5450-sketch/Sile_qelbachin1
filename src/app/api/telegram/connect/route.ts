@@ -46,6 +46,12 @@ export async function POST(request: Request) {
     }
     if (token) headers.Authorization = `Bearer ${token}`
 
+    const preferredLocale = String(
+      body.preferred_locale || body.locale || body.language || ''
+    )
+      .trim()
+      .toLowerCase()
+
     const res = await fetch(adminTelegramBase(), {
       method: 'POST',
       headers,
@@ -54,6 +60,8 @@ export async function POST(request: Request) {
         guest_email: guestEmail || undefined,
         email: guestEmail || undefined,
         token: body.token ? String(body.token) : undefined,
+        preferred_locale: preferredLocale || undefined,
+        language: preferredLocale || undefined,
       }),
       signal: AbortSignal.timeout(15000),
     })

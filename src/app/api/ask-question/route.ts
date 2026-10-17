@@ -178,6 +178,12 @@ export async function POST(request: Request) {
     .trim()
     .toLowerCase()
   const answer_channel = channelRaw === 'telegram' ? 'telegram' : 'email'
+  const preferred_locale = String(
+    body.preferred_locale || body.locale || body.language || ''
+  )
+    .trim()
+    .toLowerCase()
+    .slice(0, 8)
 
   if (!authEmail.includes('@')) {
     return NextResponse.json({ ok: false, error: 'Authenticated email required.' }, { status: 400 })
@@ -194,6 +200,7 @@ export async function POST(request: Request) {
     user_id: userId,
     auth_email: authEmail,
     answer_channel,
+    preferred_locale: preferred_locale || undefined,
   }
 
   // Production path: Admin on Render is the inbox source of truth

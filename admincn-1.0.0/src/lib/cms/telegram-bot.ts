@@ -25,21 +25,21 @@ export function formatUstazAnswerTelegramHtml(input: {
   question: string
   answer: string
   greeting?: string | null
+  description?: string | null
   locale?: TgLocale | string | null
   languageCode?: string | null
 }): string {
-  const locale =
-    input.locale === 'am' || input.locale === 'en'
-      ? input.locale
-      : resolveTgLocale({
-          languageCode: input.languageCode,
-          sampleText: `${input.question} ${input.answer}`,
-        })
+  const locale = resolveTgLocale({
+    preferred: input.locale,
+    languageCode: input.languageCode,
+    sampleText: `${input.question} ${input.answer} ${input.greeting || ''}`,
+  })
   return formatAnswerDeliveryText({
     locale,
     question: input.question,
     answer: input.answer,
     greeting: input.greeting,
+    description: input.description,
   })
 }
 
@@ -166,20 +166,22 @@ export async function telegramDeliverUstazAnswer(input: {
   question: string
   answer: string
   greeting?: string | null
+  description?: string | null
   coverUrl?: string | null
   audioUrl?: string | null
   videoUrl?: string | null
   locale?: TgLocale | string | null
 }): Promise<{ ok: boolean; error?: string; media_errors?: string[] }> {
-  const locale =
-    input.locale === 'am' || input.locale === 'en'
-      ? input.locale
-      : resolveTgLocale({ sampleText: `${input.question} ${input.answer}` })
+  const locale = resolveTgLocale({
+    preferred: input.locale,
+    sampleText: `${input.question} ${input.answer} ${input.greeting || ''}`,
+  })
 
   const text = formatUstazAnswerTelegramHtml({
     question: input.question,
     answer: input.answer,
     greeting: input.greeting,
+    description: input.description,
     locale,
   })
   const sent = await telegramSendMessage({ chatId: input.chatId, text, parseMode: 'HTML' })

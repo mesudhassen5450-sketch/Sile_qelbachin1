@@ -172,6 +172,7 @@ export async function PATCH(request: Request) {
         coverUrl: cover_url,
         audioUrl: audio_url,
         videoUrl: video_url,
+        preferredLocale: existing.preferred_locale,
       })
       deliveryOk = mail.ok
       deliveryError = mail.ok ? null : mail.error || 'Email failed'
@@ -196,9 +197,11 @@ export async function PATCH(request: Request) {
           question: existing.question,
           answer,
           greeting: greeting || null,
+          description: description || null,
           coverUrl: cover_url,
           audioUrl: audio_url,
           videoUrl: video_url,
+          locale: existing.preferred_locale,
         })
         deliveryOk = tg.ok
         deliveryError = tg.ok

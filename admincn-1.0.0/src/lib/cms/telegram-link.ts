@@ -34,6 +34,32 @@ function normalizeEmail(email: string): string {
     .toLowerCase()
 }
 
+/** Look up website preferred_locale stored on an existing chat link. */
+export async function getPreferredLocaleForChatId(
+  chatId: string | number
+): Promise<string | null> {
+  const sb = getServiceSupabase()
+  if (!sb) return null
+  const id = String(chatId)
+  for (const table of ['user_telegram_links', 'guest_telegram_links'] as const) {
+    let { data, error } = await sb
+      .from(table)
+      .select('preferred_locale')
+      .eq('chat_id', id)
+      .maybeSingle()
+    if (error && /preferred_locale|column|schema cache/i.test(error.message)) {
+      return null
+    }
+    if (data && 'preferred_locale' in data) {
+      const pref = normalizePreferredLocale(
+        (data as { preferred_locale?: string | null }).preferred_locale
+      )
+      if (pref) return pref
+    }
+  }
+  return null
+}
+
 /** Prevent concurrent getUpdates races (status poll every 2s). */
 let pollingInFlight: Promise<number> | null = null
 let backgroundPollingStarted = false
@@ -58,10 +84,13 @@ export async function processTelegramPollingStarts(): Promise<number> {
     const updates = await telegramPollStartUpdates()
     let n = 0
     for (const u of updates) {
-      const locale = resolveTgLocale({ languageCode: u.languageCode })
-
       // Bare /start (no deep-link token) — still guide user back to the website.
       if (!String(u.startPayload || '').trim()) {
+        const preferred = await getPreferredLocaleForChatId(u.chatId)
+        const locale = resolveTgLocale({
+          preferred,
+          languageCode: u.languageCode,
+        })
         await notifyTelegramConnected(u.chatId, bareStartGuidanceText(locale), {
           locale,
           withReturnButton: true,
@@ -189,9 +218,20 @@ export async function getTelegramChatIdForEmail(email: string): Promise<string |
   return data?.chat_id ? String(data.chat_id) : null
 }
 
+function normalizePreferredLocale(raw?: string | null): string | null {
+  const v = String(raw || '')
+    .trim()
+    .toLowerCase()
+  if (v.startsWith('am') || v.startsWith('ti')) return 'am'
+  if (v.startsWith('ar')) return 'ar'
+  if (v.startsWith('en')) return 'en'
+  return null
+}
+
 async function insertLinkToken(input: {
   userId?: string | null
   guestEmail?: string | null
+  preferredLocale?: string | null
 }): Promise<{ ok: boolean; token?: string; deep_link?: string; bot_username?: string; expires_at?: string; error?: string }> {
   const sb = getServiceSupabase()
   if (!sb) {
@@ -199,17 +239,25 @@ async function insertLinkToken(input: {
   }
   const token = `c_${randomBytes(16).toString('hex')}`
   const expires = new Date(Date.now() + TOKEN_TTL_MS).toISOString()
-  const { error } = await sb.from('telegram_link_tokens').upsert(
-    {
-      token,
-      user_id: input.userId || null,
-      guest_email: input.guestEmail ? normalizeEmail(input.guestEmail) : null,
-      expires_at: expires,
-      used_at: null,
-      created_at: new Date().toISOString(),
-    },
-    { onConflict: 'token' }
-  )
+  const preferred_locale = normalizePreferredLocale(input.preferredLocale)
+  const baseRow = {
+    token,
+    user_id: input.userId || null,
+    guest_email: input.guestEmail ? normalizeEmail(input.guestEmail) : null,
+    expires_at: expires,
+    used_at: null,
+    created_at: new Date().toISOString(),
+  }
+  const tokenRow: Record<string, unknown> = preferred_locale
+    ? { ...baseRow, preferred_locale }
+    : { ...baseRow }
+  let { error } = await sb.from('telegram_link_tokens').upsert(tokenRow as never, {
+    onConflict: 'token',
+  })
+  // Before migration 011, retry without preferred_locale
+  if (error && /preferred_locale|column|schema cache/i.test(error.message)) {
+    ;({ error } = await sb.from('telegram_link_tokens').upsert(baseRow, { onConflict: 'token' }))
+  }
   if (error) {
     if (/relation|does not exist|schema cache|guest_email|null value/i.test(error.message)) {
       return {
@@ -230,10 +278,27 @@ async function insertLinkToken(input: {
   }
 }
 
-export async function createTelegramLinkStart(userId: string, email?: string | null) {
+export async function createTelegramLinkStart(
+  userId: string,
+  email?: string | null,
+  preferredLocale?: string | null
+) {
   const bot = getTelegramBotUsername()
   const existing = await getTelegramStatusForUser(userId)
   if (existing.connected) {
+    const preferred_locale = normalizePreferredLocale(preferredLocale)
+    if (preferred_locale) {
+      const sb = getServiceSupabase()
+      if (sb) {
+        const { error } = await sb
+          .from('user_telegram_links')
+          .update({ preferred_locale, updated_at: new Date().toISOString() })
+          .eq('user_id', userId)
+        if (error && !/preferred_locale|column/i.test(error.message)) {
+          /* ignore */
+        }
+      }
+    }
     return {
       ok: true as const,
       already_connected: true as const,
@@ -252,16 +317,28 @@ export async function createTelegramLinkStart(userId: string, email?: string | n
       const sb = getServiceSupabase()
       if (sb) {
         const now = new Date().toISOString()
-        await sb.from('user_telegram_links').upsert(
-          {
-            user_id: userId,
-            chat_id: chatId,
-            username: guest.username,
-            connected_at: guest.connected_at || now,
-            updated_at: now,
-          },
-          { onConflict: 'user_id' }
-        )
+        const preferred_locale = normalizePreferredLocale(preferredLocale)
+        const row: Record<string, unknown> = {
+          user_id: userId,
+          chat_id: chatId,
+          username: guest.username,
+          connected_at: guest.connected_at || now,
+          updated_at: now,
+        }
+        if (preferred_locale) row.preferred_locale = preferred_locale
+        const { error } = await sb.from('user_telegram_links').upsert(row, { onConflict: 'user_id' })
+        if (error && /preferred_locale|column/i.test(error.message)) {
+          await sb.from('user_telegram_links').upsert(
+            {
+              user_id: userId,
+              chat_id: chatId,
+              username: guest.username,
+              connected_at: guest.connected_at || now,
+              updated_at: now,
+            },
+            { onConflict: 'user_id' }
+          )
+        }
       }
       return {
         ok: true as const,
@@ -273,16 +350,32 @@ export async function createTelegramLinkStart(userId: string, email?: string | n
     }
   }
 
-  return insertLinkToken({ userId })
+  return insertLinkToken({ userId, preferredLocale })
 }
 
-export async function createTelegramLinkStartForGuest(email: string) {
+export async function createTelegramLinkStartForGuest(
+  email: string,
+  preferredLocale?: string | null
+) {
   const e = normalizeEmail(email)
   if (!e.includes('@')) {
     return { ok: false as const, error: 'Valid email required to connect Telegram.' }
   }
   const existing = await getTelegramStatusForGuest(e, null)
   if (existing.connected) {
+    const preferred_locale = normalizePreferredLocale(preferredLocale)
+    if (preferred_locale) {
+      const sb = getServiceSupabase()
+      if (sb) {
+        const { error } = await sb
+          .from('guest_telegram_links')
+          .update({ preferred_locale, updated_at: new Date().toISOString() })
+          .eq('guest_email', e)
+        if (error && !/preferred_locale|column/i.test(error.message)) {
+          /* ignore */
+        }
+      }
+    }
     const bot = getTelegramBotUsername()
     return {
       ok: true as const,
@@ -292,7 +385,7 @@ export async function createTelegramLinkStartForGuest(email: string) {
       connected_at: existing.connected_at,
     }
   }
-  return insertLinkToken({ guestEmail: e })
+  return insertLinkToken({ guestEmail: e, preferredLocale })
 }
 
 export async function consumeTelegramStartPayload(input: {
@@ -301,23 +394,41 @@ export async function consumeTelegramStartPayload(input: {
   startPayload: string
   languageCode?: string | null
 }): Promise<{ ok: boolean; message: string; locale: 'en' | 'am' }> {
-  const locale = resolveTgLocale({ languageCode: input.languageCode })
-  const err = (key: keyof typeof TG_ERR) => TG_ERR[key][locale]
-  const sb = getServiceSupabase()
-  if (!sb) {
-    return { ok: false, locale, message: err('svc') }
-  }
-
   const token = String(input.startPayload || '').trim()
   if (!/^c_[a-f0-9]{32}$/i.test(token)) {
+    const locale = resolveTgLocale({ languageCode: input.languageCode })
+    const err = (key: keyof typeof TG_ERR) => TG_ERR[key][locale]
     return { ok: false, locale, message: err('start') }
   }
 
-  const { data: row, error } = await sb
+  const sb = getServiceSupabase()
+  if (!sb) {
+    const locale = resolveTgLocale({ languageCode: input.languageCode })
+    return { ok: false, locale, message: TG_ERR.svc[locale] }
+  }
+
+  let { data: row, error } = await sb
     .from('telegram_link_tokens')
-    .select('token, user_id, guest_email, expires_at, used_at')
+    .select('token, user_id, guest_email, expires_at, used_at, preferred_locale')
     .eq('token', token)
     .maybeSingle()
+  if (error && /preferred_locale|column|schema cache/i.test(error.message)) {
+    ;({ data: row, error } = await sb
+      .from('telegram_link_tokens')
+      .select('token, user_id, guest_email, expires_at, used_at')
+      .eq('token', token)
+      .maybeSingle())
+  }
+
+  const preferred =
+    row && 'preferred_locale' in row
+      ? normalizePreferredLocale((row as { preferred_locale?: string | null }).preferred_locale)
+      : null
+  const locale = resolveTgLocale({
+    preferred,
+    languageCode: input.languageCode,
+  })
+  const err = (key: keyof typeof TG_ERR) => TG_ERR[key][locale]
 
   if (error || !row) {
     return { ok: false, locale, message: err('invalid') }
@@ -334,31 +445,57 @@ export async function consumeTelegramStartPayload(input: {
 
   if (row.user_id) {
     await sb.from('user_telegram_links').delete().eq('chat_id', chatId)
-    const { error: linkErr } = await sb.from('user_telegram_links').upsert(
-      {
-        user_id: row.user_id,
-        chat_id: chatId,
-        username: input.username || null,
-        connected_at: now,
-        updated_at: now,
-      },
-      { onConflict: 'user_id' }
-    )
+    const linkRow: Record<string, unknown> = {
+      user_id: row.user_id,
+      chat_id: chatId,
+      username: input.username || null,
+      connected_at: now,
+      updated_at: now,
+    }
+    if (preferred) linkRow.preferred_locale = preferred
+    let { error: linkErr } = await sb
+      .from('user_telegram_links')
+      .upsert(linkRow, { onConflict: 'user_id' })
+    if (linkErr && /preferred_locale|column/i.test(linkErr.message)) {
+      ;({ error: linkErr } = await sb.from('user_telegram_links').upsert(
+        {
+          user_id: row.user_id,
+          chat_id: chatId,
+          username: input.username || null,
+          connected_at: now,
+          updated_at: now,
+        },
+        { onConflict: 'user_id' }
+      ))
+    }
     if (linkErr) {
       return { ok: false, locale, message: `Could not save connection: ${linkErr.message}` }
     }
   } else if (row.guest_email) {
     await sb.from('guest_telegram_links').delete().eq('chat_id', chatId)
-    const { error: linkErr } = await sb.from('guest_telegram_links').upsert(
-      {
-        guest_email: normalizeEmail(row.guest_email),
-        chat_id: chatId,
-        username: input.username || null,
-        connected_at: now,
-        updated_at: now,
-      },
-      { onConflict: 'guest_email' }
-    )
+    const linkRow: Record<string, unknown> = {
+      guest_email: normalizeEmail(row.guest_email),
+      chat_id: chatId,
+      username: input.username || null,
+      connected_at: now,
+      updated_at: now,
+    }
+    if (preferred) linkRow.preferred_locale = preferred
+    let { error: linkErr } = await sb
+      .from('guest_telegram_links')
+      .upsert(linkRow, { onConflict: 'guest_email' })
+    if (linkErr && /preferred_locale|column/i.test(linkErr.message)) {
+      ;({ error: linkErr } = await sb.from('guest_telegram_links').upsert(
+        {
+          guest_email: normalizeEmail(row.guest_email),
+          chat_id: chatId,
+          username: input.username || null,
+          connected_at: now,
+          updated_at: now,
+        },
+        { onConflict: 'guest_email' }
+      ))
+    }
     if (linkErr) {
       return {
         ok: false,

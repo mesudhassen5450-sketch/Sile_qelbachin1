@@ -599,6 +599,13 @@ export async function POST(
         }
       }
 
+      const preferred_locale = String(
+        body.preferred_locale || body.locale || body.language || ''
+      )
+        .trim()
+        .toLowerCase()
+        .slice(0, 8)
+
       const row = await createQuestionSubmission({
         user_id: typeof body.user_id === 'string' ? body.user_id : null,
         auth_email: authEmail,
@@ -607,6 +614,7 @@ export async function POST(
         question,
         answer_channel,
         telegram_chat_id,
+        preferred_locale: preferred_locale || null,
       })
       // Best-effort receipt email for Email channel only
       if (answer_channel === 'email') {

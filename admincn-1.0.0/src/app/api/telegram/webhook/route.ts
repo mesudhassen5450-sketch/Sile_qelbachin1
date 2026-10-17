@@ -48,7 +48,6 @@ export async function POST(request: Request) {
   const chatId = update.message?.chat?.id
   const username = update.message?.from?.username || null
   const languageCode = update.message?.from?.language_code || null
-  const locale = resolveTgLocale({ languageCode })
 
   if (chatId == null) {
     return NextResponse.json({ ok: true })
@@ -57,6 +56,9 @@ export async function POST(request: Request) {
   if (text.startsWith('/start')) {
     const payload = text.replace(/^\/start(@\w+)?\s*/i, '').trim()
     if (!payload) {
+      const { getPreferredLocaleForChatId } = await import('@/lib/cms/telegram-link')
+      const preferred = await getPreferredLocaleForChatId(chatId)
+      const locale = resolveTgLocale({ preferred, languageCode })
       await notifyTelegramConnected(chatId, bareStartGuidanceText(locale), {
         locale,
         withReturnButton: true,
